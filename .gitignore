@@ -14,11 +14,14 @@ data/**
 !data/README.md
 !data/personal/
 !data/personal/README.md
+!data/personal/your-name/
+!data/personal/your-name/**/
+!data/personal/your-name/**/README.md
 !data/company/
 !data/company/README.md
-!data/company/_intake/
-!data/company/_intake/**/
-!data/company/_intake/**/README.md
+!data/company/your-company/
+!data/company/your-company/**/
+!data/company/your-company/**/README.md
 
 # vault/ output — your generated brain(s):
 #   vault/personal/<id>-brain/  vault/company/<co>-brain/  vault/_correlations/

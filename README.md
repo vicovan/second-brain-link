@@ -35,14 +35,14 @@
 - **Instagram** → Accounts Center → *Your information and permissions* → *Download your information* → **JSON**.
 - **Google** → [takeout.google.com](https://takeout.google.com) → select **Contacts, Calendar, YouTube, Maps, Profile**.
 
-**2 · Put the exports where the tool looks.** Unzip each into a per-source folder under an entity named after you:
+**2 · Put the exports where the tool looks.** The repo ships two rename-me template folders — `data/personal/your-name/` and `data/company/your-company/` — each with the source subfolders ready. **Rename `your-name` to your actual name** (e.g. `data/personal/jane/`), then unzip each export into the matching source subfolder:
 ```
-data/personal/<you>/linkedin/…
-data/personal/<you>/facebook/…      ← the unzipped "facebook-<name>-…" folder
-data/personal/<you>/instagram/…
-data/personal/<you>/google/…        ← your Takeout/ folder
+data/personal/jane/linkedin/…
+data/personal/jane/facebook/…      ← the unzipped "facebook-<name>-…" folder
+data/personal/jane/instagram/…
+data/personal/jane/google/…        ← your Takeout/ folder
 ```
-(One source is fine too. A company brain goes under `data/company/<org>/<source>/…`.) The **folder name is the entity**; multiple people/orgs each get their own brain.
+(One source is fine too. A company brain goes under `data/company/<org>/<source>/…` — rename `your-company` the same way.) The **folder name becomes your brain** (`vault/personal/jane-brain/`); multiple people/orgs each get their own. If you forget to rename and just drop files into `your-name/`, the builder still works — it names the brain after the identity it detects and prints a tip to rename the folder.
 
 **3 · Get the skill into your agent.** Clone, then build + install the Agent Skill for Claude Code and/or OpenAI Codex:
 ```bash
@@ -330,11 +330,20 @@ Grab one source or several — the tool detects and merges whatever you give it.
 
 ### Step 2 — Put the archive(s) in the `data/` folder, by entity
 Organize exports by **entity** — one folder per identity/company. **The folder
-name is the entity name.**
+name is the entity name** (it becomes your brain's name). The repo ships two
+**rename-me template folders** so the layout is obvious — `data/personal/your-name/`
+and `data/company/your-company/`, each with the source subfolders + READMEs.
+
+> **Rename the template folders first.** Change `your-name` to your real name
+> (e.g. `data/personal/jane/`) and `your-company` to your company before adding
+> data — that name becomes the vault (`vault/personal/jane-brain/`). If you skip
+> the rename and just drop files into `your-name/`, the build still succeeds: it
+> names the brain after the identity it detects and prints a tip reminding you to
+> rename the folder.
 
 ```
 data/
-├── personal/<you>/linkedin/   …/facebook/  …/instagram/  …/google/    # a digital twin
+├── personal/jane/linkedin/   …/facebook/  …/instagram/  …/google/    # a digital twin
 │   personal/<someone-else>/…                                          # another identity
 └── company/<your-company>/linkedin_company/  …/google_workspace/  …/slack/   # a Company Brain
 ```

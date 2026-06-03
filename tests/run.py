@@ -17,6 +17,7 @@ Usage: python3 tests/run.py
 """
 import json
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -513,6 +514,31 @@ def test_analyze_org_trim_identity():
         vault_invariants(brain, "analyze", [])
 
 
+def test_template_folder_autoname():
+    """A user may drop a real export into the shipped rename-me template folder
+    (data/personal/your-name/) without renaming it. The builder must NOT ship a
+    'your-name-brain' — it names the brain after the detected identity instead.
+    Build a data root with personal/your-name/<owner instagram fixture> and assert
+    the brain folder is the identity slug ('owner-realname-brain'), not 'your-name'."""
+    owner_ig = FIXTURES / "personal" / "owner" / "instagram"
+    if not owner_ig.is_dir():
+        return
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d) / "data"
+        (root / "personal").mkdir(parents=True)
+        shutil.copytree(owner_ig, root / "personal" / "your-name" / "instagram")
+        out = Path(d) / "v"
+        r = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"), str(root),
+                            "-o", str(out)], capture_output=True, text=True)
+        check("template: build runs", r.returncode == 0, r.stderr[-300:])
+        check("template: brain NOT named your-name-brain",
+              not (out / "personal" / "your-name-brain").exists())
+        check("template: brain named after detected identity (owner-realname-brain)",
+              (out / "personal" / "owner-realname-brain").exists(),
+              "\n".join(p.name for p in (out / "personal").iterdir()) if (out / "personal").is_dir() else "(none)")
+        check("template: prints rename tip", "rename-me template" in (r.stdout + r.stderr))
+
+
 def test_facebook_mapping():
     """Build the fbtest fixture (a Facebook export) and assert the comprehensive
     mapping: friends→people (tagged source/facebook + person/friend), ad-interests→
@@ -631,6 +657,7 @@ def main():
     test_places_and_mappings_build()
     test_harvester_rescues_unmapped()
     test_analyze_org_trim_identity()
+    test_template_folder_autoname()
     test_facebook_mapping()
     test_data_catalog()
     # Per-source fixtures live at tests/fixtures/<personal|company>/<entity>/<source>/.

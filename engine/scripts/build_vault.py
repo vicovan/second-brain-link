@@ -1041,12 +1041,20 @@ def _build_one(mods, root, file_index, all_paths, out, subj, emit_names, full,
     return col, sources_used, consumed_keys
 
 
+# Folder names the repo ships as rename-me templates (data/personal/your-name,
+# data/company/your-company). If a user drops a real export in WITHOUT renaming,
+# run_multi names the brain after the detected identity instead (see below).
+PLACEHOLDER_ENTITIES = {"your-name", "your-company"}
+
+
 def discover_entities(root: Path):
     """If `root` uses the named-entity layout (personal/<name>/… and/or
-    company/<name>/…), return a list of {kind, name, path}. A child dir whose name
-    starts with '_' (e.g. company/_intake) is treated as a template, not an entity,
-    and skipped if it has no recognizable data. Returns [] if `root` is a plain
-    single export (back-compat — caller falls back to run())."""
+    company/<name>/…), return a list of {kind, name, path}. A child dir is treated
+    as a template (not an entity) and skipped when it has no recognizable data — so
+    the shipped `personal/your-name/` and `company/your-company/` placeholders (only
+    READMEs) are ignored until a real export is added. A name starting with '_' or
+    '.' is always skipped. Returns [] if `root` is a plain single export (back-compat
+    — caller falls back to run())."""
     entities = []
     for kind, sub in (("person", "personal"), ("company", "company")):
         base = root / sub
@@ -1092,10 +1100,31 @@ def run_multi(root: Path, out: Path, emit_names="obsidian", full=False, correlat
             mods = srcs                   # fall back to whatever matched
         col, used, _ = _build_one(mods, e["path"], fi, ap_, target,
                                   e["kind"], emit_names, full)
-        col.entity_name = e["name"]; col.entity_kind = e["kind"]
+        name = e["name"]
+        # Graceful fallback: a user may drop a real export into the shipped template
+        # folder (your-name/ · your-company/) WITHOUT renaming it. Rather than ship a
+        # "your-name-brain", name the brain after the detected identity and tell them
+        # to rename the data folder. (The in-vault content already uses the identity
+        # name, not the folder name, so renaming the dir afterward is safe.)
+        if name.lower().replace("_", "-") in PLACEHOLDER_ENTITIES:
+            real = (col.subject_entity or col.identity.get("name", "") or "").strip()
+            slug = re.sub(r"[^a-z0-9]+", "-", real.lower()).strip("-")
+            folder = "personal" if e["kind"] == "person" else "company"
+            if slug and not (target.parent / f"{slug}-brain").exists():
+                new_target = target.parent / f"{slug}-brain"
+                target.rename(new_target); target = new_target
+                print(f"  ⚠ '{name}/' is the rename-me template folder — built the brain "
+                      f"as '{slug}-brain' from the detected identity \"{real}\". "
+                      f"Tip: rename data/{folder}/{name} → data/{folder}/{slug} to make it explicit.")
+                name = slug
+            else:
+                print(f"  ⚠ '{name}/' is the rename-me template folder — rename "
+                      f"data/{folder}/{name} to your real name/company so the brain "
+                      f"isn't called '{name}-brain'.")
+        col.entity_name = name; col.entity_kind = e["kind"]
         col.entity_vault = target
         cols.append(col)
-        print(f"  ✓ {e['kind']}:{e['name']} → {target}")
+        print(f"  ✓ {e['kind']}:{name} → {target}")
 
     if correlate and len(cols) >= 2:
         import correlate as _corr

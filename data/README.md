@@ -13,21 +13,25 @@ across entities). Put each source export in its own subfolder under the entity:
 ```
 data/
 ├── personal/                       # digital twins (one folder per identity)
-│   ├── <you>/
+│   ├── your-name/                  # ← TEMPLATE: rename to your real name
 │   │   ├── linkedin/               #   your LinkedIn export
 │   │   ├── facebook/               #   your Facebook export (JSON)
 │   │   ├── instagram/              #   your Instagram export (JSON)
 │   │   └── google/                 #   your Google Takeout export
 │   └── <someone-else>/…            # another identity → its own brain
 └── company/                        # Company Brains (one folder per company)
-    └── <your-company>/
+    └── your-company/               # ← TEMPLATE: rename to your real company
         ├── linkedin_company/       #   LinkedIn company export (CSV)
         ├── google_workspace/       #   Workspace export (mixed)
         └── slack/                  #   Slack export (JSON)
 ```
 
-Folders beginning with `_` or `.` (e.g. a `company/_intake/` template directory)
-are **skipped** by entity discovery — use them for notes/templates, not data.
+This repo ships those two folders — `personal/your-name/` and
+`company/your-company/` — as **templates** (source subfolders + READMEs) so the
+layout is obvious. **Rename each to your real name / company**, then drop your
+exports in. While a folder holds only READMEs it's **skipped** by entity discovery,
+so it's harmless to leave in place until you add data. (Folders beginning with `_`
+or `.` are also always skipped — handy for notes/templates.)
 
 You only need to fill the folders for the source(s) and entit(ies) you have — one
 identity with one source is fine; several of each is fine.
