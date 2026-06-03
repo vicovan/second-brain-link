@@ -1,0 +1,16 @@
+[
+  {
+    "timestamp": 1600000000,
+    "data": [
+      {
+        "place": {
+          "name": "Blue Bottle Coffee",
+          "coordinate": {
+            "latitude": 37.77,
+            "longitude": -122.41
+          }
+        }
+      }
+    ]
+  }
+]

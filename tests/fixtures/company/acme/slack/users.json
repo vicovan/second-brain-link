@@ -1,0 +1,8 @@
+[
+  {"id": "U001", "name": "grace", "deleted": false, "is_bot": false,
+   "profile": {"real_name": "Grace Hopper", "title": "VP Engineering", "email": "ghopper@example.com"}},
+  {"id": "U002", "name": "alan", "deleted": false, "is_bot": false,
+   "profile": {"real_name": "Alan Turing", "title": "Principal Scientist", "email": "aturing@example.com"}},
+  {"id": "UBOT", "name": "slackbot", "deleted": false, "is_bot": true,
+   "profile": {"real_name": "Slackbot"}}
+]

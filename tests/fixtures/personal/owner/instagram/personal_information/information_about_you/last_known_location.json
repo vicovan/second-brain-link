@@ -1,0 +1,8 @@
+{
+  "account_history_imprecise_last_known_location": [
+    { "title": "",
+      "string_map_data": {
+        "Precise latitude": { "value": "48.8584" },
+        "Precise longitude": { "value": "2.2945" } } }
+  ]
+}

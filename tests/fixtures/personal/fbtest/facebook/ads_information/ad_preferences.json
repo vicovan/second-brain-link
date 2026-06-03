@@ -1,0 +1,18 @@
+[
+  {
+    "label_values": [
+      {
+        "label": "Interest",
+        "value": "SaaS"
+      }
+    ]
+  },
+  {
+    "label_values": [
+      {
+        "label": "Interest",
+        "value": "Venture capital"
+      }
+    ]
+  }
+]

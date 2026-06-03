@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Privacy & security
+    url: https://secondbrainlink.com
+    about: Second Brain Link runs 100% locally and makes zero network calls. Never attach a real export or vault to an issue — share only the PII-safe schema_map.md excerpt.

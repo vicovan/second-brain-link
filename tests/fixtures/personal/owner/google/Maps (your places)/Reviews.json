@@ -1,0 +1,12 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [2.3499, 48.8530] },
+      "properties": { "date": "2023-07-01T09:00:00Z",
+                      "google_maps_url": "https://maps.google.com/?cid=3",
+                      "five_star_rating_published": 5,
+                      "review_text_published": "Best coffee in the Marais.",
+                      "location": { "name": "Cafe Marais", "address": "10 Rue de Bretagne, Paris", "country_code": "FR" } } }
+  ]
+}

@@ -1,0 +1,20 @@
+name: tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Run test harness (stdlib only — no install step)
+        run: python3 tests/run.py
+      - name: Engine is the single source of truth (provider manifests are thin)
+        run: |
+          test -f engine/scripts/build_vault.py
+          test -f engine/scripts/diagrams.py
+          test -f providers/claude/SKILL.md
+          test -f providers/openai/SKILL.md
+      - name: Skill packages cleanly for both providers
+        run: python3 packaging/build_skill.py all

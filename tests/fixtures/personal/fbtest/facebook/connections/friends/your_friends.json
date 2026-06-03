@@ -1,0 +1,12 @@
+{
+  "friends_v2": [
+    {
+      "name": "Bob Builder",
+      "timestamp": 1600000000
+    },
+    {
+      "name": "Carla Vega",
+      "timestamp": 1610000000
+    }
+  ]
+}

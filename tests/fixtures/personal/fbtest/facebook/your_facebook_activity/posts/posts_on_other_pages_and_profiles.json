@@ -1,0 +1,16 @@
+[
+  {
+    "timestamp": 1700000000,
+    "media": [],
+    "label_values": [
+      {
+        "label": "Message",
+        "value": "Congrats on the launch, legend!"
+      },
+      {
+        "label": "Detected dialect",
+        "value": "English"
+      }
+    ]
+  }
+]

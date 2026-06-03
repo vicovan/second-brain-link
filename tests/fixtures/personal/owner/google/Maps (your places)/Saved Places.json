@@ -1,0 +1,15 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [2.2945, 48.8584] },
+      "properties": { "date": "2023-05-01T10:00:00Z",
+                      "google_maps_url": "https://maps.google.com/?cid=1",
+                      "location": { "name": "Eiffel Tower", "address": "Champ de Mars, Paris", "country_code": "FR" } } },
+    { "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-122.4194, 37.7749] },
+      "properties": { "date": "2023-06-01T12:00:00Z",
+                      "google_maps_url": "https://maps.google.com/?cid=2",
+                      "location": { "name": "Ferry Building", "address": "1 Ferry Bldg, San Francisco", "country_code": "US" } } }
+  ]
+}

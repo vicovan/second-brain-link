@@ -1,0 +1,6 @@
+{
+  "contacts_contact_info": [
+    { "string_map_data": { "First Name": { "value": "Synced Contact One" } } },
+    { "string_map_data": { "First Name": { "value": "Synced Contact Two" } } }
+  ]
+}
