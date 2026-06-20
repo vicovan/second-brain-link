@@ -1,15 +1,15 @@
-# Second Brain Link
+<h1><img src="docs/logo.svg" height="28" align="middle" style="vertical-align:-0.04em" alt="">&nbsp;Second Brain Link</h1>
 
-![Second Brain Link — turning scattered data into your private AI twin](docs/Building_a_Private_AI_Twin.png)
+![Second Brain Link — your data, linked into one AI-queryable brain](docs/cover.png)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-182%20passing-brightgreen)](tests/run.py)
-<!-- Once the repo is on GitHub and Actions has run once, you can swap the line above for the live badge:
-[![Tests](https://github.com/vicovan/second-brain-link/actions/workflows/tests.yml/badge.svg)](https://github.com/vicovan/second-brain-link/actions/workflows/tests.yml) -->
+[![Tests](https://github.com/vicovan/second-brain-link/actions/workflows/tests.yml/badge.svg)](https://github.com/vicovan/second-brain-link/actions/workflows/tests.yml)
 [![Local-first](https://img.shields.io/badge/local--first-zero%20network-brightgreen)](#privacy-details)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![Website](https://img.shields.io/badge/site-SecondBrainLink.com-1f6feb)](https://secondbrainlink.com)
+[![Try Studio](https://img.shields.io/badge/▶_try-Brain%20Studio-7c5cff)](https://secondbrainlink.com/studio)
+[![Download app](https://img.shields.io/badge/⬇_desktop%20app-Mac%20·%20Windows%20·%20Linux-1f6feb)](https://github.com/vicovan/second-brain-studio-releases/releases/latest)
 
 **Bootstrap a brain — personal or company — from the data you already have. Turn your exports (LinkedIn, Facebook, Instagram, Google) — or your org's (LinkedIn Company, Google Workspace, Slack) — into a private, local, AI-queryable digital twin, on your machine, working *for* you.**
 
@@ -24,6 +24,45 @@
 > Your life is scattered across platforms — connections on LinkedIn, friends on Facebook, follows on Instagram, contacts and calendar in Google. Each gives you a data export, and each sits dead in a zip. Second Brain Link pulls them into **one** structured knowledge vault your AI can think with — and the same person across two networks becomes a single, richer note. Give it a goal — **Get Me Hired**, **Get My Startup Funded** — and it works your whole network to get you there.
 
 **Multi-source by design.** LinkedIn and Facebook are full adapters today; Instagram and Google Takeout are supported now, and the architecture adds any future network with a data export through a single drop-in adapter file. One vault, every source — and every note tagged by source so the **graph** shows all of it connected.
+
+---
+
+## 🎨 Second Brain Studio — see & talk to your brain (web + desktop)
+
+**Studio is the visual front door to a built brain.** Explore the cross-source **graph**, browse the **dashboard** and individual **notes**, and **talk to your brain** in plain English (*"who are my warmest intros to a Series A investor?"*). It runs right in your **browser**, or as a native **desktop app** (Mac · Windows · Linux) that drives **Claude Code / Codex locally** over your vault — your data never leaves your machine.
+
+![Second Brain Studio — the desktop app](docs/studio-shot-desktop.png)
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/studio-shot.png" alt="Web Studio — a personal brain"></td>
+    <td width="50%"><img src="docs/studio-shot-company.png" alt="Web Studio — a company brain"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Web Studio</b> · a personal brain (digital twin)</sub></td>
+    <td align="center"><sub><b>Web Studio</b> · a company brain</sub></td>
+  </tr>
+</table>
+
+### Get Studio
+
+- **▶ Try it in your browser — no install** → **[secondbrainlink.com/studio](https://secondbrainlink.com/studio)**
+- **⬇ Download the desktop app** — all downloads + release notes on the **[latest release](https://github.com/vicovan/second-brain-studio-releases/releases/latest)**:
+
+  | Platform | Download |
+  |---|---|
+  | **macOS** (Apple Silicon) | [`SecondBrainStudio-mac-arm64.dmg`](https://github.com/vicovan/second-brain-studio-releases/releases/latest/download/SecondBrainStudio-mac-arm64.dmg) |
+  | **macOS** (Intel) | [`SecondBrainStudio-mac-x64.dmg`](https://github.com/vicovan/second-brain-studio-releases/releases/latest/download/SecondBrainStudio-mac-x64.dmg) |
+  | **Windows** 10/11 (x64) | [`SecondBrainStudio-windows-x64.exe`](https://github.com/vicovan/second-brain-studio-releases/releases/latest/download/SecondBrainStudio-windows-x64.exe) |
+  | **Linux** (AppImage) | [`SecondBrainStudio-linux-x64.AppImage`](https://github.com/vicovan/second-brain-studio-releases/releases/latest/download/SecondBrainStudio-linux-x64.AppImage) |
+
+  > Builds are **unsigned**. **macOS:** right-click the app ▸ *Open* (or `xattr -dr com.apple.quarantine "/Applications/Second Brain Studio.app"`). **Windows:** SmartScreen ▸ *More info* ▸ *Run anyway*.
+
+- **⬇ Prefer a one-file Agent Skill install?** Drop the prebuilt `.skill` straight into your agent (no clone, no build):
+  - **[Claude Code skill](https://github.com/vicovan/second-brain-link/raw/main/dist/claude/second-brain-link.skill)** — `dist/claude/second-brain-link.skill`
+  - **[OpenAI Codex skill](https://github.com/vicovan/second-brain-link/raw/main/dist/openai/second-brain-link.skill)** — `dist/openai/second-brain-link.skill`
+
+> **How it fits together:** Second Brain Link (this repo) **builds** the vault from your exports; **Studio** is how you **see and use** it. Build with the skill below (or the CLI), then open the vault in Studio — or in [Obsidian](https://obsidian.md), or any AI agent.
 
 ---
 
@@ -519,4 +558,6 @@ data is yours. This tool is everyone's.
 
 ---
 
-<sub>Built by <b>Adrian Vicovan</b> · <a href="https://secondbrainlink.com">SecondBrainLink.com</a> · MIT licensed · © 2026</sub>
+<p align="center"><img src="docs/og.png" width="600" alt="Second Brain Link — your data, linked into one AI-queryable brain"></p>
+
+<p align="center"><sub>Built by <b>Adrian Vicovan</b> · <a href="https://secondbrainlink.com">SecondBrainLink.com</a> · MIT licensed · © 2026</sub></p>
