@@ -1,4 +1,4 @@
-<h1><img src="docs/logo.svg" height="28" align="middle" style="vertical-align:-0.04em" alt="">&nbsp;Second Brain Link</h1>
+<h1><img src="docs/logo.svg" height="30" align="middle" alt="">&nbsp;Second Brain Link</h1>
 
 ![Second Brain Link — your data, linked into one AI-queryable brain](docs/cover.png)
 
