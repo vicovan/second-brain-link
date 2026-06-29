@@ -366,13 +366,16 @@ def test_mapping_engine():
     vec = {"label_values": [{"label": "Friend suggestions", "vec": [{"value": "Ann"}, {"value": "Bob"}]}]}
     check("selector: label predicate + vec",
           rf(vec, "label_values[label=Friend suggestions].vec[].value") == ["Ann", "Bob"])
-    # mapping-wins: instagram + google + facebook are JsonMapping, linkedin is a module
+    # mapping-wins: instagram + facebook are JsonMapping, linkedin/google are modules
+    # (google is a Python adapter — Takeout mixes vCard/ICS/HTML the mapping can't parse)
     import sources
     sources.register_mappings()
-    check("mapping wins over .py (instagram/google/facebook)",
+    check("mapping wins over .py (instagram/facebook)",
           all(type(sources.BY_NAME[n]).__name__ == "JsonMapping"
-              for n in ("instagram", "google", "facebook")), str({n: type(sources.BY_NAME[n]).__name__ for n in ("instagram","google","facebook","linkedin")}))
-    check("python adapter kept (linkedin)", type(sources.BY_NAME["linkedin"]).__name__ == "module")
+              for n in ("instagram", "facebook")), str({n: type(sources.BY_NAME[n]).__name__ for n in ("instagram","facebook","linkedin","google")}))
+    check("python adapter kept (linkedin, google)",
+          type(sources.BY_NAME["linkedin"]).__name__ == "module"
+          and type(sources.BY_NAME["google"]).__name__ == "module")
 
 
 def test_places_and_mappings_build():
@@ -417,6 +420,60 @@ def test_places_and_mappings_build():
         leak = [p.name for p in brain.rglob("*.md")
                 if "_quarantine" not in p.parts and EMAIL.search(p.read_text(encoding="utf-8", errors="replace"))]
         check("mappings: default-mode PII clean", not leak, str(leak[:3]))
+
+
+def test_google_takeout_subsources():
+    """The Google Python adapter ingests the multi-FORMAT sub-products the old JSON
+    mapping couldn't: vCard contacts, .ics calendar, labeled-places GeoJSON, Saved
+    place-list CSV, YouTube subscriptions + search-history HTML — across a Takeout
+    tree — landing in the right layers with PII clean in default mode."""
+    with tempfile.TemporaryDirectory() as d:
+        g = Path(d) / "personal" / "adi" / "google" / "Takeout"
+        (g / "Contacts").mkdir(parents=True)
+        (g / "Calendar").mkdir()
+        (g / "Maps" / "My labeled places").mkdir(parents=True)
+        (g / "Saved").mkdir()
+        yt = g / "YouTube and YouTube Music"
+        (yt / "subscriptions").mkdir(parents=True)
+        (yt / "history").mkdir()
+        # vCard: one real contact (with an email that must NOT leak) + one email-only (dropped)
+        (g / "Contacts" / "All Contacts.vcf").write_text(
+            "BEGIN:VCARD\nVERSION:3.0\nFN:Grace Hopper\nORG:US Navy\nTITLE:Rear Admiral\n"
+            "EMAIL;TYPE=INTERNET:grace@example.com\nEND:VCARD\n"
+            "BEGIN:VCARD\nVERSION:3.0\nitem1.EMAIL;TYPE=INTERNET:spam@example.com\nEND:VCARD\n")
+        (g / "Calendar" / "cal.ics").write_text(
+            "BEGIN:VCALENDAR\nBEGIN:VEVENT\nSUMMARY:Team Offsite\nDTSTART:20240615T090000Z\n"
+            "END:VEVENT\nEND:VCALENDAR\n")
+        (g / "Maps" / "My labeled places" / "Labeled places.json").write_text(json.dumps({
+            "features": [{"type": "Feature",
+                          "geometry": {"type": "Point", "coordinates": [27.58, 47.14]},
+                          "properties": {"name": "Home", "address": "Carpati 7, Iasi"}}]}))
+        (g / "Saved" / "Want to go.csv").write_text(
+            "Title,Note,URL,Tags,Comment\nTokyo Tower,,https://maps.google.com/?cid=9,,must visit\n")
+        (yt / "subscriptions" / "subscriptions.csv").write_text(
+            "Channel Id,Channel Url,Channel Title\nUC1,http://x,Veritasium\n")
+        (yt / "history" / "search-history.html").write_text(
+            'Searched for <a href="https://www.youtube.com/results?search_query=neural+nets">'
+            'neural nets</a>')
+        out = Path(d) / "v"
+        r = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"),
+                            str(Path(d)), "-o", str(out)], capture_output=True, text=True)
+        check("google: build runs", r.returncode == 0, r.stderr[-300:])
+        brain = out / "personal" / "adi-brain"
+        brain = brain if brain.is_dir() else out
+        allmd = "\n".join(p.read_text() for p in brain.rglob("*.md"))
+        check("google: vCard contact → person", "Grace Hopper" in allmd)
+        check("google: email-only vCard dropped", "spam@example.com" not in allmd)
+        check("google: .ics event captured", "Team Offsite" in allmd)
+        check("google: labeled place → 85-places",
+              (brain / "85-places").is_dir() and "Home" in allmd)
+        check("google: Saved-list place captured", "Tokyo Tower" in allmd)
+        check("google: YouTube subscription → interest", "Veritasium" in allmd)
+        check("google: search-history → search log", "neural nets" in allmd)
+        leak = [p.name for p in brain.rglob("*.md")
+                if "_quarantine" not in p.parts
+                and EMAIL.search(p.read_text(encoding="utf-8", errors="replace"))]
+        check("google: default-mode PII clean (vCard email not leaked)", not leak, str(leak[:3]))
 
 
 def test_harvester_rescues_unmapped():
@@ -655,6 +712,7 @@ def main():
     test_multi_entity_and_correlation()
     test_mapping_engine()
     test_places_and_mappings_build()
+    test_google_takeout_subsources()
     test_harvester_rescues_unmapped()
     test_analyze_org_trim_identity()
     test_template_folder_autoname()

@@ -385,6 +385,13 @@ class VaultWriter:
         counts = getattr(self.col, "_li_company_counts", Counter())
         min_refs = getattr(self.col, "min_org_refs", 1)
         orgs = dict(self.col.orgs)
+        # Reverse index: which known people are at each org → list them in the org's
+        # body so an org node carries real context, not just a title.
+        people_by_org = {}
+        for pr in self.col.people.values():
+            cn = (pr.get("company") or "").strip()
+            if cn:
+                people_by_org.setdefault(nk(cn), []).append(pr)
         # ensure every merely-referenced company also gets a note so links resolve
         for c in self.col.companies:
             orgs.setdefault(c, {"category": "referenced", "sources": set()})
@@ -412,8 +419,21 @@ class VaultWriter:
             sub = "_mentions" if thin else ""
             if thin:
                 pruned += 1
+            # Body context: category line + the people known at this org.
+            ctx = []
+            cat = meta.get("category", "referenced")
+            if cat and cat != "referenced":
+                ctx.append(f"_{cat}_\n")
+            folks = people_by_org.get(nk(name), [])
+            if folks:
+                ctx.append(f"## People here ({len(folks)})\n")
+                for pr in sorted(folks, key=lambda x: x["name"].lower())[:50]:
+                    role = (pr.get("role") or "").strip()
+                    ctx.append(f"- [[{obsidian_name(pr['name'])}]]" + (f" — {role}" if role else ""))
+                ctx.append("")
+            ctx_body = ("\n".join(ctx) + "\n") if ctx else ""
             write(self.out / "15-organizations" / sub / f"{title}.md",
-                  note + f"\n\n# {title}\n" + details)
+                  note + f"\n\n# {title}\n\n" + ctx_body + details)
         self._orgs_count = len(seen)
         self._orgs_pruned = pruned
         if pruned:
@@ -558,7 +578,12 @@ class VaultWriter:
             lines = [fm({"type": "events",
                          "tags": note_tags(["events"], ev_sources)}), "", "# Events\n"]
             for e in c.events:
-                lines.append(f"- {e['name']} — {e['date']}".rstrip(" —"))
+                line = f"- {e['name']} — {e['date']}".rstrip(" —")
+                if e.get("location"):
+                    line += f" · 📍 {e['location']}"
+                lines.append(line)
+                if e.get("description"):
+                    lines.append(f"  - {e['description']}")
             write(self.out / "60-learning" / "events.md", "\n".join(lines))
         if any(c.services.values()):
             d = self.out / "70-services"
@@ -574,40 +599,41 @@ class VaultWriter:
     # 85 — places (saved/reviewed locations: Google Maps, IG locations)
     def places(self):
         """Write the `85-places/` layer from the Collector's places bucket (Google
-        Maps saved/reviewed, IG locations): an index note plus one note per place,
-        filename==place name (obsidian_name) so the index `[[X]]` links resolve.
+        Maps saved/reviewed, IG locations): ONE note per place, filename==place name
+        (obsidian_name), each carrying its full detail (address, lat/lng, map link,
+        lists, review) — exactly like people/orgs get one note each. No aggregate
+        `places.md` index: an index that `[[links]]` thousands of places became one
+        giant graph hub the whole graph clustered under (and a confusing mega-note).
         No-op when there are no places."""
         c = self.col
         if not c.places:
             return
         d = self.out / "85-places"
-        # one index note + a note per place (entity-name == filename so links resolve)
-        saved = [p for p in c.places.values() if p.get("kind") != "reviewed"]
-        reviewed = [p for p in c.places.values() if p.get("kind") == "reviewed"]
-        idx = [fm({"type": "places", "title": "Places", "tags": ["places"],
-                   "count": len(c.places)}), "",
-               f"# Places ({len(c.places)})\n",
-               f"{len(saved)} saved · {len(reviewed)} reviewed. Locations you saved "
-               "or reviewed (Google Maps, check-ins).\n"]
-        for p in sorted(c.places.values(), key=lambda x: x["name"].lower())[:500]:
-            link_md = f" — [map]({p['url']})" if p.get("url") else ""
-            idx.append(f"- [[{obsidian_name(p['name'])}]]"
-                       + (f" · {p['address']}" if p.get("address") else "") + link_md)
-        write(d / "places.md", "\n".join(idx))
         for p in c.places.values():
             lat, lng = p.get("lat", ""), p.get("lng", "")
-            note = fm({"type": "place", "title": obsidian_name(p["name"]),
-                       "tags": note_tags(["place", f"place/{_tag_slug(p.get('kind','place'))}"],
-                                         p.get("sources", []), p.get("tags")),
-                       "address": p.get("address", ""), "url": p.get("url", ""),
-                       "lat": lat, "lng": lng,
-                       # combined key the Obsidian "Map View" plugin reads by default,
-                       # so saved places plot on a map with no extra config.
-                       "location": f"{lat},{lng}" if (lat and lng) else "",
-                       "created": p.get("date", ""), "sources": sorted(p.get("sources", []))})
+            lists = sorted(p.get("lists", []))
+            list_tags = [f"place/list/{_tag_slug(x)}" for x in lists]
+            fmd = {"type": "place", "title": obsidian_name(p["name"]),
+                   "tags": note_tags(["place", f"place/{_tag_slug(p.get('kind','place'))}"]
+                                     + list_tags,
+                                     p.get("sources", []), p.get("tags")),
+                   "address": p.get("address", ""), "url": p.get("url", ""),
+                   "lat": lat, "lng": lng,
+                   # combined key the Obsidian "Map View" plugin reads by default,
+                   # so saved places plot on a map with no extra config.
+                   "location": f"{lat},{lng}" if (lat and lng) else ""}
+            if lists:
+                fmd["lists"] = lists
+            fmd["created"] = p.get("date", "")
+            fmd["sources"] = sorted(p.get("sources", []))
+            note = fm(fmd)
             body = note + f"\n\n# {p['name']}\n"
             if p.get("address"):
                 body += f"\n{p['address']}\n"
+            if lists:
+                body += f"\nSaved in: {', '.join(lists)}\n"
+            if p.get("url"):
+                body += f"\n[View on Google Maps]({p['url']})\n"
             if p.get("note"):
                 body += f"\n## My review\n\n{p['note']}\n"
             write(d / f"{obsidian_name(p['name'])}.md", body)

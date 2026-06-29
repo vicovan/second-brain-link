@@ -252,7 +252,8 @@ class Collector:
         self.ad_segments = []
         self.searches = []
         self.events = []                    # {name, date}
-        self.places = {}                    # nk(name) -> {name,address,lat,lng,url,kind,note}
+        self.places = {}                    # key -> {name,address,lat,lng,url,kind,note,lists}
+        self._place_index = {}              # nk(name) -> [place rec, …] (merge lookup)
         self.learning_count = 0
         self.services = Counter()           # label -> n
         self.msg_signal = {}                # nk(name) -> (count, last_iso)
@@ -369,31 +370,60 @@ class Collector:
                            "url": url, "source": source, "tags": tags})
 
     def add_place(self, source, name="", address="", lat="", lng="", url="",
-                  kind="place", note="", date="", tags=None):
+                  kind="place", note="", date="", tags=None, category=""):
         """A geographic place — saved/reviewed location (Google Maps, IG locations).
-        Keyed by normalized name (+ address) so re-saves dedupe. `note` is the
-        owner's own review text; it's run through strip_pii like any free text.
-        `tags` are semantic tags merged across sources (rendered with source/type)."""
+        Merged by normalized name so the SAME place seen in more than one source —
+        e.g. a bare entry from a saved-list CSV (title + URL only) and the rich
+        GeoJSON entry (address + coordinates) — becomes ONE node carrying the union
+        of details, instead of two thin duplicates. Precision-biased: two places that
+        share a name but have different non-empty addresses stay separate (a wrong
+        merge is worse than a miss). `category` is the saved-list it came from
+        (e.g. "Favorite places", "Want to go"), collected into `lists`. `note` is the
+        owner's own review text; strip_pii'd. `tags` are semantic tags merged across
+        sources (rendered with source/type)."""
         name = fix_mojibake((name or "").strip())
         if not name:
             return
         self.sources.add(source)
-        key = nk(name) + "|" + nk(address)
-        rec = self.places.get(key)
+        address = (address or "").strip()
         note = fix_mojibake(strip_pii((note or "").strip()))
         tags = {str(t).strip() for t in (tags or []) if str(t).strip()}
+        category = (category or "").strip()
+        na = nk(address)
+        # Find an existing place with the same name whose address is compatible
+        # (one side empty, or equal) → merge. Else this is a distinct place.
+        base = nk(name)
+        rec = None
+        for p in self._place_index.get(base, ()):
+            pa = nk(p.get("address", ""))
+            if not pa or not na or pa == na:
+                rec = p
+                break
         if rec is None:
-            self.places[key] = {"name": name, "address": (address or "").strip(),
-                                "lat": str(lat or ""), "lng": str(lng or ""),
-                                "url": url or "", "kind": kind,
-                                "note": note, "date": iso_date(date),
-                                "sources": {source}, "tags": set(tags)}
+            key = base if base not in self.places else base + "|" + na
+            rec = {"name": name, "address": address,
+                   "lat": str(lat or ""), "lng": str(lng or ""),
+                   "url": url or "", "kind": kind,
+                   "note": note, "date": iso_date(date),
+                   "sources": {source},
+                   "tags": set(tags),
+                   "lists": {category} if category else set()}
+            self.places[key] = rec
+            self._place_index.setdefault(base, []).append(rec)
         else:
             rec["sources"].add(source)
             rec.setdefault("tags", set()).update(tags)
-            for k, v in (("address", address), ("url", url), ("note", note)):
+            if category:
+                rec.setdefault("lists", set()).add(category)
+            # Fill any missing scalar from this sighting (don't overwrite richer data).
+            for k, v in (("address", address), ("url", url), ("note", note),
+                         ("lat", str(lat or "")), ("lng", str(lng or "")),
+                         ("date", iso_date(date))):
                 if v and not rec.get(k):
                     rec[k] = v
+            # A real review/coordinates upgrade a bare "saved" pin to its richer kind.
+            if kind == "reviewed" or (kind == "labeled" and rec.get("kind") == "saved"):
+                rec["kind"] = kind
 
     def add_comment(self, source, text="", date=""):
         """Record one of the owner's own comments. Privacy: text is strip_pii'd
