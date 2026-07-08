@@ -1,0 +1,81 @@
+{
+  "_comment": "TikTok data export (choose the JSON 'machine-readable' option → user_data_tiktok.json) — interpreted by engine/scripts/mapping.py. Following → light people, favorite/liked hashtags + videos → interests (the taste graph), search history → 80-search, profile → identity. Privacy: Direct Messages chat text lives in the SAME file but no rule selects it — bodies never enter the vault. Quarantine entries are EXACT norm_file keys.",
+  "name": "tiktok",
+  "subject": "person",
+  "detect": {
+    "any_key": ["userdatatiktok", "userdata_tiktok"],
+    "path_contains": ["user_data_tiktok"]
+  },
+  "quarantine": [],
+  "records": [
+    {
+      "match": { "name_contains": ["user_data_tiktok"], "suffix": ".json" },
+      "locate": "dict",
+      "emit": "person",
+      "fields": {
+        "name": "Activity.Following List.Following[].UserName",
+        "handle": "Activity.Following List.Following[].UserName",
+        "date": "Activity.Following List.Following[].Date",
+        "role": { "const": "tiktok following" }
+      },
+      "tags": ["person/following"]
+    },
+    {
+      "match": { "name_contains": ["user_data_tiktok"], "suffix": ".json" },
+      "locate": "dict",
+      "emit": "search",
+      "fields": { "query": "Activity.Search History.SearchList[].SearchTerm" }
+    },
+    {
+      "match": { "name_contains": ["user_data_tiktok"], "suffix": ".json" },
+      "locate": "dict",
+      "emit": "interest",
+      "fields": { "tag": "Activity.Favorite Hashtags.FavoriteHashtagList[].Link" }
+    },
+    {
+      "match": { "name_contains": ["user_data_tiktok"], "suffix": ".json" },
+      "locate": "dict",
+      "emit": "identity",
+      "fields": {
+        "name": "Profile.Profile Information.ProfileMap.userName",
+        "headline": "Profile.Profile Information.ProfileMap.bioDescription"
+      }
+    },
+    {
+      "match": { "name_contains": ["user_data_tiktok"], "suffix": ".json" },
+      "locate": "dict",
+      "emit": "comment",
+      "fields": {
+        "text": "Comment.Comments.CommentsList[].Comment",
+        "date": "Comment.Comments.CommentsList[].Date"
+      }
+    },
+    {
+      "match": { "name_contains": ["user_data_tiktok"], "suffix": ".json" },
+      "locate": "dict",
+      "emit": "reaction",
+      "fields": {
+        "count_of": "Activity.Like List.ItemFavoriteList[].Date",
+        "kind": { "const": "like" }
+      }
+    },
+    {
+      "match": { "name_contains": ["user_data_tiktok"], "suffix": ".json" },
+      "locate": "dict",
+      "emit": "reaction",
+      "fields": {
+        "count_of": "Activity.Favorite Videos.FavoriteVideoList[].Date",
+        "kind": { "const": "favorite video" }
+      }
+    },
+    {
+      "match": { "name_contains": ["user_data_tiktok"], "suffix": ".json" },
+      "locate": "dict",
+      "emit": "reaction",
+      "fields": {
+        "count_of": "Activity.Favorite Sounds.FavoriteSoundList[].Date",
+        "kind": { "const": "favorite sound" }
+      }
+    }
+  ]
+}

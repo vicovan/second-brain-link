@@ -1,0 +1,6 @@
+<hibernate-generic datetime="2024-04-01">
+<object class="Space" package="com.atlassian.confluence.spaces"><property name="name"><![CDATA[Globex Wiki]]></property></object>
+<object class="ConfluenceUserImpl" package="com.atlassian.confluence.user"><id name="key">8a7f</id><property name="name">fgrimes</property><property name="fullName"><![CDATA[Frank Grimes]]></property></object>
+<object class="Page" package="com.atlassian.confluence.pages"><property name="title"><![CDATA[Incident Response Runbook]]></property><property name="creator" class="ConfluenceUserImpl" package="com.atlassian.confluence.user"><id name="key">8a7f</id></property></object>
+<object class="BodyContent" package="com.atlassian.confluence.core"><property name="body"><![CDATA[<p>Page the on-call engineer first, then isolate the sector.</p>]]></property></object>
+</hibernate-generic>

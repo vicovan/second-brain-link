@@ -14,13 +14,19 @@ frontmatter, `aliases`, `[[slug]]` wikilinks, and typed edges (works_at,
 invested_in, founded, advises, attended, mentions) but DO NOT pin the on-disk
 entity directory. We therefore emit the documented-safe shape:
   people/<slug>.md, companies/<slug>.md, writing/<slug>.md, notes/<slug>.md
-at the repo root, with `type` + `title` + `aliases` frontmatter and `[[people/slug]]`
--style links. Typed edges are written BOTH as a `## Edges` list (human + greppable)
-and inline in the body, e.g. `- works_at [[companies/acme]]`. If a future GBrain
-version requires `wiki/` prefixes or a Facts-fence for edges, that's a one-line
-change here — flagged in CLAUDE.md §12. We only emit edges we can ground
-deterministically; we never fabricate. PII follows the Collector: default mode is
-clean; `--full` carries emails/phones through just like Obsidian.
+at the repo root — plus `deals/<slug>.md` (CRM opportunities) and
+`meetings/<slug>.md` (calendar events with attendees) — with `type` + `title` +
+`aliases` frontmatter and `[[people/slug]]`-style links. Typed edges are written
+BOTH as a `## Edges` list (human + greppable) and inline in the body. Edge types
+actually emitted: `works_at` (positions/employment), `attended` (meeting
+attendees), `deal_with` (deal ↔ account company) — only what we can ground
+deterministically; we never fabricate. People carry the relationship SIGNAL
+(strength/last_contact from message frequency — never content), location, and
+handles; the root page carries compiled Interests / Algorithmic-mirror / Search
+sections. If a future GBrain version requires `wiki/` prefixes or a Facts-fence
+for edges, that's a one-line change here — flagged in CLAUDE.md §12. PII follows
+the Collector: default mode is clean; `--full` carries emails/phones through just
+like Obsidian.
 """
 import json
 import re
@@ -106,6 +112,17 @@ class GBrainEmitter(Emitter):
             body += [ident["about"], ""]
         if ident.get("skills"):
             body += ["## Skills", "", ", ".join(ident["skills"][:60]), ""]
+        # compiled-truth sections (GBrain style: current state above the timeline)
+        if col.interests:
+            top = [t for t, _ in col.interests.most_common(15)]
+            body += ["## Interests", "", ", ".join(top), ""]
+        if col.mirror_inferences:
+            uniq = list(dict.fromkeys(col.mirror_inferences))[:10]
+            body += ["## Algorithmic mirror", "",
+                     *[f"- {m}" for m in uniq], ""]
+        if col.searches:
+            uniq = list(dict.fromkeys(col.searches))[:10]
+            body += ["## Search themes", "", *[f"- {q}" for q in uniq], ""]
         if edges:
             body += ["## Edges", "", *edges, ""]
         self._write(root_dir / f"{_slug(root_name)}.md", body)
@@ -115,6 +132,16 @@ class GBrainEmitter(Emitter):
             fm = {"type": "person", "title": r["name"], "aliases": [r["name"]],
                   "tags": ["person"], "sources": sorted(r["sources"])}
             if r.get("url"): fm["url"] = r["url"]
+            if r.get("location"): fm["location"] = r["location"]
+            if r.get("handles"): fm["handles"] = sorted(r["handles"])
+            if r.get("connected_on"): fm["connected_on"] = r["connected_on"]
+            # relationship SIGNAL (frequency/recency only — content never read)
+            _sig = col.msg_signal.get(key) or {}
+            cnt, last = _sig.get("n", 0), _sig.get("last", "")
+            if cnt:
+                fm["strength"] = 5 if cnt >= 20 else 4 if cnt >= 10 else 3 if cnt >= 5 else 2
+            if last:
+                fm["last_contact"] = last
             if full and r.get("email"): fm["email"] = r["email"]
             if full and r.get("phone"): fm["phone"] = r["phone"]
             e = []
@@ -138,6 +165,9 @@ class GBrainEmitter(Emitter):
                   "tags": ["company"], "category": meta_o.get("category", "referenced"),
                   "sources": sorted(meta_o.get("sources", []))}
             if meta_o.get("url"): fm["url"] = meta_o["url"]
+            if meta_o.get("industry"): fm["industry"] = meta_o["industry"]
+            if meta_o.get("domain"): fm["domain"] = meta_o["domain"]
+            if meta_o.get("size"): fm["size"] = meta_o["size"]
             self._write(comp_dir / f"{cslug[name]}.md", [_fm(fm), "", f"# {name}", ""])
 
         # --- writing (posts/comments → writing pages) ----------------------
@@ -152,18 +182,81 @@ class GBrainEmitter(Emitter):
                         [_fm(fm), "", p["text"], ""])
             n_w += 1
 
+        # --- deals (CRM opportunities → first-class GBrain Deal pages) ------
+        # Convention: adapters emit deal events named "Deal: <name> (<Account>) — <stage>".
+        n_deals = 0
+        name_slug = {n: s for n, s in cslug.items()}
+        for i, e in enumerate(col.events):
+            nm = str(e.get("name", ""))
+            if not nm.startswith("Deal:") and not nm.startswith("Campaign:"):
+                continue
+            kind = "deal" if nm.startswith("Deal:") else "campaign"
+            title = nm.split(":", 1)[1].strip()
+            m = re.search(r"\(([^)]+)\)", title)
+            account = (m.group(1).strip() if m else "")
+            edges_d = []
+            if account and account in name_slug:
+                edges_d.append(f"- deal_with [[companies/{name_slug[account]}]]")
+            b = [_fm({"type": "deal", "title": title, "tags": ["deal", kind],
+                      "date": e.get("date", ""), "sources": [e.get("source", "")]}),
+                 "", f"# {title}", ""]
+            if edges_d:
+                b += ["## Edges", "", *edges_d, ""]
+            self._write(out_dir / "deals" / f"{_slug(title)}-{i}.md", b)
+            n_deals += 1
+
+        # --- meetings (calendar events with attendees → Meeting pages) ------
+        n_meet = 0
+        pslug_by_name = {col.people[k]["name"]: s for k, s in pslug.items()}
+        for i, e in enumerate(col.events):
+            att = e.get("attendees") or []
+            if not att:
+                continue
+            title = str(e.get("name", "")) or f"Meeting {i}"
+            edges_m = [f"- attended [[people/{pslug_by_name[a]}]]"
+                       for a in att if a in pslug_by_name]
+            b = [_fm({"type": "meeting", "title": title, "tags": ["meeting"],
+                      "date": e.get("date", ""), "location": e.get("location", ""),
+                      "sources": [e.get("source", "")]}),
+                 "", f"# {title}", ""]
+            if e.get("description"):
+                b += [str(e["description"])[:300], ""]
+            if edges_m:
+                b += ["## Edges", "", *edges_m, ""]
+            self._write(out_dir / "meetings" / f"{_slug(title)}-{i}.md", b)
+            n_meet += 1
+
+        # --- places roll-up (GBrain has no first-class Place — one note) ----
+        if col.places:
+            pl = [_fm({"type": "note", "title": "Places overview",
+                       "tags": ["synthesis", "places"]}), "", "# Places overview", ""]
+            for p in list(col.places.values())[:200]:
+                line = f"- {p['name']}"
+                if p.get("kind"):
+                    line += f" ({p['kind']})"
+                if p.get("address"):
+                    line += f" — {p['address']}"
+                if p.get("lat") and p.get("lng"):
+                    line += f" · {p['lat']},{p['lng']}"
+                pl.append(line)
+            pl.append("")
+            self._write(notes_dir / "places-overview.md", pl)
+
         # --- a synthesis note (network overview) ---------------------------
         overview = [_fm({"type": "note", "title": "Network overview",
                          "tags": ["synthesis"]}), "", "# Network overview", "",
                     f"- people: {len(col.people)}", f"- companies: {len(col.companies)}",
-                    f"- writing: {n_w}", f"- subject: {subject} ({root_name})", ""]
+                    f"- writing: {n_w}", f"- deals: {n_deals}", f"- meetings: {n_meet}",
+                    f"- places: {len(col.places)}",
+                    f"- subject: {subject} ({root_name})", ""]
         self._write(notes_dir / "network-overview.md", overview)
 
         # --- import manifest + README -------------------------------------
         manifest = {"schema": "gbrain-base-v2 (best-effort)", "subject": subject,
                     "root": {"type": root_type, "slug": _slug(root_name)},
                     "counts": {"people": len(col.people), "companies": len(col.companies),
-                               "writing": n_w}}
+                               "writing": n_w, "deals": n_deals, "meetings": n_meet,
+                               "places": len(col.places)}}
         (out_dir / "gbrain.manifest.json").write_text(
             json.dumps(manifest, indent=2), encoding="utf-8")
         (out_dir / "README.md").write_text(

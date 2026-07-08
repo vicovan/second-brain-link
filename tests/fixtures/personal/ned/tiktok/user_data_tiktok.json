@@ -1,0 +1,77 @@
+{
+ "Activity": {
+  "Following List": {
+   "Following": [
+    {
+     "Date": "2024-04-01 10:00:00",
+     "UserName": "woodworkdaily"
+    }
+   ]
+  },
+  "Search History": {
+   "SearchList": [
+    {
+     "Date": "2024-04-01 10:00:00",
+     "SearchTerm": "left handed tools"
+    }
+   ]
+  },
+  "Favorite Hashtags": {
+   "FavoriteHashtagList": [
+    {
+     "Link": "https://tiktok.com/tag/diy"
+    }
+   ]
+  },
+  "Like List": {
+   "ItemFavoriteList": [
+    {
+     "Date": "2024-04-01 10:00:00",
+     "Link": "https://tiktok.com/v/1"
+    },
+    {
+     "Date": "2024-04-02 10:00:00",
+     "Link": "https://tiktok.com/v/2"
+    }
+   ]
+  },
+  "Favorite Videos": {
+   "FavoriteVideoList": [
+    {
+     "Date": "2024-04-01 10:00:00",
+     "Link": "https://tiktok.com/v/3"
+    }
+   ]
+  }
+ },
+ "Profile": {
+  "Profile Information": {
+   "ProfileMap": {
+    "userName": "nedflanders",
+    "bioDescription": "Okily dokily"
+   }
+  }
+ },
+ "Direct Messages": {
+  "Chat History": {
+   "ChatHistory": {
+    "Chat with maude": [
+     {
+      "From": "maude",
+      "Content": "secret-body-do-not-leak tiktok dm"
+     }
+    ]
+   }
+  }
+ },
+ "Comment": {
+  "Comments": {
+   "CommentsList": [
+    {
+     "Date": "2024-04-03 10:00:00",
+     "Comment": "Great jig design, saving this technique"
+    }
+   ]
+  }
+ }
+}

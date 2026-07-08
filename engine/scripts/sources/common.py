@@ -14,10 +14,59 @@ the body.
 """
 
 import csv
+import hashlib
 import json
 import re
 from collections import Counter
 from pathlib import Path
+
+
+# --- generated-file manifest context (lives HERE, not in build_vault, because
+# emitters import build_vault as a SEPARATE module object — module globals there
+# are stale across the two copies; sources.common is imported once). ------------
+MANIFEST_CTX = None   # {"root": Path, "files": {relpath: sha256}} while emitting
+
+
+def sha256_text(text: str) -> str:
+    return hashlib.sha256((text.rstrip() + "\n").encode("utf-8")).hexdigest()
+
+
+def manifest_begin(root):
+    global MANIFEST_CTX
+    MANIFEST_CTX = {"root": Path(root).resolve(), "files": {}}
+
+
+def manifest_take():
+    """Return and clear the active manifest context."""
+    global MANIFEST_CTX
+    ctx = MANIFEST_CTX
+    MANIFEST_CTX = None
+    return ctx
+
+
+def record_write(path, text):
+    """Record a generated file into the active manifest (no-op outside a build)."""
+    if MANIFEST_CTX is None:
+        return
+    try:
+        rel = Path(path).resolve().relative_to(MANIFEST_CTX["root"])
+    except ValueError:
+        return
+    MANIFEST_CTX["files"][str(rel).replace("\\", "/")] = sha256_text(text)
+
+
+class SearchQuery(str):
+    """A search query string that ALSO carries provenance (`source`, `date`).
+    Subclassing str keeps every legacy reader working (`" ".join`, f-strings,
+    slicing) while the renderer can group by source and show dates."""
+    source = ""
+    date = ""
+
+    def __new__(cls, q, source="", date=""):
+        s = super().__new__(cls, q)
+        s.source = source
+        s.date = date
+        return s
 
 # ---------------------------------------------------------------------------
 # normalization + Obsidian-safe naming (shared by all sources)
@@ -33,7 +82,7 @@ def norm_file(name: str) -> str:
     export-specific shard/member-id suffix, then reduce to alphanumerics. This is
     the canonical `file_index` key — adapters/mappings MUST report consumed keys via
     norm_file (not nk) or coverage will show files as unclaimed."""
-    stem = re.sub(r"\.(csv|json|html?|ics|vcf|mbox)$", "", name, flags=re.I)
+    stem = re.sub(r"\.(csv|json|html?|ics|vcf|mbox|js|txt|md|xml|eml|gpx)$", "", name, flags=re.I)
     stem = re.sub(r"_\d{6,}$", "", stem)      # linkedin member-id suffix
     stem = re.sub(r"_\d{1,3}$", "", stem)     # facebook/instagram _1,_2 shard suffix
     return re.sub(r"[^a-z0-9]", "", stem.lower())
@@ -103,6 +152,10 @@ def iso_date(s):
     m = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})$", s)
     if m:
         return f"{int(m.group(3)):04d}-{int(m.group(1)):02d}-{int(m.group(2)):02d}"
+    # Twitter/X archive format: "Mon Apr 01 10:00:00 +0000 2024"
+    m = re.match(r"^[A-Za-z]{3} ([A-Za-z]{3}) (\d{1,2}) [\d:]{8} [+-]\d{4} (\d{4})$", s)
+    if m and m.group(1)[:3].lower() in _MONTHS:
+        return f"{int(m.group(3)):04d}-{_MONTHS[m.group(1)[:3].lower()]:02d}-{int(m.group(2)):02d}"
     if re.match(r"^\d{4}$", s): return s
     return s
 
@@ -225,6 +278,9 @@ class Collector:
         self.full = full
         self.structure_spec = None          # brain_structure.json spec (set by builder)
         self.file_keys = set()              # normalized file keys (set by builder)
+        self.skipped_keys = set()           # consumed-but-deliberately-not-extracted
+                                            # (low-signal by design; shown honestly
+                                            # in _COVERAGE.md as "skipped")
         self.subject = "person"             # "person" | "company" — what the brain is rooted on
         self.subject_entity = ""            # the root entity name (the user, or the company)
         self.entity_name = ""               # named-entity folder this brain came from (multi-entity)
@@ -250,13 +306,20 @@ class Collector:
         self.saved_jobs = []                # {title, company}
         self.mirror_inferences = []
         self.ad_segments = []
-        self.searches = []
-        self.events = []                    # {name, date}
+        self.searches = []                  # list[SearchQuery] (str subclass w/ source+date)
+        self.events = []                    # canonical via add_event: {name,date,kind,source,
+                                            #   location,description,attendees,tags,url,value}
         self.places = {}                    # key -> {name,address,lat,lng,url,kind,note,lists}
         self._place_index = {}              # nk(name) -> [place rec, …] (merge lookup)
         self.learning_count = 0
         self.services = Counter()           # label -> n
-        self.msg_signal = {}                # nk(name) -> (count, last_iso)
+        self.msg_signal = {}                # nk(name) -> {"n","first","last","by":Counter(source)}
+        self.interest_meta = {}             # tag -> {"sources": set, "date": first_iso}
+        self.reaction_sources = {}          # kind -> set(sources)
+        self._event_keys = set()            # (source, kind, nk(name), date) dedupe
+        self._post_keys = set()             # (source, date, sha1(text)) dedupe
+        self._comment_keys = set()          # (source, date, sha1(text)) dedupe
+        self._msg_keys = set()              # (source, nk(party), ts) dedupe (ts-bearing only)
         self.uncategorized = []             # {source,file,columns,rows}
         self.sources = set()
         self.companies = set()
@@ -282,12 +345,15 @@ class Collector:
     # profile link) IS kept. FULL mode (self.full): email/phone/extra ARE stored
     # too — the owner explicitly wants their complete data.
     def add_person(self, source, name, company="", role="", date="", handle="",
-                   url="", email="", phone="", extra=None, tags=None):
+                   url="", email="", phone="", extra=None, tags=None, location="",
+                   connected_on="", dept=""):
         """Add/merge a person keyed by nk(name); merges across sources (first
         non-empty value wins per field). Privacy invariant: a name matching
         EMAIL_RE is dropped entirely, and email/phone/extra are stored ONLY in full
         mode — in default mode they're forced empty even if an adapter passes them.
         A public profile `url` is kept in both modes (public identifier, not PII).
+        `location` is a public place string (a city, not an address) — kept in both
+        modes and geocoded offline at render time for the map view.
         `tags` are semantic tags (e.g. "person/friend") merged across sources and
         rendered alongside the automatic source/type tags."""
         name = fix_mojibake((name or "").strip())
@@ -309,20 +375,44 @@ class Collector:
         phone = (phone or "").strip() if self.full else ""
         extra = {k: v for k, v in (extra or {}).items()
                  if v and str(v).strip()} if self.full else {}
+        location = fix_mojibake((location or "").strip())
+        connected_on = iso_date(connected_on)
+        dept = fix_mojibake((dept or "").strip())
         if rec is None:
             self.people[key] = {
                 "name": name, "company": company, "role": role,
                 "date": iso_date(date), "handles": {handle} if handle else set(),
                 "url": cu, "email": email, "phone": phone, "extra": dict(extra),
+                "location": location, "connected_on": connected_on, "dept": dept,
                 "sources": {source}, "tags": set(tags),
+                # provenance: which source first supplied each field, and any
+                # CONFLICTING later values (first-non-empty still wins, but the
+                # losing claim is preserved and rendered as "Also reported")
+                "prov": {f: source for f, v in
+                         (("company", company), ("role", role),
+                          ("location", location), ("dept", dept)) if v},
+                "alt": {},
             }
         else:
             rec["sources"].add(source)
             rec.setdefault("tags", set()).update(tags)
             if handle: rec["handles"].add(handle)
-            if company and not rec["company"]: rec["company"] = company
-            if role and not rec["role"]: rec["role"] = role
+            for field, val in (("company", company), ("role", role),
+                               ("location", location), ("dept", dept)):
+                if not val:
+                    continue
+                cur = rec.get(field, "")
+                if not cur:
+                    rec[field] = val
+                    rec.setdefault("prov", {})[field] = source
+                elif nk(val) != nk(cur):
+                    # conflicting claim from another source — keep, don't lose
+                    alts = rec.setdefault("alt", {}).setdefault(field, [])
+                    if (val, source) not in alts:
+                        alts.append((val, source))
             if date and not rec["date"]: rec["date"] = iso_date(date)
+            if connected_on and not rec.get("connected_on"):
+                rec["connected_on"] = connected_on
             if cu and not rec.get("url"): rec["url"] = cu
             if email and not rec.get("email"): rec["email"] = email
             if phone and not rec.get("phone"): rec["phone"] = phone
@@ -333,9 +423,14 @@ class Collector:
                 rec["extra"] = merged
         self.companies.discard("")  # never let an empty company name linger in the set
 
-    def add_org(self, source, name, category="referenced", url="", extra=None, tags=None):
+    def add_org(self, source, name, category="referenced", url="", extra=None,
+                tags=None, location="", industry="", size="", domain="", about=""):
         """Add/merge an organization keyed by exact name; tracks category, public
         url, and contributing sources. `extra` fields are kept only in full mode.
+        `location` (HQ city), `industry`, `size` (headcount/range), `domain`
+        (website domain) and `about` (self-description, e.g. a Slack channel's
+        topic/purpose) are PUBLIC business facts — kept in both modes; location
+        geocodes offline at render time for the map view.
         `tags` are semantic tags merged across sources (rendered with source/type)."""
         name = fix_mojibake((name or "").strip())
         if not name:
@@ -344,16 +439,38 @@ class Collector:
         self.sources.add(source)
         cu = canonical_url(url)
         tags = {str(t).strip() for t in (tags or []) if str(t).strip()}
+        location = fix_mojibake((location or "").strip())
+        industry = fix_mojibake((industry or "").strip())
+        size = str(size or "").strip()
+        domain = re.sub(r"^(https?://)?(www\.)?", "", (domain or "").strip().lower()).rstrip("/")
+        about = fix_mojibake(strip_pii((about or "").strip()))
         extra = {k: v for k, v in (extra or {}).items()
                  if v and str(v).strip()} if self.full else {}
         cur = self.orgs.get(name)
         if cur is None:
             self.orgs[name] = {"category": category, "sources": {source},
-                               "url": cu, "extra": dict(extra), "tags": set(tags)}
+                               "url": cu, "extra": dict(extra), "tags": set(tags),
+                               "location": location, "industry": industry,
+                               "size": size, "domain": domain, "about": about,
+                               "prov": {f: source for f, v in
+                                        (("industry", industry), ("location", location))
+                                        if v},
+                               "alt": {}}
         else:
             cur["sources"].add(source)
             cur.setdefault("tags", set()).update(tags)
             if cu and not cur.get("url"): cur["url"] = cu
+            for field, val in (("location", location), ("industry", industry),
+                               ("size", size), ("domain", domain), ("about", about)):
+                if not val:
+                    continue
+                if not cur.get(field):
+                    cur[field] = val
+                    cur.setdefault("prov", {})[field] = source
+                elif field in ("location", "industry") and nk(val) != nk(cur[field]):
+                    alts = cur.setdefault("alt", {}).setdefault(field, [])
+                    if (val, source) not in alts:
+                        alts.append((val, source))
             if extra:
                 merged = dict(cur.get("extra") or {})
                 for k, v in extra.items():
@@ -362,11 +479,19 @@ class Collector:
 
     def add_post(self, source, text="", date="", kind="post", url="", tags=None):
         """Record one of the owner's own posts/writings. Privacy: text is run
-        through strip_pii so any embedded emails are redacted before storage."""
+        through strip_pii so any embedded emails are redacted before storage.
+        Idempotent: the same (source, date, text) seen again — e.g. when an old
+        and a new export of the same archive sit in the data folder together —
+        is recorded once."""
         text = fix_mojibake(strip_pii((text or "").strip()))
+        d = iso_date(date)
+        k = (source, d, hashlib.sha1(text.encode("utf-8")).hexdigest())
+        if text and k in self._post_keys:
+            return
+        self._post_keys.add(k)
         self.sources.add(source)
         tags = sorted({str(t).strip() for t in (tags or []) if str(t).strip()})
-        self.posts.append({"text": text, "date": iso_date(date), "kind": kind,
+        self.posts.append({"text": text, "date": d, "kind": kind,
                            "url": url, "source": source, "tags": tags})
 
     def add_place(self, source, name="", address="", lat="", lng="", url="",
@@ -427,21 +552,80 @@ class Collector:
 
     def add_comment(self, source, text="", date=""):
         """Record one of the owner's own comments. Privacy: text is strip_pii'd
-        (emails redacted) before storage; empty comments are skipped."""
+        (emails redacted) before storage; empty comments are skipped. Idempotent
+        on (source, date, text) like add_post."""
         text = fix_mojibake(strip_pii((text or "").strip()))
-        if text:
-            self.comments.append({"text": text, "date": iso_date(date), "source": source})
+        if not text:
+            return
+        d = iso_date(date)
+        k = (source, d, hashlib.sha1(text.encode("utf-8")).hexdigest())
+        if k in self._comment_keys:
+            return
+        self._comment_keys.add(k)
+        self.comments.append({"text": text, "date": d, "source": source})
 
-    def add_reaction(self, source, kind="like"):
+    def add_reaction(self, source, kind="like", date=""):
         """Tally one reaction by kind (defaults to 'like'); aggregate count only,
-        no per-target detail is retained."""
-        self.reactions[kind or "like"] += 1
+        no per-target detail is retained. Contributing sources are tracked so the
+        reactions note can attribute its counts."""
+        kind = kind or "like"
+        self.reactions[kind] += 1
+        self.reaction_sources.setdefault(kind, set()).add(source)
 
-    def add_interest(self, source, tag):
-        """Tally an interest/topic tag (e.g. a followed page or YouTube topic)."""
+    def add_interest(self, source, tag, date=""):
+        """Tally an interest/topic tag (e.g. a followed page or YouTube topic).
+        Provenance (which sources, earliest date) is kept in interest_meta so the
+        interests note can group by source."""
         tag = fix_mojibake((tag or "").strip())
-        if tag:
-            self.interests[tag] += 1
+        if not tag:
+            return
+        self.interests[tag] += 1
+        m = self.interest_meta.setdefault(tag, {"sources": set(), "date": ""})
+        m["sources"].add(source)
+        d = iso_date(date)
+        if d and (not m["date"] or d < m["date"]):
+            m["date"] = d
+
+    def add_search(self, source, query, date=""):
+        """Record a search query WITH provenance. Entries remain plain strings
+        (SearchQuery subclasses str) so legacy readers keep working."""
+        q = fix_mojibake((query or "").strip())
+        if q:
+            self.sources.add(source)
+            self.searches.append(SearchQuery(q, source=source, date=iso_date(date)))
+
+    def add_event(self, source, name, date="", kind="event", location="",
+                  description="", attendees=None, tags=None, url="", value=""):
+        """THE canonical event verb (replaces raw events.append): a dated
+        happening — calendar event/meeting, CRM deal or campaign, activity.
+        `kind` routes rendering (deal/campaign → pipeline in company brains;
+        attendees → meeting pages in GBrain). Idempotent on
+        (source, kind, nk(name), date)."""
+        name = fix_mojibake((name or "").strip())
+        if not name:
+            return
+        d = iso_date(date)
+        k = (source, kind, nk(name), d)
+        if k in self._event_keys:
+            return
+        self._event_keys.add(k)
+        self.sources.add(source)
+        ev = {"name": name, "date": d, "kind": kind or "event", "source": source}
+        if location:
+            ev["location"] = fix_mojibake(str(location).strip())
+        if description:
+            ev["description"] = fix_mojibake(strip_pii(str(description).strip()))[:500]
+        att = [fix_mojibake(str(a).strip()) for a in (attendees or []) if str(a).strip()]
+        if att:
+            ev["attendees"] = att
+        tags = sorted({str(t).strip() for t in (tags or []) if str(t).strip()})
+        if tags:
+            ev["tags"] = tags
+        if url:
+            ev["url"] = url
+        if value:
+            ev["value"] = str(value).strip()
+        self.events.append(ev)
 
     # ---- the algorithmic mirror (50-mirror): how the platforms model the user.
     # These are inferences/segments DERIVED about the owner by a platform (FB ad
@@ -465,13 +649,30 @@ class Collector:
             self.sources.add(source)
             self.ad_segments.append(text)
 
-    def add_message_signal(self, source, party_name, date=""):
-        """Records ONLY that a message exchange happened + when. Never the body."""
+    def add_message_signal(self, source, party_name, date="", ts=""):
+        """Records ONLY that a message exchange happened + when. Never the body.
+        Record: {"n": count, "first": iso, "last": iso, "by": Counter(source)}.
+        When a precise `ts` is supplied (epoch/timestamp string), the signal is
+        idempotent on (source, party, ts) — so re-reading the same history in an
+        accumulated data folder can't inflate relationship strength."""
         key = nk(party_name)
         if not key:
             return
-        cnt, last = self.msg_signal.get(key, (0, ""))
-        self.msg_signal[key] = (cnt + 1, max(last, iso_date(date) or ""))
+        if ts:
+            mk = (source, key, str(ts))
+            if mk in self._msg_keys:
+                return
+            self._msg_keys.add(mk)
+        d = iso_date(date) or iso_date(ts) or ""
+        rec = self.msg_signal.get(key)
+        if rec is None:
+            rec = self.msg_signal[key] = {"n": 0, "first": "", "last": "",
+                                          "by": Counter()}
+        rec["n"] += 1
+        rec["by"][source] += 1
+        if d:
+            rec["last"] = max(rec["last"], d)
+            rec["first"] = min(rec["first"], d) if rec["first"] else d
 
     def add_uncategorized(self, source, filename, columns, rows):
         """Stash a file no adapter/mapping claimed (columns + sample rows) so the

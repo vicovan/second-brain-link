@@ -1,3 +1,3 @@
-First Name,Last Name,Email,Title
-Grace,Hopper,ghopper@acme-robotics.example,VP Engineering
-Alan,Turing,aturing@acme-robotics.example,Principal Scientist
+First Name,Last Name,Email,Title,Org Unit
+Grace,Hopper,ghopper@acme-robotics.example,VP Engineering,/Engineering
+Alan,Turing,aturing@acme-robotics.example,Principal Scientist,/Research

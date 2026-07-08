@@ -190,13 +190,29 @@ def _emit(col, source, kind, fields, rec, tags=None):
     they join the renderer's automatic `source/<name>` + type tags so all data
     points are filterable in the Obsidian graph/Bases/Dataview."""
     tags = list(tags or [])
-    resolved = {k: resolve_field(rec, v) for k, v in fields.items()}
+    # `extra` is a rule-level dict {"Label": "selector"} — captured per record and
+    # passed through to the Collector (stored only in --full, like adapters). This
+    # closes the old gap where mapping sources dropped every unmodeled column.
+    extra_spec = fields.get("extra") if isinstance(fields.get("extra"), dict) else None
+    plain_fields = {k: v for k, v in fields.items() if k != "extra"}
+    resolved = {k: resolve_field(rec, v) for k, v in plain_fields.items()}
 
     def g(k, i=0):
         """Pick field `k`'s i-th resolved value, falling back to its first (so a
         scalar field like company/role aligns to every fanned-out primary value)."""
         vals = resolved.get(k) or []
         return vals[i] if i < len(vals) else (vals[0] if vals else "")
+
+    def extra_for(i=0):
+        if not extra_spec:
+            return None
+        out = {}
+        for label, sel in extra_spec.items():
+            vals = resolve_field(rec, sel) or []
+            v = vals[i] if i < len(vals) else (vals[0] if vals else "")
+            if v:
+                out[label] = str(v)
+        return out or None
 
     if kind == "person":
         names = resolved.get("name") or resolved.get("handle") or []
@@ -206,12 +222,17 @@ def _emit(col, source, kind, fields, rec, tags=None):
                            role=str(g("role", i)), date=str(g("date", i)),
                            handle=str(g("handle", i)), url=str(g("url", i)),
                            email=str(g("email", i)), phone=str(g("phone", i)),
-                           tags=tags)
+                           connected_on=str(g("connected_on", i)),
+                           dept=str(g("dept", i)), location=str(g("location", i)),
+                           extra=extra_for(i), tags=tags)
         return len(names)
     if kind == "org":
         for i, _ in enumerate(resolved.get("name") or []):
             col.add_org(source, str(g("name", i)), category=str(g("category", i) or "referenced"),
-                        url=str(g("url", i)), tags=tags)
+                        url=str(g("url", i)), location=str(g("location", i)),
+                        industry=str(g("industry", i)), size=str(g("size", i)),
+                        domain=str(g("domain", i)), about=str(g("about", i)),
+                        extra=extra_for(i), tags=tags)
         return len(resolved.get("name") or [])
     if kind == "post":
         n = 0
@@ -226,10 +247,10 @@ def _emit(col, source, kind, fields, rec, tags=None):
             col.add_comment(source, str(g("text", i)), date=str(g("date", i))); n += 1
         return n
     if kind == "interest":
-        tags = resolved.get("tag") or resolved.get("name") or []
-        for t in tags:
-            col.add_interest(source, str(t))
-        return len(tags)
+        vals = resolved.get("tag") or resolved.get("name") or []
+        for i, t in enumerate(vals):
+            col.add_interest(source, str(t), date=str(g("date", i)))
+        return len(vals)
     if kind == "mirror":
         vals = resolved.get("text") or resolved.get("tag") or resolved.get("name") or []
         for v in vals:
@@ -241,18 +262,30 @@ def _emit(col, source, kind, fields, rec, tags=None):
             col.add_ad_segment(source, str(v))
         return len(vals)
     if kind == "reaction":
+        # `count_of` lets a rule tally one reaction per matched record without
+        # storing the records themselves (TikTok likes/favorites: the LINKS are
+        # noise, the COUNT is the signal). The selector's resolved list length
+        # is the tally; `kind` (usually a const) names the reaction.
+        over = resolved.get("count_of") or []
+        if over:
+            k = str((resolved.get("kind") or ["like"])[0])
+            for _ in over:
+                col.add_reaction(source, k)
+            return len(over)
         for k in (resolved.get("kind") or ["like"]):
             col.add_reaction(source, str(k))
         return len(resolved.get("kind") or ["like"])
     if kind == "search":
         n = 0
-        for q in (resolved.get("query") or resolved.get("text") or []):
-            col.searches.append(str(q)); n += 1
+        qs = resolved.get("query") or resolved.get("text") or []
+        for i, q in enumerate(qs):
+            col.add_search(source, str(q), date=str(g("date", i))); n += 1
         return n
     if kind == "event":
         for i, _ in enumerate(resolved.get("name") or []):
-            col.events.append({"name": str(g("name", i)), "date": iso_date(str(g("date", i))),
-                               "source": source, "tags": tags})
+            col.add_event(source, str(g("name", i)), date=str(g("date", i)),
+                          kind=str(g("kind", i) or "event"),
+                          location=str(g("location", i)), tags=tags)
         return len(resolved.get("name") or [])
     if kind == "message_signal":
         names = resolved.get("name") or []
@@ -273,7 +306,15 @@ def _emit(col, source, kind, fields, rec, tags=None):
         col.set_identity(source, name=str(_first(resolved.get("name") or [])),
                          headline=str(_first(resolved.get("headline") or [])),
                          location=str(_first(resolved.get("location") or [])),
+                         industry=str(_first(resolved.get("industry") or [])),
                          about=str(_first(resolved.get("about") or [])))
+        # list-valued identity enrichment (e.g. skills from a JSON export)
+        skills = [str(s) for s in (resolved.get("skills") or []) if str(s).strip()]
+        if skills:
+            cur = col.identity.setdefault("skills", [])
+            for s in skills:
+                if s not in cur:
+                    cur.append(s)
         return 1
     return 0
 

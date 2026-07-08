@@ -16,6 +16,7 @@ Usage:
     python build_vault.py <export.zip | folder> --dry-run        # detect + plan only
 """
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -27,6 +28,7 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+ENGINE_DIR = Path(__file__).resolve().parent.parent   # engine/ (scripts' parent)
 import sources as _sources
 from sources import detect_sources, BY_NAME, ALL
 def _quar():  # always read the live registry (rebuilt when --mappings overrides)
@@ -114,11 +116,32 @@ def fm(d):
     out.append("---")
     return "\n".join(out)
 
+# --- generated-file manifest (the --refresh primitive) ----------------------
+# The live context lives in sources.common (ONE module object even though
+# build_vault itself gets imported twice — emitters do `from build_vault import
+# VaultWriter`, a separate module object whose globals would be stale; see
+# CLAUDE.md §10).
+from sources.common import (manifest_begin, manifest_take,          # noqa: E402
+                            record_write, sha256_text as _sha256_text)
+
+
+def manifest_end(root: Path):
+    """Write _GENERATED.json for the brain at `root` and clear the context."""
+    ctx = manifest_take()
+    if not ctx:
+        return
+    payload = {"schema": 1, "files": ctx["files"]}
+    (Path(root) / "_GENERATED.json").write_text(
+        json.dumps(payload, indent=1, sort_keys=True), encoding="utf-8")
+
+
 def write(path: Path, text: str):
     """Write `text` to `path` (creating parent dirs), normalizing to a single
-    trailing newline. UTF-8 so mojibake-repaired names survive on disk."""
+    trailing newline. UTF-8 so mojibake-repaired names survive on disk. Every
+    write is recorded into the active generated-file manifest (see MANIFEST_CTX)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text.rstrip() + "\n", encoding="utf-8")
+    record_write(path, text)
 
 def slug(s):
     """Slugify a string for a NON-entity filename (coverage/owner/service notes).
@@ -187,6 +210,86 @@ def keywords(text, n=20):
 # folder and generated file is documented (what it is, what feeds it, its role).
 # Person-mode layout; 00-org/ replaces 00-me/ in company mode.
 # ---------------------------------------------------------------------------
+# --- subject-aware layout ---------------------------------------------------
+# Layer KEYS are stable; FOLDER NAMES vary by subject (a company brain gets
+# company-named folders — DECIDED 2026-07-07). layout.json's `variants` block is
+# the source of truth; these dicts are the in-code fallback. Never hardcode a
+# layer folder string again — go through VaultWriter.L(key) / layout_for().
+_LAYERS_PERSON = {
+    "root": "00-me", "people": "10-people", "orgs": "15-organizations",
+    "reputation": "20-reputation", "voice": "30-voice", "career": "40-career",
+    "mirror": "50-mirror", "learning": "60-learning", "services": "70-services",
+    "search": "80-search", "places": "85-places", "synthesis": "90-synthesis",
+    "uncategorized": "99-uncategorized", "quarantine": "_quarantine",
+    "notes": "_notes",
+}
+_LAYERS_COMPANY = {
+    "root": "00-org", "people": "10-people", "orgs": "15-organizations",
+    "reputation": "20-brand", "voice": "30-content", "career": "40-pipeline",
+    "mirror": "50-market-view", "learning": "60-knowledge", "services": "70-support",
+    "search": "80-signals", "places": "85-locations", "synthesis": "90-synthesis",
+    "uncategorized": "99-uncategorized", "quarantine": "_quarantine",
+    "notes": "_notes",
+}
+# role text per layer key: (person wording, company wording)
+_LAYER_ROLE_TEXT = {
+    "root": ("IDENTITY — who the twin speaks as (name, headline, positions, education, skills).",
+             "THE ORGANIZATION — org identity + the data-handling (data-controller) note."),
+    "people": ("NETWORK — one note per person, merged across sources; tags carry `source/*` + relationship status/strength.",
+               "PEOPLE — employees, customers, vendors and correspondents, merged across sources; `relationship:` classifies each."),
+    "orgs": ("Companies: employers, targets, vendors, pages/groups followed. `_mentions/` holds thin one-off orgs (links still resolve).",
+             "Organizations: customers, vendors, departments, teams and channels. `_mentions/` holds thin one-offs."),
+    "reputation": ("Recommendations received/given + endorsement summary.",
+                   "BRAND — reviews and public reputation signals."),
+    "voice": ("Your own content: posts/, comments, reactions, interests/follows, saved.",
+              "CONTENT — the company's published voice: posts, wiki pages, comments."),
+    "career": ("Applications log, job-seeker preferences, saved jobs, reusable answers.",
+               "PIPELINE — deals and campaigns from the CRM (one note per deal)."),
+    "mirror": ("HOW THE ALGORITHMS SEE YOU — inferences + ad-targeting segments (fed by the mirror/ad_segment emits).",
+               "MARKET VIEW — how platforms/audiences model the org: follower/visitor demographics, segments."),
+    "learning": ("Courses/coaching + events.",
+                 "KNOWLEDGE — meetings, events, learning."),
+    "services": ("Freelance / Services Marketplace activity.",
+                 "SUPPORT — ticket volume and service signals."),
+    "search": ("Your search history — a curiosity log.",
+               "SIGNALS — search/activity signals around the org."),
+    "places": ("Saved/reviewed/checked-in locations (lat/lng → Obsidian Map View).",
+               "LOCATIONS — HQ, offices and customer sites (lat/lng → map views)."),
+    "synthesis": ("THE PAYOFF (derived): network-map, target-companies, positions-i-hold, positioning-gaps.",
+                  "THE PAYOFF (derived): org map, network map — plus onboarding/whoknows via analyze."),
+    "uncategorized": ("Files no mapping claimed, rescued + summarized by the harvester (nothing lost).",) * 2,
+    "quarantine": ("Sensitive files catalogued but NEVER imported (default mode). In --full they fold into the root layer as my-*.md.",) * 2,
+    "notes": ("YOUR OWN NOTES — the engine never writes, overwrites or deletes anything here.",) * 2,
+}
+
+
+def layout_for(subject):
+    """The {layer_key: folder} map for `subject` ('person'|'company') — from
+    layout.json `variants` when present, else the in-code defaults."""
+    base = dict(_LAYERS_COMPANY if subject == "company" else _LAYERS_PERSON)
+    try:
+        lay = json.loads((ENGINE_DIR / "mappings" / "brain" / "layout.json")
+                         .read_text(encoding="utf-8"))
+        var = (lay.get("variants") or {}).get(
+            "company" if subject == "company" else "person") or {}
+        for k, v in var.items():
+            if isinstance(v, str) and v.strip():
+                base[k] = v.strip()
+    except Exception:
+        pass
+    return base
+
+
+def layer_roles(subject):
+    """LAYER_ROLES equivalent for `subject`: [(folder/, role), …] in layer order."""
+    lay = layout_for(subject)
+    idx = 1 if subject == "company" else 0
+    order = ["root", "people", "orgs", "reputation", "voice", "career", "mirror",
+             "learning", "services", "search", "places", "synthesis",
+             "notes", "uncategorized", "quarantine"]
+    return [(lay[k] + "/", _LAYER_ROLE_TEXT[k][idx]) for k in order]
+
+
 LAYER_ROLES = [
     ("00-me/", "IDENTITY — who the twin speaks as (name, headline, positions, education, skills). `00-org/` in company mode."),
     ("10-people/", "NETWORK — one note per person, merged across sources; tags carry `source/*` + relationship status/strength."),
@@ -235,6 +338,12 @@ class VaultWriter:
     def __init__(self, col: Collector, out: Path):
         self.col = col
         self.out = out
+        # subject-aware folder map — NEVER hardcode a layer folder; use self.L(key)
+        self.lay = layout_for(getattr(col, "subject", "person"))
+
+    def L(self, key):
+        """Folder name for a layer KEY under this brain's subject variant."""
+        return self.lay[key]
 
     def _prov(self):
         """Return the PROVIDERS row for this build's target agent."""
@@ -257,31 +366,47 @@ class VaultWriter:
         self.places()
         self.synthesis()
         self.home()
+        self.user_notes_space()
         self.scaffolding()
 
     # 00 — identity (company mode roots on the org; person mode on the user)
+    @staticmethod
+    def _geo(location):
+        """Offline-geocode a public location string → {lat, lng} frontmatter
+        fields (engine/scripts/geocode.py; bundled gazetteer, zero network) or
+        {} when unresolved/ambiguous — a missing pin beats a wrong pin."""
+        if not location:
+            return {}
+        try:
+            import geocode
+            hit = geocode.resolve(location)
+        except Exception:
+            hit = None
+        return {"lat": hit[0], "lng": hit[1]} if hit else {}
+
     def identity(self):
         """Write the root identity note: `00-org/organization.md` in company mode
         (rooted on the org, plus a data-handling note), else `00-me/identity.md`
         (the person the twin speaks as). Subject is read off the Collector."""
         i = self.col.identity
         company_mode = getattr(self.col, "subject", "person") == "company"
-        root_dir = "00-org" if company_mode else "00-me"
+        root_dir = self.L("root")
         if company_mode:
             self._company_data_controller_note(root_dir)
         if not i:
             return
         name = i.get("name", "Me")
-        body = [fm({"type": ("organization" if company_mode else "identity"),
-                    "title": name or "Me",
-                    "aliases": [name] if name else [],
-                    "tags": note_tags(["organization"] if company_mode else ["identity"],
-                                      i.get("sources", [])),
-                    "created": TODAY, "updated": TODAY,
-                    "headline": i.get("headline", ""), "location": i.get("location", ""),
-                    "industry": i.get("industry", ""),
-                    "sources": sorted(i.get("sources", []))}), "",
-                f"# {name or 'Me'}\n"]
+        fmd = {"type": ("organization" if company_mode else "identity"),
+               "title": name or "Me",
+               "aliases": [name] if name else [],
+               "tags": note_tags(["organization"] if company_mode else ["identity"],
+                                 i.get("sources", [])),
+               "created": TODAY, "updated": TODAY,
+               "headline": i.get("headline", ""), "location": i.get("location", ""),
+               "industry": i.get("industry", ""),
+               "sources": sorted(i.get("sources", []))}
+        fmd.update(self._geo(i.get("location", "")))
+        body = [fm(fmd), "", f"# {name or 'Me'}\n"]
         if i.get("headline"): body.append(f"**{i['headline']}**\n")
         if i.get("about"): body.append("## About\n\n" + i["about"] + "\n")
         if i.get("positions"):
@@ -290,6 +415,8 @@ class VaultWriter:
                 comp = r.get("company", "")
                 body.append(f"- **{r.get('title','')}** — {link(comp) if comp else ''} "
                             f"({r.get('start','')} – {r.get('end','')})")
+                if r.get("desc"):
+                    body.append(f"    - {str(r['desc'])[:300]}")
             body.append("")
         if i.get("skills"):
             body.append("## Skills\n\n" + ", ".join(i["skills"][:40]) + "\n")
@@ -337,8 +464,17 @@ class VaultWriter:
         status from the privacy-safe message SIGNAL only (count + last date — no
         body was ever read). email/phone are blank unless --full."""
         seen = set()
-        d = self.out / "10-people"
-        for key, r in self.col.people.items():
+        d = self.out / self.L("people")
+        # deterministic iteration: on title collisions the record with the
+        # richest identity (url > company > source-set) gets the bare filename —
+        # NOT whichever adapter happened to run first (stable across rebuilds)
+        ordered = sorted(self.col.people.items(),
+                         key=lambda kv: (obsidian_name(kv[1]["name"]).lower(),
+                                         0 if kv[1].get("url") else 1,
+                                         0 if kv[1].get("company") else 1,
+                                         ",".join(sorted(kv[1].get("sources", []))),
+                                         kv[0]))
+        for key, r in ordered:
             name = r["name"]
             title = obsidian_name(name)
             # disambiguate same-title people with a numeric suffix so no filename collides
@@ -346,8 +482,9 @@ class VaultWriter:
             while base.lower() in seen:
                 base = f"{title} {i}"; i += 1
             seen.add(base.lower())
-            msg = self.col.msg_signal.get(key, (0, ""))
-            cnt, last = msg
+            msg = self.col.msg_signal.get(key) or {}
+            cnt, last = msg.get("n", 0), msg.get("last", "")
+            first = msg.get("first", "")
             # strength buckets from message count only (frequency signal, not content)
             if cnt >= 20: strength = 5
             elif cnt >= 10: strength = 4
@@ -355,23 +492,57 @@ class VaultWriter:
             else: strength = 2
             # warm = recent sustained contact; dormant = had contact but it lapsed pre-2024
             status = "warm" if cnt >= 5 else ("dormant" if last and last < "2024" else "cold")
+            # company brains classify the RELATIONSHIP instead of dating-style
+            # warmth: employees vs customers vs correspondents (derived from the
+            # sources + semantic tags that produced the person)
+            relationship = ""
+            if getattr(self.col, "subject", "person") == "company":
+                tset = r.get("tags") or set()
+                srcs_ = r.get("sources") or set()
+                if r.get("dept") or srcs_ & {"google_workspace", "linkedin_company"}:
+                    relationship = "employee"
+                elif any(t.startswith("person/customer") for t in tset):
+                    relationship = "customer"
+                elif any(t.startswith("person/author") for t in tset) or "slack" in srcs_:
+                    relationship = "employee"
+                elif any(t.startswith("person/email") for t in tset):
+                    relationship = "correspondent"
+                else:
+                    relationship = "contact"
             comp = r.get("company", "")
-            note = fm({"type": "person", "title": title,
-                       "aliases": [name] if name != title else [],
-                       "tags": note_tags(["person"], r["sources"], r.get("tags")),
-                       "sources": sorted(r["sources"]),
-                       "created": r.get("date") or TODAY,
-                       "status": status,
-                       "company": link(comp) if comp else "",
-                       "role": r.get("role", ""),
-                       "url": r.get("url", ""),
-                       "email": r.get("email", ""),   # only populated in --full mode
-                       "phone": r.get("phone", ""),   # only populated in --full mode
-                       "handles": sorted(r.get("handles", [])),
-                       "strength": strength, "last_contact": last})
+            fmd = {"type": "person", "title": title,
+                   "aliases": [name] if name != title else [],
+                   "tags": note_tags(["person"], r["sources"], r.get("tags")),
+                   "sources": sorted(r["sources"]),
+                   "created": r.get("date") or TODAY,
+                   "relationship": relationship,
+                   "status": "" if relationship else status,
+                   "company": link(comp) if comp else "",
+                   "role": r.get("role", ""),
+                   "url": r.get("url", ""),
+                   "email": r.get("email", ""),   # only populated in --full mode
+                   "phone": r.get("phone", ""),   # only populated in --full mode
+                   "handles": sorted(r.get("handles", [])),
+                   "strength": strength, "last_contact": last,
+                   "first_contact": first,
+                   "connected_on": r.get("connected_on", ""),
+                   "dept": link(r["dept"]) if r.get("dept") else "",
+                   "location": r.get("location", "")}
+            fmd.update(self._geo(r.get("location", "")))
+            # conflicting claims from other sources — preserved, never silently lost
+            alt = r.get("alt") or {}
+            for f_ in ("company", "role"):
+                if alt.get(f_):
+                    fmd[f"alt_{f_}"] = [f"{v} ({src})" for v, src in alt[f_]]
+            note = fm(fmd)
             sub = f"{r.get('role','')}{' at ' + link(comp) if comp else ''}".strip()
+            alt_lines = ""
+            if alt:
+                rows_ = [f"- {f_}: {v} — per {src}"
+                         for f_, pairs in sorted(alt.items()) for v, src in pairs]
+                alt_lines = "\n## Also reported\n\n" + "\n".join(rows_) + "\n"
             details = _details_block(r)
-            write(d / f"{base}.md", note + f"\n\n# {name}\n\n{sub}\n" + details)
+            write(d / f"{base}.md", note + f"\n\n# {name}\n\n{sub}\n" + alt_lines + details)
         self.col.note(f"vault: {len(seen)} person notes (merged across sources)")
         self._people_count = len(seen)
 
@@ -398,16 +569,31 @@ class VaultWriter:
         pruned = 0
         for name, meta in orgs.items():
             title = obsidian_name(name)
-            if not title or title.lower() in seen:
+            if not title:
                 continue
+            # collision → numeric suffix (was: silent drop of the later org's meta)
+            base_t = title; ti = 2
+            while base_t.lower() in seen:
+                base_t = f"{title} {ti}"; ti += 1
+            title = base_t
             seen.add(title.lower())
-            note = fm({"type": "company", "title": title,
-                       "aliases": [name] if name != title else [],
-                       "tags": note_tags(["company"], meta.get("sources", []), meta.get("tags")),
-                       "category": meta.get("category", "referenced"),
-                       "sources": sorted(meta.get("sources", [])),
-                       "url": meta.get("url", ""),
-                       "known_contacts": counts.get(name, 0)})
+            fmd = {"type": "company", "title": title,
+                   "aliases": [name] if name != title else [],
+                   "tags": note_tags(["company"], meta.get("sources", []), meta.get("tags")),
+                   "category": meta.get("category", "referenced"),
+                   "sources": sorted(meta.get("sources", [])),
+                   "url": meta.get("url", ""),
+                   "industry": meta.get("industry", ""),
+                   "size": meta.get("size", ""),
+                   "domain": meta.get("domain", ""),
+                   "known_contacts": counts.get(name, 0),
+                   "location": meta.get("location", "")}
+            fmd.update(self._geo(meta.get("location", "")))
+            alt_o = meta.get("alt") or {}
+            for f_ in ("industry", "location"):
+                if alt_o.get(f_):
+                    fmd[f"alt_{f_}"] = [f"{v} ({src})" for v, src in alt_o[f_]]
+            note = fm(fmd)
             details = _details_block(meta)
             # Declutter: a "thin" org (few references AND no metadata) goes to a
             # _mentions/ subfolder. Obsidian resolves [[links]] by basename across
@@ -424,6 +610,19 @@ class VaultWriter:
             cat = meta.get("category", "referenced")
             if cat and cat != "referenced":
                 ctx.append(f"_{cat}_\n")
+            if meta.get("about"):
+                ctx.append(f"> {meta['about']}\n")
+            biz = " · ".join(x for x in (meta.get("industry", ""),
+                                         f"{meta['size']} people" if meta.get("size") else "",
+                                         meta.get("domain", "")) if x)
+            if biz:
+                ctx.append(f"{biz}\n")
+            if alt_o:
+                ctx.append("## Also reported\n")
+                for f_, pairs in sorted(alt_o.items()):
+                    for v, src in pairs:
+                        ctx.append(f"- {f_}: {v} — per {src}")
+                ctx.append("")
             folks = people_by_org.get(nk(name), [])
             if folks:
                 ctx.append(f"## People here ({len(folks)})\n")
@@ -432,19 +631,19 @@ class VaultWriter:
                     ctx.append(f"- [[{obsidian_name(pr['name'])}]]" + (f" — {role}" if role else ""))
                 ctx.append("")
             ctx_body = ("\n".join(ctx) + "\n") if ctx else ""
-            write(self.out / "15-organizations" / sub / f"{title}.md",
+            write(self.out / self.L("orgs") / sub / f"{title}.md",
                   note + f"\n\n# {title}\n\n" + ctx_body + details)
         self._orgs_count = len(seen)
         self._orgs_pruned = pruned
         if pruned:
             self.col.note(f"[orgs] moved {pruned} thin one-off companies to "
-                          f"15-organizations/_mentions/ (min_org_refs={min_refs}; links still resolve)")
+                          f"{self.L('orgs')}/_mentions/ (min_org_refs={min_refs}; links still resolve)")
 
     # 20 — reputation
     def reputation(self):
         """Write `20-reputation/` notes: recommendations received/given and an
         endorsements summary. Skips any sub-note that has no data."""
-        c = self.col; d = self.out / "20-reputation"
+        c = self.col; d = self.out / self.L("reputation")
         if c.reputation_received:
             lines = [fm({"type": "reputation", "tags": ["reputation"]}), "",
                      "# Recommendations received\n"]
@@ -471,7 +670,7 @@ class VaultWriter:
         """Write `30-voice/`: one note per post, plus comments, reactions,
         interests/follows, and a saved-items count. Also caches a combined voice
         corpus on self for the synthesis drafts (positions-i-hold)."""
-        c = self.col; d = self.out / "30-voice"; posts_dir = d / "posts"
+        c = self.col; d = self.out / self.L("voice"); posts_dir = d / "posts"
         for idx, p in enumerate(c.posts):
             if not p["text"]:
                 continue
@@ -479,25 +678,52 @@ class VaultWriter:
                        "tags": note_tags(["post"], [p["source"]], p.get("tags")),
                        "kind": p["kind"],
                        "source": p["source"], "created": p["date"], "url": p.get("url", "")})
-            write(posts_dir / f"{p['date'] or 'post'}-{idx}.md", note + f"\n\n{p['text']}\n")
+            # content-addressed filename → stable across rebuilds (no idx churn)
+            h8 = hashlib.sha1(p["text"].encode("utf-8")).hexdigest()[:8]
+            write(posts_dir / f"{p['date'] or 'post'}-{h8}.md", note + f"\n\n{p['text']}\n")
         if c.comments:
             lines = [fm({"type": "voice", "tags": ["voice"]}), "", "# Comments\n"]
             for r in c.comments:
                 lines.append(f"- ({r['date']}) [{r['source']}] {r['text']}")
             write(d / "comments.md", "\n".join(lines))
         if c.reactions:
-            lines = ["# Reactions & votes\n"]
+            r_sources = set().union(*(getattr(c, "reaction_sources", {}).values() or [set()]))
+            lines = [fm({"type": "reactions",
+                         "tags": note_tags(["reactions"], r_sources),
+                         "total": sum(c.reactions.values())}), "",
+                     "# Reactions & votes\n"]
             for k, n in c.reactions.most_common():
-                lines.append(f"- {k}: {n}")
+                srcs = sorted(getattr(c, "reaction_sources", {}).get(k, []))
+                lines.append(f"- {k}: {n}" + (f" · {', '.join(srcs)}" if srcs else ""))
             write(d / "reactions.md", "\n".join(lines))
         if c.interests:
-            lines = ["# Interests & follows\n",
-                     "*Pages, topics, hashtags, channels you follow across networks.*\n"]
-            for tag, n in c.interests.most_common(200):
-                lines.append(f"- {tag}" + (f" ({n})" if n > 1 else ""))
+            meta = getattr(c, "interest_meta", {})
+            i_sources = set().union(*((m.get("sources") or set())
+                                      for m in meta.values())) if meta else set()
+            lines = [fm({"type": "interests",
+                         "tags": note_tags(["interests"], i_sources),
+                         "total": len(c.interests)}), "",
+                     "# Interests & follows\n",
+                     "*Pages, topics, hashtags, channels you follow across networks — "
+                     "grouped by the source that knows it.*\n"]
+            # group top interests under their (first) source for provenance
+            by_src = {}
+            for tag, n in c.interests.most_common(500):
+                srcs = sorted((meta.get(tag) or {}).get("sources", [])) or ["(unattributed)"]
+                by_src.setdefault(srcs[0], []).append((tag, n, srcs))
+            for src in sorted(by_src):
+                lines.append(f"\n## {src}\n")
+                for tag, n, srcs in by_src[src]:
+                    more = f" · also {', '.join(srcs[1:])}" if len(srcs) > 1 else ""
+                    lines.append(f"- {tag}" + (f" ({n})" if n > 1 else "") + more)
+            if len(c.interests) > 500:
+                lines.append(f"\n…and {len(c.interests) - 500} more (see frontmatter total).")
             write(d / "interests.md", "\n".join(lines))
         if c.saved_count:
-            write(d / "saved.md", f"# Saved items\n\n{c.saved_count} items you kept.")
+            write(d / "saved.md",
+                  fm({"type": "saved", "tags": ["saved"], "count": c.saved_count})
+                  + f"\n\n# Saved items\n\n{c.saved_count} items you kept "
+                  "(titles, when the export carried them, are in interests.md).")
         self._voice_corpus = " ".join(p["text"] for p in c.posts) + " " + \
                              " ".join(r["text"] for r in c.comments)
         self._voice_count = len(c.posts) + len(c.comments)
@@ -507,7 +733,7 @@ class VaultWriter:
         """Write `40-career/`: applications log, job-seeker preferences, saved jobs,
         and reusable application answers. Companies are linked via link() so the
         orgs pass (which runs after) registers them as resolvable notes."""
-        c = self.col; d = self.out / "40-career"
+        c = self.col; d = self.out / self.L("career")
         if c.applications:
             dates = sorted(c.app_dates)
             note = fm({"type": "career", "title": "Applications log", "tags": ["career"],
@@ -521,7 +747,10 @@ class VaultWriter:
             note += "\n".join(f"- {t} ({n})" for t, n in c.app_titles.most_common(15))
             write(d / "applications.md", note)
         if c.prefs:
-            write(d / "preferences.md", "# Job-seeker preferences\n\n" +
+            write(d / "preferences.md",
+                  fm({"type": "career", "title": "Job-seeker preferences",
+                      "tags": ["career", "preferences"]}) +
+                  "\n\n# Job-seeker preferences\n\n" +
                   "\n".join(f"- **{k}**: {v}" for k, v in c.prefs.items()))
         if c.saved_jobs:
             lines = ["# Saved jobs\n"]
@@ -541,7 +770,7 @@ class VaultWriter:
         """Write `50-mirror/`: how the platforms see the user — algorithmic
         inferences and the ad-targeting segment profile. De-duplicates while
         preserving order. Feeds the positioning-gaps synthesis draft."""
-        c = self.col; d = self.out / "50-mirror"
+        c = self.col; d = self.out / self.L("mirror")
         if c.mirror_inferences:
             uniq = list(dict.fromkeys(c.mirror_inferences))
             note = fm({"type": "mirror", "title": "How platforms see me",
@@ -560,7 +789,7 @@ class VaultWriter:
                     f"· ads clicked: {getattr(c,'_li_ads_clicked',0)} "
                     f"· engagements: {getattr(c,'_li_ad_eng',0)}\n",
                     "## Targeting segments (revealed interests)"]
-            for s in uniq[:80]:
+            for s in uniq[:500]:
                 note.append(f"- {s}")
             write(d / "ad-profile.md", "\n".join(note))
 
@@ -571,29 +800,93 @@ class VaultWriter:
         search keywords on self for the target-companies synthesis draft."""
         c = self.col
         if c.learning_count:
-            write(self.out / "60-learning" / "coaching.md",
+            write(self.out / self.L("learning") / "coaching.md",
                   f"# Learning coach sessions\n\n{c.learning_count} messages recorded.")
-        if c.events:
-            ev_sources = {e.get("source") for e in c.events if e.get("source")}
+        company_mode = getattr(c, "subject", "person") == "company"
+        events = list(c.events)
+        if company_mode and events:
+            # deals/campaigns → one note each in the pipeline layer (type deal)
+            pipe = self.out / self.L("career")
+            seen_deal = set()
+            for e in [e for e in events if e.get("kind") in ("deal", "campaign")]:
+                title = obsidian_name(e["name"])
+                base = title; i = 2
+                while base.lower() in seen_deal:
+                    base = f"{title} {i}"; i += 1
+                seen_deal.add(base.lower())
+                note = fm({"type": "deal", "title": base,
+                           "tags": note_tags(["deal", f"deal/{e.get('kind','deal')}"],
+                                             [e.get("source", "")]),
+                           "kind": e.get("kind", "deal"),
+                           "date": e.get("date", ""),
+                           "value": e.get("value", ""),
+                           "sources": [e.get("source", "")]})
+                write(pipe / f"{base}.md", note + f"\n\n# {e['name']}\n")
+            deals_n = len(seen_deal)
+            if deals_n:
+                c.note(f"vault: {deals_n} deal/campaign notes → {self.L('career')}/")
+            # meetings (events with attendees / kind meeting) → meetings.md
+            meetings = [e for e in events
+                        if e.get("kind") == "meeting" or e.get("attendees")]
+            if meetings:
+                m_sources = {e.get("source") for e in meetings if e.get("source")}
+                mlines = [fm({"type": "meetings",
+                              "tags": note_tags(["meetings"], m_sources)}),
+                          "", "# Meetings\n"]
+                for e in meetings:
+                    line = f"- {e['name']} — {e['date']}".rstrip(" —")
+                    if e.get("location"):
+                        line += f" · 📍 {e['location']}"
+                    mlines.append(line)
+                    if e.get("attendees"):
+                        mlines.append("  - with: " +
+                                      ", ".join(link(a) for a in e["attendees"][:15]))
+                write(self.out / self.L("learning") / "meetings.md",
+                      "\n".join(mlines))
+            events = [e for e in events
+                      if e.get("kind") not in ("deal", "campaign", "meeting")
+                      and not e.get("attendees")]
+        if events:
+            ev_sources = {e.get("source") for e in events if e.get("source")}
             lines = [fm({"type": "events",
                          "tags": note_tags(["events"], ev_sources)}), "", "# Events\n"]
-            for e in c.events:
+            for e in events:
                 line = f"- {e['name']} — {e['date']}".rstrip(" —")
+                # RSVP/status tags (event/going, event/interested) → visible suffix
+                st = [t.split("/", 1)[1] for t in (e.get("tags") or [])
+                      if isinstance(t, str) and t.startswith("event/")]
+                if st:
+                    line += f" · {'/'.join(st)}"
                 if e.get("location"):
                     line += f" · 📍 {e['location']}"
                 lines.append(line)
                 if e.get("description"):
                     lines.append(f"  - {e['description']}")
-            write(self.out / "60-learning" / "events.md", "\n".join(lines))
+                # attendee wikilinks — the who-met-whom collaboration edge; the
+                # names were registered as people by the adapter so links resolve
+                if e.get("attendees"):
+                    lines.append("  - with: " +
+                                 ", ".join(link(a) for a in e["attendees"][:15]))
+            write(self.out / self.L("learning") / "events.md", "\n".join(lines))
         if any(c.services.values()):
-            d = self.out / "70-services"
+            d = self.out / self.L("services")
             for label, n in c.services.items():
                 if n:
                     write(d / f"{slug(label)}.md", f"# {label.title()}\n\n{n} {label}.")
         if c.searches:
-            write(self.out / "80-search" / "search-log.md",
-                  "# Search log\n\n*What you've been looking for, over time.*\n\n" +
-                  "\n".join(f"- {q}" for q in c.searches[:200]))
+            s_sources = {getattr(q, "source", "") for q in c.searches} - {""}
+            slines = [fm({"type": "search", "title": "Search log",
+                          "tags": note_tags(["search"], s_sources),
+                          "total": len(c.searches)}), "",
+                      "# Search log\n\n*What you've been looking for, over time.*\n"]
+            for q in c.searches[:500]:
+                src = getattr(q, "source", "")
+                dt = getattr(q, "date", "")
+                suffix = " · ".join(x for x in (src, dt) if x)
+                slines.append(f"- {q}" + (f"  — {suffix}" if suffix else ""))
+            if len(c.searches) > 500:
+                slines.append(f"\n…and {len(c.searches) - 500} more.")
+            write(self.out / self.L("search") / "search-log.md", "\n".join(slines))
             self._search_terms = keywords(" ".join(c.searches), 20)
 
     # 85 — places (saved/reviewed locations: Google Maps, IG locations)
@@ -608,7 +901,8 @@ class VaultWriter:
         c = self.col
         if not c.places:
             return
-        d = self.out / "85-places"
+        d = self.out / self.L("places")
+        seen_p = set()
         for p in c.places.values():
             lat, lng = p.get("lat", ""), p.get("lng", "")
             lists = sorted(p.get("lists", []))
@@ -636,7 +930,12 @@ class VaultWriter:
                 body += f"\n[View on Google Maps]({p['url']})\n"
             if p.get("note"):
                 body += f"\n## My review\n\n{p['note']}\n"
-            write(d / f"{obsidian_name(p['name'])}.md", body)
+            p_title = obsidian_name(p["name"])
+            p_base = p_title; pi = 2
+            while p_base.lower() in seen_p:
+                p_base = f"{p_title} {pi}"; pi += 1
+            seen_p.add(p_base.lower())
+            write(d / f"{p_base}.md", body)
         self._places_count = len(c.places)
 
     # 90 — synthesis
@@ -645,7 +944,7 @@ class VaultWriter:
         is told to read first: network-map, target-companies, and the two
         deterministic drafts (positions-i-hold, positioning-gaps, marked with
         callouts) that the optional AI enrichment pass later articulates."""
-        c = self.col; d = self.out / "90-synthesis"
+        c = self.col; d = self.out / self.L("synthesis")
         # network map
         cc = getattr(c, "_li_company_counts", None)
         if c.people:
@@ -668,7 +967,7 @@ class VaultWriter:
             lines.append("\n## Strongest company clusters\n")
             for comp, n in by_company.most_common(20):
                 lines.append(f"- {link(comp)} — {n} people")
-            warm = sum(1 for v in c.msg_signal.values() if v[0] >= 5)
+            warm = sum(1 for v in c.msg_signal.values() if v.get("n", 0) >= 5)
             lines.append(f"\n## Relationship signal\n\n**{warm}** correspondents with "
                          "sustained contact (5+ messages). People with `status: warm` "
                          "and an old `last_contact` are your revival candidates. People "
@@ -721,6 +1020,13 @@ class VaultWriter:
         c = self.col
         name = c.identity.get("name", "") or "your professional life"
         srcs = ", ".join(sorted(c.sources)) or "your data"
+        # subject-aware layer legend (company brains have company-named folders)
+        _ll = self.lay
+        layers_line = (f"`{_ll['root']}/` identity · `{_ll['people']}/` people · "
+                       f"`{_ll['orgs']}/` organizations · `{_ll['reputation']}/` · "
+                       f"`{_ll['voice']}/` · `{_ll['career']}/` · `{_ll['mirror']}/` · "
+                       f"`{_ll['learning']}/` · `{_ll['services']}/` · `{_ll['search']}/` · "
+                       f"`{_ll['places']}/` · `{_ll['notes']}/` your own notes")
         body = f"""{fm({"type": "moc", "tags": ["moc", "home"], "title": "Home",
                         "sources": sorted(c.sources)})}
 
@@ -741,9 +1047,7 @@ Your digital twin, built from **{srcs}** ({name}). Start here, then ask your AI 
 - [[positioning-gaps]] — how you see yourself vs how the algorithms tag you
 
 ## Your layers
-`00-me/` identity · `10-people/` network · `15-organizations/` companies ·
-`20-reputation/` · `30-voice/` posts & interests · `40-career/` · `50-mirror/` ·
-`60-learning/` · `70-services/` · `80-search/`
+{layers_line}
 
 ## How to explore
 Open **Graph view** (left ribbon) to see your network as a map — people link to
@@ -754,6 +1058,17 @@ Everything is plain Markdown you own.
 *Built by Second Brain Link · secondbrainlink.com · sources: {srcs}*
 """
         write(self.out / "Home.md", body)
+
+    def user_notes_space(self):
+        """Scaffold the engine-never-touches user area: `_notes/` — the ONE
+        folder rebuilds and refreshes will never write into, overwrite or delete.
+        Only the README stub is written, and only if absent."""
+        stub = self.out / self.L("notes") / "README.md"
+        if not stub.exists():
+            write(stub, "# Your notes\n\nWrite anything here — the engine never "
+                        "touches this folder: rebuilds and `--refresh` updates "
+                        "leave it exactly as you left it. Studio's \"save to "
+                        "brain\" also lands here.\n")
 
     def scaffolding(self):
         """Write the non-layer scaffolding: the provider's agent guide
@@ -783,7 +1098,7 @@ Everything is plain Markdown you own.
              "exports support. ✅ = present here · ◻️ = empty for this export · ⏳ = written by "
              "`analyze.py` (the value/goals step, run after the build).", "",
              "## Layers (the knowledge graph)", ""]
-        for rel, role in LAYER_ROLES:
+        for rel, role in layer_roles(getattr(self.col, "subject", "person")):
             L.append(f"- {mark(rel)} **`{rel}`** — {role}")
         L += ["", "## Reports & generated artifacts", ""]
         for rel, role in ARTIFACT_ROLES:
@@ -793,7 +1108,8 @@ Everything is plain Markdown you own.
             m = ("⏳" if not present(rel) else "✅") if rel in ANALYZE_ARTIFACTS else "✅"
             L.append(f"- {m} **`{rel}`** — {role}")
         # any unexpected top-level folder not covered above (forward-compat)
-        known = {r.split("/")[0].rstrip("/") for r, _ in LAYER_ROLES + ARTIFACT_ROLES}
+        known = {r.split("/")[0].rstrip("/") for r, _ in
+                 layer_roles(getattr(self.col, "subject", "person")) + ARTIFACT_ROLES}
         extra = sorted(p.name for p in self.out.iterdir()
                        if p.is_dir() and p.name not in known and not p.name.startswith("."))
         if extra:
@@ -825,7 +1141,13 @@ def index_files(root: Path):
     for p in root.rglob("*"):
         if p.is_file():
             all_paths.append(p)
-            if p.suffix.lower() in (".csv", ".json", ".ics", ".vcf", ".html", ".htm"):
+            # data suffixes across all supported sources (.js = X archive JSON,
+            # .txt = WhatsApp chats, .md = Notion pages, .xml = Confluence/Jira,
+            # .mbox/.eml = email archives, .gpx = Strava tracks). READMEs are
+            # documentation, not data — the placeholder data/ tree ships them.
+            if p.suffix.lower() in (".csv", ".json", ".ics", ".vcf", ".html", ".htm",
+                                    ".js", ".txt", ".md", ".xml", ".mbox", ".eml",
+                                    ".gpx") and norm_file(p.name) != "readme":
                 idx.setdefault(norm_file(p.name), []).append(p)
     return idx, all_paths
 
@@ -897,9 +1219,16 @@ def build_uncategorized_and_coverage(col, out, file_index, all_paths, consumed_k
              f"({len(uncategorized)} uncategorized, {quar} quarantined).\n",
              "## By file\n"]
     harvested_keys = {k for k, _, _ in harvested}
+    # keys an adapter consciously chose NOT to extract (low-signal by design) —
+    # honest coverage: "covered" must mean extracted OR visibly skipped, never
+    # silently dropped (real bug: LinkedIn richmedia / Chrome history read as
+    # "mapped" while their data went nowhere).
+    skipped_keys = set(getattr(col, "skipped_keys", set()) or set())
     for key in sorted(file_index):
         if key in _quar():
             st = "quarantined (not imported)"
+        elif key in skipped_keys:
+            st = "skipped (low-signal, by design — see _BUILD_REPORT.md)"
         elif key in consumed_keys:
             st = "mapped"
         elif key in routes:
@@ -966,7 +1295,7 @@ def write_seed_summary(out: Path, col, sources_used, subj, emit_list, stats):
     write(out / "_SUMMARY.md", "\n".join(lines))
     return total_md
 
-def dump_owner_records(out: Path, file_index, consumed_keys):
+def dump_owner_records(out: Path, file_index, consumed_keys, subject="person"):
     """FULL mode only: render the files that the normal build deliberately leaves
     out — the quarantine-class personal records (the OWNER's own Email Addresses,
     PhoneNumbers, Logins, Receipts, Security Challenges, Registration, …) plus any
@@ -975,7 +1304,7 @@ def dump_owner_records(out: Path, file_index, consumed_keys):
     again — no redundant parallel tree. These are about YOU, so they live in
     identity. Local only; vault/ is git-ignored."""
     quar = _quar()
-    me = out / "00-me"
+    me = out / layout_for(subject)["root"]
     written = []
     for key in sorted(file_index):
         # only the records the normal build skipped
@@ -1045,6 +1374,7 @@ def _build_one(mods, root, file_index, all_paths, out, subj, emit_names, full,
     import emitters as _emitters
     chosen = _emitters.select(emit_names) or _emitters.select("obsidian")
     meta = {"sources": sources_used, "subject": subj}
+    manifest_begin(out)   # record every generated file (the --refresh primitive)
     if len(chosen) == 1:
         chosen[0].emit(col, out, subject=subj, meta=meta)
         cov_dir = out
@@ -1056,7 +1386,8 @@ def _build_one(mods, root, file_index, all_paths, out, subj, emit_names, full,
     stats = build_uncategorized_and_coverage(col, cov_dir, file_index, all_paths,
                                              consumed_keys, sources_used, owned_elsewhere)
     if full:
-        dump_owner_records(cov_dir, file_index, consumed_keys)
+        dump_owner_records(cov_dir, file_index, consumed_keys,
+                           getattr(col, "subject", "person"))
     write(cov_dir / "_BUILD_REPORT.md", "# Build report\n\n" + f"Built: {TODAY}\n\n"
           f"Subject: {subj} · Emitters: {', '.join(e.name for e in chosen)}\n\n"
           f"Sources: {', '.join(sources_used) or 'none'}\n\n## Log\n" +
@@ -1064,6 +1395,7 @@ def _build_one(mods, root, file_index, all_paths, out, subj, emit_names, full,
     # seed-counts snapshot (per-layer note counts + coverage) for a quick read
     write_seed_summary(cov_dir, col, sources_used, subj,
                        [e.name for e in chosen], stats)
+    manifest_end(out)
     return col, sources_used, consumed_keys
 
 
@@ -1071,6 +1403,134 @@ def _build_one(mods, root, file_index, all_paths, out, subj, emit_names, full,
 # data/company/your-company). If a user drops a real export in WITHOUT renaming,
 # run_multi names the brain after the detected identity instead (see below).
 PLACEHOLDER_ENTITIES = {"your-name", "your-company"}
+
+
+# --- incremental updates (--refresh) ----------------------------------------
+
+REFRESH_EXCLUDE = ("_GENERATED.json", "_UPDATE_REPORT.md")
+
+
+def refresh_sync(new_dir: Path, live_dir: Path):
+    """Three-way sync a freshly built brain (`new_dir`) into the live vault
+    (`live_dir`) using the generated-file manifests. DECIDED policies
+    (2026-07-07): unedited engine notes are overwritten; USER-EDITED engine
+    notes are kept and the fresh version lands beside them as `<name>.new.md`;
+    stale unedited generated notes are deleted (regenerable); stale edited ones
+    are kept + reported; anything the engine never generated (your notes, the
+    whole `_notes/` space) is never touched. Writes `_UPDATE_REPORT.md` and the
+    new `_GENERATED.json`. Returns the report stats dict."""
+    new_dir, live_dir = Path(new_dir), Path(live_dir)
+    old_man = {}
+    mf = live_dir / "_GENERATED.json"
+    if mf.exists():
+        try:
+            old_man = (json.loads(mf.read_text(encoding="utf-8")) or {}).get("files", {})
+        except Exception:
+            old_man = {}
+    new_man = {}
+    nmf = new_dir / "_GENERATED.json"
+    if nmf.exists():
+        new_man = (json.loads(nmf.read_text(encoding="utf-8")) or {}).get("files", {})
+
+    def _on_disk_sha(path: Path):
+        try:
+            return _sha256_text(path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+
+    stats = {"new": [], "updated": [], "unchanged": [], "conflicts": [],
+             "deleted_stale": [], "kept_stale": []}
+    for rel, new_sha in sorted(new_man.items()):
+        src = new_dir / rel
+        dst = live_dir / rel
+        live_sha = _on_disk_sha(dst)
+        if live_sha is None:                       # brand new
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+            stats["new"].append(rel)
+        elif live_sha == new_sha:                  # identical already
+            stats["unchanged"].append(rel)
+        elif rel not in old_man or live_sha == old_man.get(rel):
+            # engine-owned and untouched by the user → safe overwrite
+            shutil.copy2(src, dst)
+            stats["updated"].append(rel)
+        else:                                      # USER EDITED → keep + .new.md
+            alt = dst.with_name(dst.stem + ".new" + dst.suffix)
+            shutil.copy2(src, alt)
+            stats["conflicts"].append(rel)
+    for rel, old_sha in sorted(old_man.items()):
+        if rel in new_man or rel.endswith("_notes/README.md"):
+            continue
+        dst = live_dir / rel
+        live_sha = _on_disk_sha(dst)
+        if live_sha is None:
+            continue
+        if live_sha == old_sha:                    # stale + unedited → delete
+            dst.unlink()
+            stats["deleted_stale"].append(rel)
+        else:                                      # stale but user-edited → keep
+            stats["kept_stale"].append(rel)
+    # adopt the new manifest + write the report
+    if nmf.exists():
+        shutil.copy2(nmf, mf)
+    rep = ["# Update report", "",
+           f"Refreshed: {TODAY}", "",
+           f"- new: {len(stats['new'])}",
+           f"- updated: {len(stats['updated'])}",
+           f"- unchanged: {len(stats['unchanged'])}",
+           f"- conflicts (kept yours, fresh copy beside as *.new.md): {len(stats['conflicts'])}",
+           f"- stale removed (unedited, regenerable): {len(stats['deleted_stale'])}",
+           f"- stale kept (you edited them): {len(stats['kept_stale'])}", ""]
+    if stats["conflicts"]:
+        rep += ["## Review these conflicts", ""] +                [f"- `{r}` → see `{Path(r).stem}.new{Path(r).suffix}`"
+                for r in stats["conflicts"]] + [""]
+    if stats["kept_stale"]:
+        rep += ["## Stale but kept (edited by you)", ""] +                [f"- `{r}`" for r in stats["kept_stale"]] + [""]
+    (live_dir / "_UPDATE_REPORT.md").write_text("\n".join(rep) + "\n",
+                                                encoding="utf-8")
+    return stats
+
+
+def refresh_tree(tmp_out: Path, live_out: Path):
+    """Apply refresh_sync across a build tree: either one brain, or the
+    multi-entity layout (personal/*-brain, company/*-brain, _correlations)."""
+    tmp_out, live_out = Path(tmp_out), Path(live_out)
+    brains = []
+    if (tmp_out / "_GENERATED.json").exists():
+        brains.append((tmp_out, live_out))
+    for sub in ("personal", "company"):
+        base = tmp_out / sub
+        if base.is_dir():
+            for b in sorted(base.iterdir()):
+                if b.is_dir() and (b / "_GENERATED.json").exists():
+                    brains.append((b, live_out / sub / b.name))
+    for extra in ("personal-brain", "company-brain"):
+        b = tmp_out / extra
+        if b.is_dir() and (b / "_GENERATED.json").exists():
+            brains.append((b, live_out / extra))
+    # _correlations is fully derived (no per-file manifest) → replace wholesale
+    corr = tmp_out / "_correlations"
+    if corr.is_dir():
+        live_corr = live_out / "_correlations"
+        shutil.rmtree(live_corr, ignore_errors=True)
+        shutil.copytree(corr, live_corr)
+        print("  ~ _correlations regenerated (fully derived)")
+    totals = {"new": 0, "updated": 0, "conflicts": 0, "deleted_stale": 0}
+    for src, dst in brains:
+        if not dst.exists():
+            shutil.copytree(src, dst)     # brand-new brain → adopt wholesale
+            print(f"  + new brain: {dst}")
+            continue
+        st = refresh_sync(src, dst)
+        totals = {k: totals[k] + len(st.get(k, [])) for k in totals}
+        print(f"  ~ refreshed {dst.name}: {len(st['new'])} new · "
+              f"{len(st['updated'])} updated · {len(st['conflicts'])} conflicts · "
+              f"{len(st['deleted_stale'])} stale removed → _UPDATE_REPORT.md")
+    # top-level multi index (overwrite is fine — always regenerated)
+    idx = tmp_out / "_SUMMARY.md"
+    if idx.exists():
+        shutil.copy2(idx, live_out / "_SUMMARY.md")
+    return totals
 
 
 def discover_entities(root: Path):
@@ -1217,11 +1677,29 @@ def run(root: Path, out: Path, emit_names="obsidian", subject="auto", full=False
         sys.exit(1)
     sources = detect_sources(file_index)
     if not sources:
-        print("Could not identify the source. Supported: LinkedIn, Facebook, "
-              "Instagram, Google Takeout (personal); LinkedIn Company, Google "
-              "Workspace, Slack (company). Proceeding with generic catch-all only.")
+        import sources as _srcreg
+        known = ", ".join(sorted(m.NAME for m in _srcreg.ALL))
+        print(f"Could not identify the source. Supported: {known}. "
+              "Proceeding with generic catch-all only.")
     personal = [m for m in sources if getattr(m, "SUBJECT", "person") != "company"]
     company = [m for m in sources if getattr(m, "SUBJECT", "person") == "company"]
+
+    # Signal-class company sources (mail/Teams headers → people + message signal)
+    # must not force a sibling company brain on their own: a PERSONAL export can
+    # legitimately contain them (e.g. a Google Takeout with Mail/*.mbox), and
+    # splitting the owner's own mail headers into a bogus company-brain/ was a
+    # real bug. When real personal sources fired and the ONLY company sources are
+    # signal-class, demote them: skip them for this build and say why. A real
+    # company export (linkedin_company/workspace/slack/CRM…) is never demoted.
+    _SIGNAL_ONLY = {"email", "microsoft365", "teams"}
+    if subject == "auto" and personal and company and \
+            all(m.NAME in _SIGNAL_ONLY for m in company):
+        print("Personal export also contains mail/chat-signal sources ("
+              + ", ".join(m.NAME for m in company)
+              + ") — skipping them here. To build a Company Brain from them, "
+              "place the archive under data/company/<name>/<source>/.")
+        sources = personal
+        company = []
 
     # Decide brains to build. `--subject` forces a single brain; `auto` builds two
     # SIBLING vaults when BOTH personal and company sources fired (clean split).
@@ -1341,6 +1819,14 @@ def main():
                     help="output target(s): obsidian (default) | gbrain | both")
     ap.add_argument("--subject", default="auto", choices=["auto", "person", "company"],
                     help="root the brain on a person or a company (default: auto-detect)")
+    ap.add_argument("--refresh", action="store_true",
+                    help="UPDATE an existing vault in place: build fresh into a "
+                         "temp dir, then three-way-sync against the previous "
+                         "build's _GENERATED.json — unedited engine notes update, "
+                         "your edited notes are kept (fresh copy lands beside as "
+                         "*.new.md), stale unedited notes are removed, and your "
+                         "own files (_notes/, anything you created) are never "
+                         "touched. Writes _UPDATE_REPORT.md.")
     ap.add_argument("--full", action="store_true",
                     help="FULL-FIDELITY / owner mode — capture EVERYTHING (emails, "
                          "phones, every extra column, sensitive files) into your own "
@@ -1415,19 +1901,50 @@ def main():
         # multi-entity (personal/<name> + company/<name>) when present, else
         # back-compat single brain. --subject forces the single-brain path.
         use_multi = args.subject == "auto" and bool(discover_entities(work))
+        # --refresh: build fresh into a temp sibling, then manifest-sync into
+        # the live vault (user notes/edits preserved per the decided policies).
+        refresh_tmp = None
+        build_target = out
+        if args.refresh:
+            if not out.exists():
+                print(f"--refresh: '{out}' doesn't exist yet — building fresh instead.")
+                args.refresh = False
+            else:
+                has_manifest = (out / "_GENERATED.json").exists() or any(
+                    (out / sub).is_dir() and any(
+                        (b / "_GENERATED.json").exists()
+                        for b in (out / sub).iterdir() if b.is_dir())
+                    for sub in ("personal", "company") if (out / sub).is_dir())
+                if not has_manifest:
+                    print(f"--refresh: '{out}' has no _GENERATED.json manifest "
+                          "(built before refresh support). Rebuild once into a "
+                          "fresh dir to establish the manifest, then --refresh "
+                          "will work for every later update.")
+                    sys.exit(1)
+                refresh_tmp = out.parent / f".{out.name}.refresh-tmp"
+                shutil.rmtree(refresh_tmp, ignore_errors=True)
+                build_target = refresh_tmp
         # The single-brain path writes straight into `out`, so it must be empty.
         # The multi-entity path writes into per-entity subdirs (guarded in
         # run_multi), so `out` may already hold a _profile/ or other brains.
-        if not use_multi and out.exists() and any(out.iterdir()):
-            print(f"Output '{out}' exists and is not empty. Use a fresh dir."); sys.exit(1)
+        if not args.refresh and not use_multi and out.exists() and any(out.iterdir()):
+            print(f"Output '{out}' exists and is not empty. Use a fresh dir, "
+                  "or update it in place with --refresh."); sys.exit(1)
         try:
             if use_multi:
-                multi_ents, _ = run_multi(work, out, emit_names=args.emit,
+                multi_ents, _ = run_multi(work, build_target, emit_names=args.emit,
                                           full=args.full, correlate=not args.no_correlate)
                 col, sources_used = None, []
             else:
-                col, sources_used = run(work, out, emit_names=args.emit,
+                col, sources_used = run(work, build_target, emit_names=args.emit,
                                         subject=args.subject, full=args.full)
+            if args.refresh and refresh_tmp is not None:
+                print(f"\n→ refreshing {out} from the new build …")
+                refresh_tree(refresh_tmp, out)
+                shutil.rmtree(refresh_tmp, ignore_errors=True)
+                print("   (goal workspaces/Dashboard are analyze.py outputs — "
+                      "re-run analyze.py to refresh them; your own notes and "
+                      "edits were preserved, see _UPDATE_REPORT.md)")
         except Exception as e:
             rep = selfheal.write_error_report(out, "build_vault", e)
             print(f"\n❌ Build failed: {type(e).__name__}: {e}")

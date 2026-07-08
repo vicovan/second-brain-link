@@ -1,50 +1,302 @@
 {
-  "_comment": "Brain layout — the canonical vault folders, what file-keys route to each (for the mindmap/brain-structure design) and which collector buckets render there (for the builder). Override with --mappings <dir>/brain/layout.json. Keep in sync with the LAYER_ROUTES default in diagrams.py.",
-  "taxonomy": "canonical-pruned",
-  "quarantine_folder": "_quarantine",
-  "layers": [
-    { "folder": "00-me", "title": "00-me · identity", "buckets": ["identity"],
-      "purpose": "Identity: profile, positions, education, skills, certs, languages",
-      "route_keys": ["profile","profilesummary","positions","skills","education",
-                     "certifications","languages","patents","volunteering","workinghours",
-                     "personalinformation","instagramprofileinformation"] },
-    { "folder": "10-people", "title": "10-people", "buckets": ["people"],
-      "purpose": "One merged note per person across all sources",
-      "route_keys": ["connections","memberfollows","invitations","followers","following","friends","contacts"] },
-    { "folder": "15-organizations", "title": "15-organizations", "buckets": ["orgs"],
-      "purpose": "Companies you follow / worked at / targeted",
-      "route_keys": ["companyfollows"] },
-    { "folder": "20-reputation", "title": "20-reputation", "buckets": ["reputation"],
-      "purpose": "Recommendations + endorsements (given & received)",
-      "route_keys": ["recommendationsreceived","recommendationsgiven",
-                     "endorsementreceivedinfo","endorsementgiveninfo"] },
-    { "folder": "30-voice", "title": "30-voice", "buckets": ["posts","comments","reactions","interests"],
-      "purpose": "Your posts, comments, reactions, interests, saved items",
-      "route_keys": ["shares","instantreposts","comments","reactions","votes",
-                     "hashtagfollows","saveditems","richmedia","articles","posts",
-                     "likedposts","yourtopics"] },
-    { "folder": "40-career", "title": "40-career", "buckets": ["applications","prefs","saved_jobs","reusable"],
-      "purpose": "Job applications, preferences, saved jobs, reusable answers",
-      "route_keys": ["jobapplications","jobseekerpreferences","savedjobs","savedjobalerts",
-                     "onlinejobpostings","jobapplicantsavedanswers",
-                     "jobapplicantsavedscreeningquestionresponses"] },
-    { "folder": "50-mirror", "title": "50-mirror", "buckets": ["mirror_inferences","ad_segments"],
-      "purpose": "How algorithms see you: inferences + ad targeting",
-      "route_keys": ["inferencesaboutyou","adtargeting","adsclicked","lanadsengagement"] },
-    { "folder": "60-learning", "title": "60-learning", "buckets": ["learning_count"],
-      "purpose": "Courses / learning activity",
-      "route_keys": ["learning","learningcoachmessages","learningroleplaymessages"] },
-    { "folder": "70-services", "title": "70-services", "buckets": ["services"],
-      "purpose": "Services-marketplace engagements & providers",
-      "route_keys": ["engagements","opprtunities","opportunities","providers"] },
-    { "folder": "80-search", "title": "80-search", "buckets": ["searches"],
-      "purpose": "Your search history (topics over time)",
-      "route_keys": ["searchqueries","recentsearches","profilesearches"] },
-    { "folder": "85-places", "title": "85-places", "buckets": ["places"],
-      "purpose": "Saved / reviewed locations (Google Maps, check-ins)",
-      "route_keys": ["savedplaces","reviews","locationsofinterest","yourplaces"] },
-    { "folder": "events", "title": "events / calendar", "buckets": ["events"],
-      "purpose": "Events / calendar",
-      "route_keys": ["events","calendar"] }
-  ]
+ "_comment": "Brain layout — the canonical vault folders, what file-keys route to each (for the mindmap/brain-structure design) and which collector buckets render there (for the builder). Override with --mappings <dir>/brain/layout.json. Keep in sync with the LAYER_ROUTES default in diagrams.py.",
+ "taxonomy": "canonical-pruned",
+ "quarantine_folder": "_quarantine",
+ "layers": [
+  {
+   "folder": "00-me",
+   "title": "00-me · identity",
+   "buckets": [
+    "identity"
+   ],
+   "purpose": "Identity: profile, positions, education, skills, certs, languages",
+   "purpose_company": "The organization: profile, HQ, followers baseline + the data-handling note",
+   "route_keys": [
+    "profile",
+    "profilesummary",
+    "positions",
+    "skills",
+    "education",
+    "certifications",
+    "languages",
+    "patents",
+    "volunteering",
+    "workinghours",
+    "personalinformation",
+    "instagramprofileinformation",
+    "organizationprofile",
+    "companyprofile",
+    "identity",
+    "user",
+    "userdata",
+    "userdatatiktok",
+    "accountgender"
+   ]
+  },
+  {
+   "folder": "10-people",
+   "title": "10-people",
+   "buckets": [
+    "people"
+   ],
+   "purpose": "One merged note per person across all sources",
+   "purpose_company": "People: employees, customers, vendors and correspondents, merged across sources",
+   "route_keys": [
+    "connections",
+    "memberfollows",
+    "invitations",
+    "followers",
+    "following",
+    "friends",
+    "contacts",
+    "contact",
+    "lead",
+    "employeelist",
+    "domainusers",
+    "users",
+    "groupmembers",
+    "task",
+    "purviewresults",
+    "teamsmessagesreport",
+    "hubspotcrmexportsallcontacts",
+    "chathistory",
+    "follow"
+   ]
+  },
+  {
+   "folder": "15-organizations",
+   "title": "15-organizations",
+   "buckets": [
+    "orgs"
+   ],
+   "purpose": "Companies you follow / worked at / targeted",
+   "purpose_company": "Organizations: customers, vendors, departments, teams and channels",
+   "route_keys": [
+    "companyfollows",
+    "account",
+    "organizations",
+    "orgunits",
+    "groups",
+    "channels",
+    "clubs",
+    "jiraexport",
+    "hubspotcrmexportsallcompanies"
+   ]
+  },
+  {
+   "folder": "20-reputation",
+   "title": "20-reputation",
+   "buckets": [
+    "reputation"
+   ],
+   "purpose": "Recommendations + endorsements (given & received)",
+   "purpose_company": "Brand: reviews and public reputation signals",
+   "route_keys": [
+    "recommendationsreceived",
+    "recommendationsgiven",
+    "endorsementreceivedinfo",
+    "endorsementgiveninfo"
+   ]
+  },
+  {
+   "folder": "30-voice",
+   "title": "30-voice",
+   "buckets": [
+    "posts",
+    "comments",
+    "reactions",
+    "interests"
+   ],
+   "purpose": "Your posts, comments, reactions, interests, saved items",
+   "purpose_company": "The company's published content: posts, wiki pages, comments",
+   "route_keys": [
+    "shares",
+    "instantreposts",
+    "comments",
+    "reactions",
+    "votes",
+    "hashtagfollows",
+    "saveditems",
+    "richmedia",
+    "articles",
+    "posts",
+    "likedposts",
+    "yourtopics",
+    "organizationposts",
+    "contentmetrics",
+    "repositories",
+    "issues",
+    "multireddits",
+    "subscribedsubreddits",
+    "subscriptions",
+    "playlist",
+    "endsong",
+    "streaminghistory",
+    "workshopfavoritesvideos"
+   ]
+  },
+  {
+   "folder": "40-career",
+   "title": "40-career",
+   "buckets": [
+    "applications",
+    "prefs",
+    "saved_jobs",
+    "reusable"
+   ],
+   "purpose": "Job applications, preferences, saved jobs, reusable answers",
+   "purpose_company": "Pipeline: deals and campaigns from the CRM (one note per deal)",
+   "route_keys": [
+    "jobapplications",
+    "jobseekerpreferences",
+    "savedjobs",
+    "savedjobalerts",
+    "onlinejobpostings",
+    "jobapplicantsavedanswers",
+    "jobapplicantsavedscreeningquestionresponses",
+    "opportunity",
+    "deal",
+    "campaign",
+    "campaignmember",
+    "hubspotcrmexportsalldeals"
+   ]
+  },
+  {
+   "folder": "50-mirror",
+   "title": "50-mirror",
+   "buckets": [
+    "mirror_inferences",
+    "ad_segments"
+   ],
+   "purpose": "How algorithms see you: inferences + ad targeting",
+   "purpose_company": "Market view: follower/visitor demographics and audience segments",
+   "route_keys": [
+    "inferencesaboutyou",
+    "adtargeting",
+    "adsclicked",
+    "lanadsengagement",
+    "inferences",
+    "marquee",
+    "pagefollowers",
+    "followerdemographics",
+    "followermetrics"
+   ]
+  },
+  {
+   "folder": "60-learning",
+   "title": "60-learning",
+   "buckets": [
+    "learning_count"
+   ],
+   "purpose": "Courses / learning activity",
+   "purpose_company": "Knowledge: meetings, events, learning",
+   "route_keys": [
+    "learning",
+    "learningcoachmessages",
+    "learningroleplaymessages"
+   ]
+  },
+  {
+   "folder": "70-services",
+   "title": "70-services",
+   "buckets": [
+    "services"
+   ],
+   "purpose": "Services-marketplace engagements & providers",
+   "purpose_company": "Support: ticket volume and service signals",
+   "route_keys": [
+    "engagements",
+    "opprtunities",
+    "opportunities",
+    "providers",
+    "case",
+    "ticket",
+    "hubspotcrmexportsalltickets"
+   ]
+  },
+  {
+   "folder": "80-search",
+   "title": "80-search",
+   "buckets": [
+    "searches"
+   ],
+   "purpose": "Your search history (topics over time)",
+   "purpose_company": "Signals: search/activity signals around the org",
+   "route_keys": [
+    "searchqueries",
+    "recentsearches",
+    "profilesearches",
+    "searchhistory",
+    "watchhistory"
+   ]
+  },
+  {
+   "folder": "85-places",
+   "title": "85-places",
+   "buckets": [
+    "places"
+   ],
+   "purpose": "Saved / reviewed locations (Google Maps, check-ins)",
+   "purpose_company": "Locations: HQ, offices and customer sites (geocoded)",
+   "route_keys": [
+    "savedplaces",
+    "reviews",
+    "locationsofinterest",
+    "yourplaces"
+   ]
+  },
+  {
+   "folder": "events",
+   "title": "events / calendar",
+   "buckets": [
+    "events"
+   ],
+   "purpose": "Events / calendar",
+   "purpose_company": "Events / meetings / calendar",
+   "route_keys": [
+    "events",
+    "calendar",
+    "calendarevents",
+    "sharedcalendars",
+    "activities"
+   ]
+  }
+ ],
+ "variants": {
+  "_comment": "Layer KEY → folder name per subject. THE source of truth for the builder (build_vault.layout_for) AND diagrams. Company brains get company-named folders (decided 2026-07-07). Keys are stable; only folder names vary.",
+  "person": {
+   "root": "00-me",
+   "people": "10-people",
+   "orgs": "15-organizations",
+   "reputation": "20-reputation",
+   "voice": "30-voice",
+   "career": "40-career",
+   "mirror": "50-mirror",
+   "learning": "60-learning",
+   "services": "70-services",
+   "search": "80-search",
+   "places": "85-places",
+   "synthesis": "90-synthesis",
+   "uncategorized": "99-uncategorized",
+   "quarantine": "_quarantine",
+   "notes": "_notes"
+  },
+  "company": {
+   "root": "00-org",
+   "people": "10-people",
+   "orgs": "15-organizations",
+   "reputation": "20-brand",
+   "voice": "30-content",
+   "career": "40-pipeline",
+   "mirror": "50-market-view",
+   "learning": "60-knowledge",
+   "services": "70-support",
+   "search": "80-signals",
+   "places": "85-locations",
+   "synthesis": "90-synthesis",
+   "uncategorized": "99-uncategorized",
+   "quarantine": "_quarantine",
+   "notes": "_notes"
+  }
+ }
 }

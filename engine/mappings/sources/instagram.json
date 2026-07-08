@@ -1,84 +1,371 @@
 {
-  "_comment": "Instagram (JSON export) source mapping — interpreted by engine/scripts/mapping.py into the adapter contract; wins over any same-named Python adapter. Pulls followers/following + synced contacts -> people, media posts -> voice, your_topics + threads-viewed -> interests, last-known-location -> 85-places, profile -> identity, and messages -> per-person SIGNAL only (sender + timestamp, never body). Selectors: 'string_list_data[].value' (IG wrappers), 'string_map_data.*.value' / 'string_map_data.Key.value' (IG label_values; keys may contain spaces), ['a','b'] = first non-empty, {const:x} = literal. NOTE: 'quarantine' entries are EXACT normalized filename keys (norm_file: lowercase, no spaces/punct/shard-suffix) — matched by `key in ALL_QUARANTINE`, NOT folder substrings. In --full owner mode quarantined files still fold into 00-me/my-*.md. Privacy is enforced by the Collector. See engine/references/blueprint.md and CONTRIBUTING.md (mapping-first).",
-  "name": "instagram",
-  "subject": "person",
-  "detect": {
-    "path_contains": ["instagram"],
-    "any_key_prefix": ["followers", "following"]
-  },
-  "quarantine": ["loginactivity", "logoutactivity", "signupdetails",
-                 "passwordchangeactivity", "eligibility",
-                 "showexclusivestorypromosetting", "yourmutedstoryteasercreators",
-                 "checkoutpaymentinformation", "camerainformation"],
-  "records": [
-    { "match": {"path_contains": ["connections/followers_and_following/followers"]},
-      "locate": "auto_array", "emit": "person",
-      "fields": { "name": "string_list_data[].value",
-                  "handle": "string_list_data[].value",
-                  "url": "string_list_data[].href",
-                  "date": "string_list_data[].timestamp",
-                  "role": {"const": "instagram follower"} } },
-
-    { "match": {"path_contains": ["connections/followers_and_following/following"]},
-      "locate": "auto_array", "emit": "person",
-      "fields": { "name": "string_list_data[].value",
-                  "handle": "string_list_data[].value",
-                  "url": "string_list_data[].href",
-                  "date": "string_list_data[].timestamp",
-                  "role": {"const": "instagram following"} } },
-
-    { "match": {"path_contains": ["your_instagram_activity/media/posts"]},
-      "locate": "auto_array", "emit": "post",
-      "fields": { "text": ["title", "media[].title", "caption"],
-                  "date": ["creation_timestamp", "media[].creation_timestamp", "timestamp"] } },
-
-    { "match": {"path_contains": ["preferences/your_topics", "ads_information/ads_and_topics",
-                                  "your_topics"]},
-      "locate": "walk", "emit": "interest",
-      "fields": { "tag": ["string_map_data.*.value", "value", "title", "name"] } },
-
-    { "match": {"path_contains": ["personal_information/personal_information/personal_information",
-                                  "instagram_profile_information"]},
-      "locate": "walk", "emit": "identity",
-      "_note": "name only — LinkedIn supplies headline/about; an IG bio shouldn't override a career headline (set_identity is first-non-empty-wins)",
-      "fields": { "name": ["string_map_data.Name.value", "profile_user[].string_map_data.Name.value"] } },
-
-    { "match": {"name_contains": ["messag"], "path_contains": ["messages"], "suffix": ".json"},
-      "emit": "message_signal", "locate": "dict",
-      "fields": { "name": "messages[].sender_name", "date": "messages[].timestamp_ms" } },
-
-    { "match": {"path_contains": ["contacts/synced_contacts", "synced_contacts"], "suffix": ".json"},
-      "locate": "walk", "emit": "person",
-      "fields": { "name": ["string_map_data.First Name.value", "string_map_data.*.value"],
-                  "role": {"const": "instagram synced contact"} } },
-
-    { "match": {"path_contains": ["text_post_app_posts_seen", "threads_viewed", "posts_seen"],
-                "suffix": ".json"},
-      "locate": "walk", "emit": "interest",
-      "fields": { "tag": "string_map_data.Author.value" } },
-
-    { "match": {"path_contains": ["last_known_location"], "suffix": ".json"},
-      "locate": "walk", "emit": "place",
-      "fields": { "name": {"const": "Instagram — last known location"},
-                  "lat": ["string_map_data.Precise latitude.value", "string_map_data.Imprecise latitude.value"],
-                  "lng": ["string_map_data.Precise longitude.value", "string_map_data.Imprecise longitude.value"],
-                  "kind": {"const": "device-location"} } },
-
-    { "match": {"path_contains": ["instagram"], "name_contains": ["saved_posts", "liked_posts"], "suffix": ".json"},
-      "locate": "auto_array", "emit": "interest",
-      "_note": "captions of posts you saved/liked — a strong topic/taste signal (feeds the personalization goal).",
-      "fields": { "tag": ["label_values[label=Caption].value", "string_map_data.Caption.value"] } },
-
-    { "match": {"path_contains": ["instagram"], "name_contains": ["follow_requests", "pending_follow"], "suffix": ".json"},
-      "locate": "auto_array", "emit": "person",
-      "tags": ["person/instagram-follow-request"],
-      "fields": { "name": ["label_values[label=Name].value", "label_values[label=Username].value"],
-                  "handle": "label_values[label=Username].value",
-                  "url": "label_values[label=URL].value",
-                  "role": {"const": "instagram follow request"} } },
-
-    { "match": {"path_contains": ["instagram"], "name_contains": ["post_comments", "reels_comments"], "suffix": ".json"},
-      "locate": "walk", "emit": "comment",
-      "fields": { "text": ["string_map_data.Comment.value", "label_values[label=Comment].value"] } }
+ "_comment": "Instagram (JSON export) source mapping — interpreted by engine/scripts/mapping.py into the adapter contract; wins over any same-named Python adapter. Pulls followers/following + synced contacts -> people, media posts -> voice, your_topics + threads-viewed -> interests, last-known-location -> 85-places, profile -> identity, and messages -> per-person SIGNAL only (sender + timestamp, never body). Selectors: 'string_list_data[].value' (IG wrappers), 'string_map_data.*.value' / 'string_map_data.Key.value' (IG label_values; keys may contain spaces), ['a','b'] = first non-empty, {const:x} = literal. NOTE: 'quarantine' entries are EXACT normalized filename keys (norm_file: lowercase, no spaces/punct/shard-suffix) — matched by `key in ALL_QUARANTINE`, NOT folder substrings. In --full owner mode quarantined files still fold into 00-me/my-*.md. Privacy is enforced by the Collector. See engine/references/blueprint.md and CONTRIBUTING.md (mapping-first).",
+ "name": "instagram",
+ "subject": "person",
+ "detect": {
+  "path_contains": [
+   "instagram"
+  ],
+  "any_key_prefix": [
+   "yourtopics",
+   "storyactivities",
+   "syncedcontacts"
   ]
+ },
+ "quarantine": [
+  "loginactivity",
+  "logoutactivity",
+  "signupdetails",
+  "passwordchangeactivity",
+  "eligibility",
+  "showexclusivestorypromosetting",
+  "yourmutedstoryteasercreators",
+  "checkoutpaymentinformation",
+  "camerainformation"
+ ],
+ "records": [
+  {
+   "match": {
+    "path_contains": [
+     "connections/followers_and_following/followers"
+    ]
+   },
+   "locate": "auto_array",
+   "emit": "person",
+   "fields": {
+    "name": "string_list_data[].value",
+    "handle": "string_list_data[].value",
+    "url": "string_list_data[].href",
+    "date": "string_list_data[].timestamp",
+    "role": {
+     "const": "instagram follower"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "connections/followers_and_following/following"
+    ]
+   },
+   "locate": "auto_array",
+   "emit": "person",
+   "fields": {
+    "name": "string_list_data[].value",
+    "handle": "string_list_data[].value",
+    "url": "string_list_data[].href",
+    "date": "string_list_data[].timestamp",
+    "role": {
+     "const": "instagram following"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "your_instagram_activity/media/posts"
+    ]
+   },
+   "locate": "auto_array",
+   "emit": "post",
+   "fields": {
+    "text": [
+     "title",
+     "media[].title",
+     "caption"
+    ],
+    "date": [
+     "creation_timestamp",
+     "media[].creation_timestamp",
+     "timestamp"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "preferences/your_topics",
+     "ads_information/ads_and_topics",
+     "your_topics"
+    ]
+   },
+   "locate": "walk",
+   "emit": "interest",
+   "fields": {
+    "tag": [
+     "string_map_data.*.value",
+     "value",
+     "title",
+     "name"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "personal_information/personal_information/personal_information",
+     "instagram_profile_information"
+    ]
+   },
+   "locate": "walk",
+   "emit": "identity",
+   "_note": "name only — LinkedIn supplies headline/about; an IG bio shouldn't override a career headline (set_identity is first-non-empty-wins)",
+   "fields": {
+    "name": [
+     "string_map_data.Name.value",
+     "profile_user[].string_map_data.Name.value"
+    ]
+   }
+  },
+  {
+   "match": {
+    "name_contains": [
+     "messag"
+    ],
+    "path_contains": [
+     "messages"
+    ],
+    "suffix": ".json"
+   },
+   "emit": "message_signal",
+   "locate": "dict",
+   "fields": {
+    "name": "messages[].sender_name",
+    "date": "messages[].timestamp_ms"
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "contacts/synced_contacts",
+     "synced_contacts"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "person",
+   "fields": {
+    "name": [
+     "string_map_data.First Name.value",
+     "string_map_data.*.value"
+    ],
+    "role": {
+     "const": "instagram synced contact"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "text_post_app_posts_seen",
+     "threads_viewed",
+     "posts_seen"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "interest",
+   "fields": {
+    "tag": "string_map_data.Author.value"
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "last_known_location"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "place",
+   "fields": {
+    "name": {
+     "const": "Instagram — last known location"
+    },
+    "lat": [
+     "string_map_data.Precise latitude.value",
+     "string_map_data.Imprecise latitude.value"
+    ],
+    "lng": [
+     "string_map_data.Precise longitude.value",
+     "string_map_data.Imprecise longitude.value"
+    ],
+    "kind": {
+     "const": "device-location"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "instagram"
+    ],
+    "name_contains": [
+     "saved_posts",
+     "liked_posts"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "interest",
+   "_note": "captions of posts you saved/liked — a strong topic/taste signal (feeds the personalization goal).",
+   "fields": {
+    "tag": [
+     "label_values[label=Caption].value",
+     "string_map_data.Caption.value"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "instagram"
+    ],
+    "name_contains": [
+     "follow_requests",
+     "pending_follow"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "person",
+   "tags": [
+    "person/instagram-follow-request"
+   ],
+   "fields": {
+    "name": [
+     "label_values[label=Name].value",
+     "label_values[label=Username].value"
+    ],
+    "handle": "label_values[label=Username].value",
+    "url": "label_values[label=URL].value",
+    "role": {
+     "const": "instagram follow request"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "instagram"
+    ],
+    "name_contains": [
+     "post_comments",
+     "reels_comments"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "comment",
+   "fields": {
+    "text": [
+     "string_map_data.Comment.value",
+     "label_values[label=Comment].value"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "story_activities"
+    ],
+    "name_contains": [
+     "polls"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "reaction",
+   "fields": {
+    "count_of": "string_list_data[].timestamp",
+    "kind": {
+     "const": "story poll"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "story_activities"
+    ],
+    "name_contains": [
+     "quizzes"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "reaction",
+   "fields": {
+    "count_of": "string_list_data[].timestamp",
+    "kind": {
+     "const": "story quiz"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "story_activities"
+    ],
+    "name_contains": [
+     "story_likes"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "reaction",
+   "fields": {
+    "count_of": "string_list_data[].timestamp",
+    "kind": {
+     "const": "story like"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "story_activities"
+    ],
+    "name_contains": [
+     "emoji_sliders"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "reaction",
+   "fields": {
+    "count_of": "string_list_data[].timestamp",
+    "kind": {
+     "const": "story slider"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "instagram"
+    ],
+    "name_contains": [
+     "posts_"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "place",
+   "tags": [
+    "place/photo"
+   ],
+   "fields": {
+    "name": [
+     "title",
+     "media_metadata.photo_metadata.exif_data[0].scene_capture_type"
+    ],
+    "lat": "media_metadata.photo_metadata.exif_data[0].latitude",
+    "lng": "media_metadata.photo_metadata.exif_data[0].longitude",
+    "kind": {
+     "const": "photo"
+    }
+   }
+  }
+ ]
 }

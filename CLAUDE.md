@@ -12,8 +12,11 @@
 ## 1. What this is, in one paragraph
 
 **Second Brain Link** turns a person's *or* a company's own platform data exports —
-LinkedIn, Facebook, Instagram, Google Takeout (personal); LinkedIn Company, Google
-Workspace, Slack (company) — into a single, private, local, AI-queryable knowledge
+24 sources: LinkedIn, Facebook, Instagram, Google Takeout, X/Twitter, WhatsApp, GitHub,
+YouTube, Strava, Reddit, Spotify, TikTok (personal); LinkedIn Company, Google Workspace,
+Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email/mbox, Microsoft 365,
+Teams (company; see §9 for depth/privacy per source) — into a single, private, local,
+AI-queryable knowledge
 vault: a **digital twin** or **Company Brain** an agent can reason over. It runs
 **100% locally**, makes **zero network calls** in the core transform, and emits
 plain Markdown the user owns. It is a **cross-model Agent Skill** (one engine, thin
@@ -130,7 +133,7 @@ from one canonical `Collector` and has no source-specific code.
   `string_list_data[].value` / `string_map_data.*.value` and Google Maps GeoJSON
   `features[].properties.location.name` + `geometry.coordinates[0]`.
   - **Mapping wins over a same-named Python adapter.** Today
-    `instagram`/`google`/`facebook` are JSON mappings; `linkedin` + the company
+    `instagram`/`facebook`/`reddit`/`spotify`/`tiktok` are JSON mappings; `linkedin`/`google` + the other personal/company
     adapters stay Python.
   - **Consumed keys must be `norm_file(p.name)`** (NOT `nk`) to match the engine's
     `file_index` keys — else coverage shows files as unclaimed though extraction
@@ -259,7 +262,7 @@ second-brain-link/
 │   │       ├── personal/         #   linkedin, facebook, instagram, google
 │   │       └── company/          #   linkedin_company, google_workspace, slack
 │   ├── mappings/
-│   │   ├── sources/<name>.json   #   declarative source mappings (instagram/google/facebook)
+│   │   ├── sources/<name>.json   #   declarative source mappings (instagram/facebook/reddit/spotify/tiktok)
 │   │   └── brain/layout.json     #   the folder/route table (adds 85-places)
 │   └── references/blueprint.md   #   full data model (every file → vault layer)
 ├── providers/                    # thin per-provider manifests (Agent Skills standard)
@@ -270,7 +273,7 @@ second-brain-link/
 │   ├── claude/second-brain-link.skill     # committed installable (unpacked folder git-ignored)
 │   └── openai/second-brain-link.skill
 ├── tests/
-│   ├── run.py                    # stdlib test harness (currently 182 checks)
+│   ├── run.py                    # stdlib test harness (currently 554 checks)
 │   └── fixtures/{personal,company}/<entity>/<source>/   # synthetic exports
 └── .github/                      # CI + issue/PR templates
 ```
@@ -288,7 +291,7 @@ languages) · `10-people/` (one merged note per person) · `15-organizations/` �
 (inferences, ad-profile) · `60-learning/` · `70-services/` · `80-search/` ·
 **`85-places/`** (saved/reviewed/checked-in locations) · `90-synthesis/` (network-map,
 target-companies, positions-i-hold [draft], positioning-gaps [draft]) ·
-`99-uncategorized/` · `_quarantine/`.
+`_notes/` (YOURS — never regenerated) · `99-uncategorized/` · `_quarantine/`. **Company brains use company-named folders** for the middle layers (20-brand, 30-content, 40-pipeline w/ one note per deal, 50-market-view, 60-knowledge w/ meetings.md, 70-support, 80-signals, 85-locations) — driven by `mappings/brain/layout.json` `variants` via `VaultWriter.L(key)` (never hardcode a layer folder). Full field reference: `docs/ENTITY-MAP.md`.
 
 Generated reports/artifacts at the brain root, each documented in `_STRUCTURE.md`:
 `_STRUCTURE.md` (ALWAYS — the vault map: every folder/file + its role) · `_SUMMARY.md`
@@ -393,14 +396,41 @@ Multiple entities → one brain each under `vault/personal/` + `vault/company/`,
 | Facebook | personal | JSON | **Full** JSON mapping (46 rules): friends/followers/requests→people, posts/comments/reactions→voice, liked pages→interests, ad-interests/advertisers/off-Meta/predictions→**50-mirror** (mirror/ad_segment emit), check-ins/cities/locations→85-places, event invitations→events, pages/groups/apps→orgs, search history, profile→identity; tagged `source/facebook` + semantic; quarantine fixed (exact norm_file keys) |
 | Instagram | personal | JSON | JSON mapping (profile, follows, posts, topics, places, msg signal) |
 | Google Takeout | personal | mixed | JSON mapping (contacts→people, calendar→events, YouTube→interests, **Maps→85-places**) |
-| LinkedIn Company | company | CSV | Python adapter (org, employees, followers, posts) |
-| Google Workspace | company | mixed | Python adapter (users→employees, calendars→events, drives→projects) |
-| Slack | company | JSON | Python adapter (members→people, channels→orgs, messages→signal only) |
+| X / Twitter | personal | .js (YTD JSON) | Python adapter (`x_twitter.py`, NAME `x`): tweets→voice (RTs excluded), likes→reaction count, following/followers→people (handles), account/profile→identity; DMs quarantined, contact.js skipped explicitly |
+| WhatsApp | personal | .txt chats | Python adapter, **signal-only**: senders+dates→people+msg signal; bodies never read; per-chat day-first/month-first detection |
+| GitHub | personal | JSON (account export) | Python adapter: user→identity (+location), repos→voice `kind: repo` + language interests, followers/following→people, stars→interests |
+| YouTube | personal | JSON/CSV (Takeout slice) | Python adapter (standalone slice only — stands down when full-Takeout markers present so `google` owns it): watch→interests, search→80-search, subscriptions/playlists→interests, comments→voice |
+| Strava | personal | CSV + GPX | Python adapter: activities→events + sport interests, profile→identity (city geocodes), clubs→orgs, GPX **first trackpoint only**→85-places |
+| Reddit | personal | CSV | JSON mapping: posts/comments→voice, subreddits→interests, search→80-search; gender/ads/IP/chat files quarantined |
+| Spotify | personal | JSON | JSON mapping: listening history→artist interests, Inferences→**50-mirror**, Marquee→ad segments, searches→80-search; Userdata/payments quarantined |
+| TikTok | personal | JSON (single file) | JSON mapping: following→people, searches→80-search, hashtags→interests, profile→identity; DM text in-file but never selected |
+| LinkedIn Company | company | CSV | Python adapter (org+HQ location, employees + **Department→dept orgs/tags**, followers, posts, **analytics→50-mirror**) |
+| Google Workspace | company | mixed | Python adapter (users→employees + **Org Unit→dept orgs/tags**, calendars→events **with attendees/location**, drives→projects) |
+| Slack | company | JSON | Python adapter (members→people, channels→orgs **with topic/membership tags `channel/<slug>`**, messages→signal only; day-files consumed — coverage bug fixed; JSON-type detection so it coexists with Workspace in one export) |
+| Notion | company | Markdown+CSV | Python adapter: pages (`<Title> <32-hex>.md`)→voice excerpts, database rows→interests |
+| Confluence | company | XML (space export) | Python adapter: entities.xml page titles→voice, space→org; HTML pages when present |
+| Jira | company | CSV | Python adapter: projects→orgs, assignees/reporters→people + `project/<slug>` tags; ticket prose never imported |
+| Salesforce | company | CSV ZIP | Python adapter (cross-file joins): Accounts→customer orgs (+geo), Contacts/Leads→people@account, Opportunities→deal events, Tasks→**signal only**, Users→employees |
+| HubSpot | company | per-object CSV | Python adapter: companies→orgs (+geo), contacts→people, deals→events, tickets→count only |
+| Zendesk | company | JSON/CSV | Python adapter: orgs→customers, users→people@org, tickets→requester **signal** + volume; subjects/bodies never read |
+| Email (mbox) | company | .mbox | Python adapter (`email_archive.py`, NAME `email`), **headers-only**: From/To/Cc display names→people+signal; subjects/bodies never accessed; PST → honest convert-first hint |
+| Microsoft 365 | company | .eml / Purview CSV | Python adapter, **headers-only**, same rule as mbox |
+| Microsoft Teams | company | CSV/JSON (Purview report) | Python adapter, **signal-only**: senders→people, teams/channels→orgs + `channel/<slug>` tags; content columns never read |
+
+**Offline geocoder** (`scripts/geocode.py` + `mappings/geo/cities.json`, GeoNames-derived,
+CC-BY — attribution in `references/geonames-attribution.md`): build-time city→lat/lng for
+identity/people/org notes carrying a public location string. Precision-biased ladder
+(city+country → city+admin → unambiguous city; ambiguous → no pin). Zero network — a
+dictionary lookup. Feeds the Studio Map view; regenerate via `packaging/build_gazetteer.py`.
+`index_files` now also indexes `.js .txt .md .xml .mbox .eml .gpx` (norm_file strips those
+extensions too); README files are never indexed as data. `analyze.py` gained the company
+goals **onboarding** + **whoknows** (grouping people by the `dept/<slug>` + `channel/<slug>`
+structure tags adapters emit).
 
 Real-world validation build (IG + Google Maps + LinkedIn + **Facebook**, `--full`): cross-source
 merge verified, `source/*` tags on every note, `_STRUCTURE.md`/`_DATA_POINTS.md`/`_GRAPH.md`
 present, default-mode PII sweep clean. Both providers package + install + run end-to-end.
-`tests/run.py` → **182 checks, 0 failed** (selector mini-language, mapping-wins,
+`tests/run.py` → **554 checks, 0 failed** (selector mini-language, mapping-wins,
 IG/Google fixture build, places + review note, harvester rescue, multi-entity 3-brain
 build, cross-person note, `works_at` edge, negative no-merge, multi-vault PII sweep, Codex
 `agents/openai.yaml` + `--install`, two-sibling-vault split, **Facebook full mapping +
@@ -454,6 +484,7 @@ S=engine/scripts
 
 # build: every entity under data/ → one brain each + _correlations/
 python3 $S/build_vault.py data -o vault
+python3 $S/build_vault.py data -o vault --refresh   # UPDATE in place (v1.5): keeps your notes/edits
 python3 $S/build_vault.py data/personal/<id>/linkedin -o vault/my-brain   # one source
 python3 $S/build_vault.py data --dry-run                                  # detect only
 python3 $S/build_vault.py data -o vault --provider openai --emit both --full
@@ -467,7 +498,7 @@ python3 packaging/build_skill.py all --install
 #   claude → ~/.claude/skills/   openai → ~/.agents/skills/
 
 # test (stdlib only; must stay green)
-python3 tests/run.py            # → 182 passed, 0 failed
+python3 tests/run.py            # → 554 passed, 0 failed
 ```
 **Testing approach:** synthetic exports under
 `tests/fixtures/{personal,company}/<entity>/<source>/`; assert valid YAML on every
@@ -479,9 +510,9 @@ rescue. Never commit a real export or vault.
 
 ## 12. Roadmap / open questions
 **Roadmap:**
-- More sources (X/Twitter, GitHub, Strava, …) — usually just a JSON mapping.
+- ✓ v1 sources shipped: X, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok + Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email(mbox), Microsoft 365, Teams. Next: Pinterest/Goodreads/Letterboxd/Netflix + Contacts(.vcf)/Calendar(.ics) light seeds (see docs-sources catalog).
 - Sharper entity resolution + stable IDs (below).
-- v1.5: idempotent re-import/merge so a rebuild refreshes without clobbering edits.
+- ✓ v1.5 SHIPPED: `--refresh` idempotent re-import (manifest + stable note IDs + collector dedupe); Studio reseed offers Update vs Rebuild.
 - v2: agentic twin (meeting prep, drafting in voice, relationship-revival nudges).
 - Live `gbrain import` validation once a `gbrain` runtime is available.
 
@@ -493,5 +524,5 @@ rescue. Never commit a real export or vault.
   (we don't store it). This is the pending **entity-resolution upgrade**.
 - **FB/IG/Google/company formats drift** across versions/regions; prefer widening
   detection + a mapping/harvester catch-all over brittle exact-path assumptions.
-- **Re-runs aren't idempotent yet** (fresh dir required) — a v1.5 problem.
+- ✓ SOLVED (v1.5): `--refresh` updates an existing vault in place — manifest (`_GENERATED.json`) three-way sync; user notes/edits preserved (conflicts → `*.new.md` + `_UPDATE_REPORT.md`), stale unedited notes pruned, `_notes/` never touched.
 - Distribution: GitHub Releases for the `.skill` files? A marketplace listing?

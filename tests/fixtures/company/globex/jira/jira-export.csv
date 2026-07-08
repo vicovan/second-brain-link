@@ -1,0 +1,3 @@
+Issue key,Issue id,Summary,Issue Type,Status,Project name,Assignee,Reporter,Created,Components,Labels,Comment
+GLX-1,10001,Fix reactor telemetry lag,Bug,Done,Reactor Core,Hank Scorpio,Frank Grimes,2024-03-01,Telemetry,perf,2024-03-02 10:00:00.0;Lenny Leonard;secret-body-do-not-leak comment text
+GLX-2,10002,Design cooling tower dashboard,Task,In Progress,Reactor Core,Frank Grimes,Hank Scorpio,2024-03-05,Dashboards,ui,

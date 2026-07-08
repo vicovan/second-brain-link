@@ -1,0 +1,2 @@
+Id,CaseNumber,ContactId,AccountId,Subject,CreatedDate,Status
+500A,00001,003A,001A,secret-body-do-not-leak gripper fault,2024-03-10,Closed

@@ -12,6 +12,8 @@ Contract: NAME, SUBJECT="company", detect(file_index), extract(root, file_index,
 all_paths, col). Privacy is the Collector's job — we pass fields through and it
 decides (default strips employee email/phone; --full keeps them).
 """
+import re
+
 from ..common import read_csv, nk, iso_date, canonical_url, fix_mojibake
 
 NAME = "linkedin_company"
@@ -84,24 +86,41 @@ def extract(root, file_index, all_paths, col):
                          about=_col(r, "Description", "About", "Overview"))
         if org_name:
             col.add_org(NAME, org_name, "self",
-                        url=_col(r, "Url", "Website", "Public Url"))
+                        url=_col(r, "Url", "Website", "Public Url"),
+                        location=_col(r, "Location", "Headquarters"),
+                        industry=_col(r, "Industry"),
+                        domain=_col(r, "Url", "Website"))
 
     # --- employees → people (works_at the company) ---------------------
+    # The Department column is org structure, not trivia: each department
+    # becomes an org note and the person carries a dept/<slug> tag (same
+    # modeling as Google Workspace Org Units) so team-level analyses work.
     emps = rows("employeelist", "employees")
     mark("employeelist", "employees")
+    depts = set()
     for r in emps:
         name = (_col(r, "First Name") + " " + _col(r, "Last Name")).strip() or _col(r, "Name")
         if not name:
             continue
+        dept = _col(r, "Department", "Team", "Function")
+        tags = []
+        if dept:
+            depts.add(dept)
+            tags.append("dept/" + re.sub(r"[^a-z0-9]+", "-", dept.lower()).strip("-"))
         col.add_person(NAME, name,
                        company=org_name or _col(r, "Company"),
                        role=_col(r, "Title", "Position", "Role"),
                        url=_col(r, "Profile Url", "Url", "Public Url"),
                        email=_col(r, "Email", "Email Address"),
+                       dept=dept,
+                       tags=tags,
                        extra={k: v for k, v in r.items()
                               if k and nk(k) not in ("firstname", "lastname",
                               "name", "title", "position", "role", "profileurl",
-                              "url", "email", "emailaddress")})
+                              "url", "email", "emailaddress", "department",
+                              "team", "function")})
+    for dept in depts:
+        col.add_org(NAME, dept, "department", tags=["org/department"])
 
     # --- followers → org-follower people (light: name + url only) ------
     folls = rows("pagefollowers", "organizationfollowers", "followers")
@@ -117,6 +136,29 @@ def extract(root, file_index, all_paths, col):
                      _col(r, "Date", "Created", "Posted On"), "post",
                      _col(r, "Url", "Link"))
     mark("organizationposts", "pageposts", "posts")
+
+    # --- page analytics → 50-mirror (how the algorithm sees the PAGE) --
+    # Follower/visitor demographics and post metrics are LinkedIn's model of
+    # the company's audience — the company-side "algorithmic mirror".
+    for r in rows("followerdemographics", "visitordemographics", "visitoranalytics",
+                  "followermetrics", "pagestatistics"):
+        seg = _col(r, "Value", "Segment", "Name", "Category", "Industry",
+                   "Job Function", "Seniority", "Location", "Company Size")
+        n = _col(r, "Followers", "Count", "Total", "Visitors", "Total Followers",
+                 "Total Views")
+        if seg:
+            col.add_mirror_inference(NAME, f"{seg}" + (f" ({n})" if n else ""))
+    mark("followerdemographics", "visitordemographics", "visitoranalytics",
+         "followermetrics", "pagestatistics")
+    for r in rows("updatemetrics", "postanalytics", "contentmetrics",
+                  "updateengagement"):
+        t = _col(r, "Update Title", "Post", "Title", "Update")
+        imp = _col(r, "Impressions", "Views")
+        eng = _col(r, "Engagement Rate", "Clicks", "Reactions")
+        if t and (imp or eng):
+            col.add_ad_segment(NAME, f"post '{t[:60]}' — impressions {imp or '?'}"
+                               + (f", engagement {eng}" if eng else ""))
+    mark("updatemetrics", "postanalytics", "contentmetrics", "updateengagement")
 
     if org_name:
         col.note(f"[linkedin_company] org '{org_name}': {len(emps)} employees, "

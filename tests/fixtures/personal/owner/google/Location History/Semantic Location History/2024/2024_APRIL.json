@@ -1,0 +1,6 @@
+{"timelineObjects": [
+ {"placeVisit": {"location": {"latitudeE7": 515085000, "longitudeE7": -1257000, "name": "The British Museum", "address": "Great Russell St\nLondon"}, "duration": {"startTimestamp": "2024-04-01T10:00:00Z"}}},
+ {"placeVisit": {"location": {"latitudeE7": 515085000, "longitudeE7": -1257000, "name": "The British Museum", "address": "Great Russell St\nLondon"}, "duration": {"startTimestamp": "2024-04-08T10:00:00Z"}}},
+ {"activitySegment": {"distance": 1200}},
+ {"placeVisit": {"location": {"latitudeE7": 514991000, "longitudeE7": -1245000, "name": "Royal Society", "address": "Carlton House Terrace\nLondon"}, "duration": {"startTimestamp": "2024-04-02T10:00:00Z"}}}
+]}

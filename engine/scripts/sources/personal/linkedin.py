@@ -106,7 +106,8 @@ def extract(root, file_index, col, alias_lookup=None):
     msgs = rows("messages"); mark("messages")
     for r in msgs:
         party = _col(r, "FROM", "TO")
-        col.add_message_signal(NAME, party, _col(r, "DATE", "Date"))
+        col.add_message_signal(NAME, party, _col(r, "DATE", "Date"),
+                               ts=_col(r, "DATE", "Date"))
         # enrich an EXISTING person with their profile URL (never create people
         # from messages, and never read the message body)
         pu = canonical_url(_col(r, "SENDER PROFILE URL", "Sender Profile Url"))
@@ -124,6 +125,7 @@ def extract(root, file_index, col, alias_lookup=None):
         # full mode loses nothing.
         col.add_person(NAME, name, _col(r, "Company"), _col(r, "Position"),
                        _col(r, "Connected On"),
+                       connected_on=_col(r, "Connected On"),
                        url=_col(r, "URL", "Profile Url", "Public Url"),
                        email=_col(r, "Email Address"),
                        extra={k: v for k, v in r.items()
@@ -184,7 +186,24 @@ def extract(root, file_index, col, alias_lookup=None):
     col.reactions["poll vote"] += len(rows("votes"))
     for r in rows("hashtagfollows"):
         col.add_interest(NAME, _col(r, "HashTag", "Hashtag", "Name"))
-    col.saved_count += len(rows("saveditems"))
+    # saved items: keep the count AND the titles when the export carries them
+    # (URL-only rows just count — a bare URL is noise, not an interest)
+    for r in rows("saveditems"):
+        col.saved_count += 1
+        title = _col(r, "Title", "Name", "Saved Item Title")
+        if title:
+            col.add_interest(NAME, f"saved: {title}")
+    # rich media: captions/descriptions are the owner's words → voice; rows that
+    # are just media links carry no text signal
+    n_media = 0
+    for r in rows("richmedia"):
+        desc = _col(r, "Media Description", "Description", "Caption")
+        if desc:
+            col.add_post(NAME, desc, _col(r, "Date", "Date/Time"), "media",
+                         _col(r, "Media Link", "Link"))
+            n_media += 1
+    if not n_media and any(k.startswith("richmedia") for k in file_index):
+        col.skipped_keys.add("richmedia")   # links-only file → honest "skipped"
     mark("shares", "instantreposts", "comments", "reactions", "votes", "hashtagfollows", "saveditems", "richmedia")
 
     # career
@@ -201,6 +220,21 @@ def extract(root, file_index, col, alias_lookup=None):
         comp = _col(r, "Company Name", "Company")
         if comp: col.add_org(NAME, comp, "saved-job")
         col.saved_jobs.append({"title": _col(r, "Job Title", "Title"), "company": comp})
+    # saved job alerts: the alert's search criteria are job-seeker intent → prefs
+    for i, r in enumerate(rows("savedjobalerts")):
+        crit = _col(r, "Search Query", "Query", "Keywords", "Title") or \
+               "; ".join(f"{k}={v}" for k, v in r.items() if k and v)[:120]
+        if crit:
+            col.prefs[f"job alert {i + 1}"] = crit
+    # online job postings (jobs the member POSTED — recruiter/founder persona)
+    for r in rows("onlinejobpostings"):
+        comp = _col(r, "Company Name", "Company")
+        title = _col(r, "Job Title", "Title")
+        if comp:
+            col.add_org(NAME, comp, "referenced")
+        if title:
+            col.services[f"job posting: {title}"] += 1
+            col.sources.add(NAME)
     mark("savedjobs", "savedjobalerts", "onlinejobpostings")
     for r in rows("jobapplicantsavedanswers") + rows("jobapplicantsavedscreeningquestionresponses"):
         col.reusable.append({"q": _col(r, "Question", "Prompt"), "a": _col(r, "Answer", "Response")})
@@ -225,7 +259,8 @@ def extract(root, file_index, col, alias_lookup=None):
             col.add_interest(NAME, title)
     mark("learning")
     for r in rows("events"):
-        col.events.append({"name": _col(r, "Event Name", "Name"), "date": _col(r, "Date", "Time")})
+        col.add_event(NAME, _col(r, "Event Name", "Name"),
+                      date=_col(r, "Date", "Time"))
     mark("events")
     col.services["engagements"] += len(rows("engagements"))
     col.services["opportunities"] += len(rows("opprtunities", "opportunities"))
@@ -233,7 +268,7 @@ def extract(root, file_index, col, alias_lookup=None):
     mark("engagements", "opprtunities", "opportunities", "providers")
     for r in rows("searchqueries"):
         q = _col(r, "Search Query", "Query", "Value")
-        if q: col.searches.append(q)
+        if q: col.add_search(NAME, q, date=_col(r, "Time", "Date"))
     mark("searchqueries")
 
     return consumed

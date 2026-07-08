@@ -40,6 +40,32 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
+# subject-aware layout — a company brain uses company-named folders
+# (30-content, 85-locations, 40-pipeline, …). Detect the subject from the built
+# brain on disk (00-org/ ⇒ company) and resolve every layer folder through
+# build_vault.layout_for — analyze never hardcodes a variant folder name
+# (a test guards this, same as for the builder).
+# ---------------------------------------------------------------------------
+
+_LAYOUTS = {}
+
+
+def brain_layout(brain: Path):
+    """Return (subject, {layer_key: folder}) for a BUILT brain dir."""
+    key = str(brain)
+    if key not in _LAYOUTS:
+        from build_vault import layout_for
+        subject = "company" if (brain / "00-org").is_dir() else "person"
+        _LAYOUTS[key] = (subject, layout_for(subject))
+    return _LAYOUTS[key]
+
+
+def _L(brain: Path, key: str):
+    """Folder name for a layer KEY under this brain's subject variant."""
+    return brain_layout(brain)[1][key]
+
+
+# ---------------------------------------------------------------------------
 # lightweight frontmatter reader (stdlib only — no YAML dependency)
 # ---------------------------------------------------------------------------
 
@@ -61,7 +87,7 @@ def read_people(brain: Path):
     """Read every 10-people/*.md note's frontmatter into dicts. Returns a list of
     {name, company, role, status, strength, last_contact, url, sources_text}."""
     people = []
-    pdir = brain / "10-people"
+    pdir = brain / _L(brain, "people")
     if not pdir.is_dir():
         return people
     for p in pdir.rglob("*.md"):
@@ -81,14 +107,23 @@ def read_people(brain: Path):
             "strength": strength,
             "last_contact": _scalar(fm, "last_contact"),
             "url": _scalar(fm, "url"),
+            "location": _scalar(fm, "location"),
+            "connected_on": _scalar(fm, "connected_on"),
+            "dept_name": _scalar(fm, "dept"),
+            # company-structure tags the adapters emit (dept/<slug> from
+            # LinkedIn-Company Department / Workspace Org Unit; channel/<slug>
+            # from Slack channel membership) — the org-chart substrate the
+            # company goals (onboarding, whoknows) group by.
+            "depts": re.findall(r"dept/([a-z0-9\-]+)", fm),
+            "channels": re.findall(r"channel/([a-z0-9\-]+)", fm),
         })
     return people
 
 
 def read_applied(brain: Path):
-    """Parse `90-synthesis/target-companies.md` 'Where you've actually applied'
-    list → {company: application_count}. Empty if there's no career data."""
-    f = brain / "90-synthesis" / "target-companies.md"
+    """Parse the synthesis layer's `target-companies.md` 'Where you've actually
+    applied' list → {company: application_count}. Empty if there's no career data."""
+    f = brain / _L(brain, "synthesis") / "target-companies.md"
     out = Counter()
     if not f.is_file():
         return out
@@ -136,7 +171,9 @@ def scan_layer(brain: Path, folder: str, exclude=()):
         for s in re.findall(r"source/([a-z0-9_\-]+)", fm):
             src[s] += 1
         for key in ("company", "role", "url", "status", "strength", "last_contact",
-                    "handles", "email", "phone", "lat", "lng", "address", "category", "kind"):
+                    "handles", "email", "phone", "lat", "lng", "address", "category",
+                    "kind", "industry", "size", "domain", "dept", "connected_on",
+                    "first_contact", "location", "alt_company"):
             if _scalar(fm, key):
                 fields.add(key)
     return n, src, fields
@@ -311,9 +348,10 @@ def build_datamining(brain, people, ctx):
     mirror-vs-stated gaps), each ending in a ready AI prompt. The exhaustive
     catalog of every data point + relation lives in `_DATA_POINTS.md`."""
     clusters = Counter(p["company"] for p in people if p["company"]).most_common(15)
+    mirror_dir = _L(brain, "mirror")
     # multi-source-confirmed = a person whose note carries ≥2 source/* tags
     multi = []
-    for p, fm in _iter_fm(brain / "10-people"):
+    for p, fm in _iter_fm(brain / _L(brain, "people")):
         srcs = sorted(set(re.findall(r"source/([a-z0-9_\-]+)", fm)))
         if len(srcs) >= 2:
             multi.append((_scalar(fm, "title") or p.stem, srcs))
@@ -336,7 +374,7 @@ def build_datamining(brain, people, ctx):
               "> Using `_DATA_POINTS.md` (the data-point & relation catalog) and the #person "
               "frontmatter, surface the 10 non-obvious insights in my network I'd most want to "
               "know for my goals — e.g. clusters I underuse, strong ties in target industries, "
-              "people the algorithms (50-mirror) and I disagree about. Cite note titles."]
+              f"people the algorithms ({mirror_dir}) and I disagree about. Cite note titles."]
     return "data-mining.md", "\n".join(lines)
 
 
@@ -350,17 +388,25 @@ def build_data_catalog(brain: Path, people):
     """Render `_DATA_POINTS.md`: entity inventory + relation inventory + a
     field-enrichment-by-source matrix + the tag taxonomy + a self-improvement
     backlog + a Mermaid schema + a 'mineable questions' catalog."""
-    ppl_n, ppl_src, ppl_fields = scan_layer(brain, "10-people")
-    org_n, org_src, _ = scan_layer(brain, "15-organizations")
-    plc_n, plc_src, _ = scan_layer(brain, "85-places", exclude=("places.md",))
-    post_n, post_src, _ = scan_layer(brain, "30-voice/posts")
-    interests = _count_bullets(brain / "30-voice" / "interests.md")
-    reactions = _count_bullets(brain / "30-voice" / "reactions.md")
-    comments = _count_bullets(brain / "30-voice" / "comments.md")
-    searches = _count_bullets(brain / "80-search" / "search-log.md")
-    events = _count_bullets(brain / "60-learning" / "events.md")
-    mirror = _count_bullets(brain / "50-mirror" / "inferences.md") + \
-             _count_bullets(brain / "50-mirror" / "ad-profile.md")
+    subject, lay = brain_layout(brain)
+    PPL, ORG, PLC = lay["people"], lay["orgs"], lay["places"]
+    VOI, MIR, SRCH, LRN = lay["voice"], lay["mirror"], lay["search"], lay["learning"]
+    ppl_n, ppl_src, ppl_fields = scan_layer(brain, PPL)
+    org_n, org_src, _ = scan_layer(brain, ORG)
+    plc_n, plc_src, _ = scan_layer(brain, PLC, exclude=("places.md",))
+    post_n, post_src, _ = scan_layer(brain, f"{VOI}/posts")
+    interests = _count_bullets(brain / VOI / "interests.md")
+    reactions = _count_bullets(brain / VOI / "reactions.md")
+    comments = _count_bullets(brain / VOI / "comments.md")
+    searches = _count_bullets(brain / SRCH / "search-log.md")
+    # company brains log meetings beside events; meetings.md is absent on personal
+    events = _count_bullets(brain / LRN / "events.md") + \
+             _count_bullets(brain / LRN / "meetings.md")
+    mirror = _count_bullets(brain / MIR / "inferences.md") + \
+             _count_bullets(brain / MIR / "ad-profile.md")
+    # company: deals/campaigns are first-class pipeline notes (one note each)
+    deal_n, deal_src, _ = (scan_layer(brain, lay["career"])
+                           if subject == "company" else (0, Counter(), set()))
     corr = sum(1 for p in people if p["last_contact"])
     warm = sum(1 for p in people if p["status"] == "warm")
     dormant = sum(1 for p in people if p["status"] == "dormant")
@@ -376,28 +422,31 @@ def build_data_catalog(brain: Path, people):
          "all of this visually; everything is tagged for filtering.", "",
          "## Data points (nodes)", "",
          _table([
-             ("People", ppl_n, "`10-people/`", "name, company, role, status, strength, last_contact, url, handles"),
-             ("Organizations", org_n, "`15-organizations/`", "name, category, url, known_contacts"),
-             ("Places", plc_n, "`85-places/`", "name, kind, lat/lng, address"),
-             ("Posts", post_n, "`30-voice/posts/`", "text, date, kind, source"),
-             ("Comments", comments, "`30-voice/comments.md`", "text, date (aggregate)"),
-             ("Reactions", reactions, "`30-voice/reactions.md`", "kind → count (aggregate)"),
-             ("Interests", interests, "`30-voice/interests.md`", "topic/page → count (aggregate)"),
-             ("Mirror inferences", mirror, "`50-mirror/`", "ad-interests, advertisers, predictions (aggregate)"),
-             ("Events", events, "`60-learning/events.md`", "name, date (aggregate)"),
-             ("Searches", searches, "`80-search/search-log.md`", "query (aggregate)"),
+             ("People", ppl_n, f"`{PPL}/`", "name, company, role, status, strength, last_contact, url, handles"),
+             ("Organizations", org_n, f"`{ORG}/`", "name, category, url, known_contacts"),
+         ] + ([("Deals & campaigns", deal_n, f"`{lay['career']}/`", "name, kind, date, value")]
+              if subject == "company" else []) + [
+             ("Places", plc_n, f"`{PLC}/`", "name, kind, lat/lng, address"),
+             ("Posts", post_n, f"`{VOI}/posts/`", "text, date, kind, source"),
+             ("Comments", comments, f"`{VOI}/comments.md`", "text, date (aggregate)"),
+             ("Reactions", reactions, f"`{VOI}/reactions.md`", "kind → count (aggregate)"),
+             ("Interests", interests, f"`{VOI}/interests.md`", "topic/page → count (aggregate)"),
+             ("Mirror inferences", mirror, f"`{MIR}/`", "ad-interests, advertisers, predictions (aggregate)"),
+             ("Events & meetings" if subject == "company" else "Events", events,
+              f"`{LRN}/`", "name, date, attendees (aggregate)"),
+             ("Searches", searches, f"`{SRCH}/search-log.md`", "query (aggregate)"),
          ], ["Node type", "Count", "Where", "Key fields"]), "",
          "## Relations (edges)", "",
          _table([
              ("person —works_at→ org", works_at, "`#person` `company`", "people with a company"),
              ("you —knows→ person", f"{warm}/{dormant}/{cold}", "`status`", "warm / dormant / cold"),
              ("you —messaged→ person", corr, "`last_contact`", "people you've actually contacted"),
-             ("you —reacted→ content", reactions, "`30-voice`", "reaction tally"),
-             ("you —commented→ content", comments, "`30-voice`", "your comments"),
-             ("you —interested_in→ topic", interests, "`30-voice/interests`", "pages/topics you follow"),
-             ("you —checked_in/saved→ place", plc_n, "`85-places`", "places (lat/lng → Map View)"),
-             ("you —invited_to→ event", events, "`60-learning/events`", "events"),
-             ("algorithm —infers→ you", mirror, "`50-mirror`", "the platforms' model of you"),
+             ("you —reacted→ content", reactions, f"`{VOI}`", "reaction tally"),
+             ("you —commented→ content", comments, f"`{VOI}`", "your comments"),
+             ("you —interested_in→ topic", interests, f"`{VOI}/interests`", "pages/topics you follow"),
+             ("you —checked_in/saved→ place", plc_n, f"`{PLC}`", "places (lat/lng → Map View)"),
+             ("you —invited_to→ event", events, f"`{LRN}`", "events + meetings"),
+             ("algorithm —infers→ you", mirror, f"`{MIR}`", "the platforms' model of you"),
          ], ["Relation", "Count", "Tag / field", "Meaning"]), ""]
 
     # field-enrichment-by-source matrix
@@ -406,11 +455,14 @@ def build_data_catalog(brain: Path, people):
           "`source/<name>` tags). Adding a new source should light up new cells here — "
           "if it doesn't, the mapping is leaving data on the table.", "",
           _table([
-              ("People (10-people)", ", ".join(f"{s} ({n})" for s, n in ppl_src.most_common()) or "—"),
-              ("Orgs (15-organizations)", ", ".join(f"{s} ({n})" for s, n in org_src.most_common()) or "—"),
-              ("Places (85-places)", ", ".join(f"{s} ({n})" for s, n in plc_src.most_common()) or "—"),
-              ("Posts (30-voice)", ", ".join(f"{s} ({n})" for s, n in post_src.most_common()) or "—"),
-          ], ["Node type", "Sources (count)"]), "",
+              (f"People ({PPL})", ", ".join(f"{s} ({n})" for s, n in ppl_src.most_common()) or "—"),
+              (f"Orgs ({ORG})", ", ".join(f"{s} ({n})" for s, n in org_src.most_common()) or "—"),
+              (f"Places ({PLC})", ", ".join(f"{s} ({n})" for s, n in plc_src.most_common()) or "—"),
+              (f"Posts ({VOI})", ", ".join(f"{s} ({n})" for s, n in post_src.most_common()) or "—"),
+          ] + ([(f"Deals ({lay['career']})",
+                 ", ".join(f"{s} ({n})" for s, n in deal_src.most_common()) or "—")]
+               if subject == "company" else []),
+              ["Node type", "Sources (count)"]), "",
           f"_Populated person fields: {', '.join(sorted(ppl_fields)) or 'none'}._", ""]
 
     # tag taxonomy
@@ -436,12 +488,12 @@ def build_data_catalog(brain: Path, people):
     L += ["## Schema (Mermaid)", "", "```mermaid", "graph LR",
           "  YOU((You))", "  YOU --> P[People]", "  YOU --> V[Voice: posts/comments/reactions]",
           "  YOU --> I[Interests]", "  YOU --> PL[Places]", "  YOU --> E[Events]",
-          "  YOU --> M[50-mirror: how algorithms see you]", "  P -->|works_at| O[Organizations]",
+          f"  YOU --> M[{MIR}: how algorithms see you]", "  P -->|works_at| O[Organizations]",
           "  P -.->|message signal| YOU", "```", "",
           "## Mineable questions", "",
           "- Which company clusters do I have the most ties in — and which am I underusing?",
           "- Who is confirmed across ≥2 sources (highest-confidence contacts)?",
-          "- Where do the algorithms (50-mirror) and my stated positioning disagree?",
+          f"- Where do the algorithms ({MIR}) and my stated positioning disagree?",
           "- Which dormant strong ties sit at target-industry companies?",
           "- Which places cluster geographically (open Map View)?",
           "", "_See `95-goals/data-mining.md` for ready plays, and the `/mine` Copilot command._"]
@@ -449,10 +501,10 @@ def build_data_catalog(brain: Path, people):
 
 
 def _read_places(brain: Path):
-    """Read 85-places notes → list of {name, kind, address}. The taste signal for
-    personalization (your saved / reviewed / checked-in spots across sources)."""
+    """Read the places layer's notes → list of {name, kind, address}. The taste
+    signal for personalization (saved / reviewed / checked-in spots across sources)."""
     out = []
-    for p, fm in _iter_fm(brain / "85-places"):
+    for p, fm in _iter_fm(brain / _L(brain, "places")):
         if p.name == "places.md":
             continue
         out.append({"name": _scalar(fm, "title") or p.stem,
@@ -477,10 +529,11 @@ def build_personalization(brain, people, ctx):
     """Solve the personalization cold-start: turn your real taste signal (places you
     saved/checked-into, interests you follow, how the algorithms profile you) into
     ready 'recommend me X' prompts grounded in YOUR history — not generic popularity."""
+    _, lay = brain_layout(brain)
     places = _read_places(brain)
     by_kind = Counter(p["kind"] or "place" for p in places)
-    interests = _top_bullets(brain / "30-voice" / "interests.md", 25)
-    mirror = _top_bullets(brain / "50-mirror" / "inferences.md", 15)
+    interests = _top_bullets(brain / lay["voice"] / "interests.md", 25)
+    mirror = _top_bullets(brain / lay["mirror"] / "inferences.md", 15)
     lines = ["---", "type: goal", "tags: [goal, personalization]", "---", "",
              "# 🧭 For me — personalized recommendations from my own history", "",
              "Your brain already knows your taste. These prompts ground recommendations in "
@@ -501,7 +554,8 @@ def build_personalization(brain, people, ctx):
         lines += ["## How the algorithms profile you (the mirror)", "",
                   ", ".join(mirror[:15]), ""]
     lines += ["## ▶ Ready prompts (paste into Obsidian Copilot / your agent)", "",
-              "Each is grounded in `85-places/`, `30-voice/interests.md`, and `50-mirror/`:", "",
+              f"Each is grounded in `{lay['places']}/`, `{lay['voice']}/interests.md`, "
+              f"and `{lay['mirror']}/`:", "",
               "- **Coffee/food:** \"Knowing my taste from my second brain, find me coffee shops "
               "(or restaurants) in **{city}** I'd actually like — match the kinds of places I "
               "already save, and say why each fits.\"",
@@ -517,12 +571,116 @@ def build_personalization(brain, people, ctx):
     return "personalization.md", "\n".join(lines)
 
 
+def _group_tag(people, key):
+    """Group people by a structure tag list ('depts' or 'channels') → {slug: [p…]}."""
+    groups = defaultdict(list)
+    for pp in people:
+        for slug in pp.get(key) or []:
+            groups[slug].append(pp)
+    return groups
+
+
+def build_onboarding(brain, people, ctx):
+    """Company goal: onboard a new hire (or a new agent) onto the Company Brain —
+    who to meet, which teams exist, where the conversations happen. Grounded in
+    the dept/channel structure tags + message-signal strength; zero API cost."""
+    depts = _group_tag(people, "depts")
+    chans = _group_tag(people, "channels")
+    key_people = _by_strength([p for p in people if _is_decision_maker(p["role"])
+                               or p["strength"] >= 3])
+    lines = ["---", "type: goal", "tags: [goal, onboarding, company]", "---", "",
+             "# 🧭 Onboarding — get productive on this Company Brain fast", ""]
+    if key_people:
+        lines += ["## People to meet first",
+                  "", "Decision-makers and the most-connected colleagues:", ""]
+        rows = [(_link(x["name"]), x["role"] or "—",
+                 ", ".join(x.get("depts") or []) or "—", x["strength"])
+                for x in key_people[:15]]
+        lines.append(_table(rows, ["Who", "Role", "Team", "Strength"]))
+        lines.append("")
+    if depts:
+        lines += ["## Teams and where people sit", ""]
+        rows = [(d, len(ppl),
+                 ", ".join(_link(x["name"]) for x in _by_strength(ppl)[:4]))
+                for d, ppl in sorted(depts.items(), key=lambda kv: -len(kv[1]))]
+        lines.append(_table(rows[:20], ["Team", "Headcount", "Key people"]))
+        lines.append("")
+    if chans:
+        lines += ["## Where the conversations happen", "",
+                  "Channels by membership (join the busy ones first):", ""]
+        rows = [(f"#{c}", len(ppl),
+                 ", ".join(_link(x["name"]) for x in _by_strength(ppl)[:4]))
+                for c, ppl in sorted(chans.items(), key=lambda kv: -len(kv[1]))]
+        lines.append(_table(rows[:20], ["Channel", "Members", "Most active"]))
+        lines.append("")
+    if not (depts or chans or key_people):
+        lines += ["_No org-structure signal yet — rebuild with a LinkedIn Company, "
+                  "Google Workspace, or Slack export to populate teams/channels._", ""]
+    lines += ["## ▶ Ask your AI to act", "",
+              "> Using the teams, channels, and people above (and `30-voice/` for how "
+              "this company writes), draft my week-one onboarding plan: the 5 people "
+              "to meet (with why + an intro line each), the 3 channels/docs to read "
+              "first, and the questions a new joiner should ask each team."]
+    return "onboarding.md", "\n".join(lines)
+
+
+def build_whoknows(brain, people, ctx):
+    """Company goal: the who-knows-what / who-owns-what expertise map — the
+    institutional-memory question every Company Brain exists to answer."""
+    depts = _group_tag(people, "depts")
+    chans = _group_tag(people, "channels")
+    # expertise clusters from role keywords (deterministic, no inference)
+    topics = defaultdict(list)
+    for pp in people:
+        for w in re.findall(r"[a-zA-Z]{4,}", (pp["role"] or "").lower()):
+            if w not in ("head", "lead", "senior", "junior", "staff", "chief",
+                         "director", "manager", "officer", "president", "vice"):
+                topics[w].append(pp)
+    ranked_topics = sorted(((t, ppl) for t, ppl in topics.items() if len(ppl) >= 1),
+                           key=lambda kv: -len(kv[1]))
+    lines = ["---", "type: goal", "tags: [goal, whoknows, company]", "---", "",
+             "# 🔎 Who knows what — the expertise & ownership map", ""]
+    if ranked_topics:
+        lines += ["## By discipline (from roles)", ""]
+        rows = [(t.title(), len(ppl),
+                 ", ".join(_link(x["name"]) for x in _by_strength(ppl)[:5]))
+                for t, ppl in ranked_topics[:20]]
+        lines.append(_table(rows, ["Topic", "People", "Who"]))
+        lines.append("")
+    if depts:
+        lines += ["## By team", ""]
+        for d, ppl in sorted(depts.items(), key=lambda kv: -len(kv[1]))[:15]:
+            best = _by_strength(ppl)
+            lines.append(f"### {d} — {len(ppl)} people")
+            rows = [(_link(x["name"]), x["role"] or "—", x["strength"]) for x in best[:8]]
+            lines.append(_table(rows, ["Who", "Role", "Strength"]))
+            lines.append("")
+    if chans:
+        lines += ["## By channel (where each topic is discussed)", ""]
+        rows = [(f"#{c}", len(ppl),
+                 ", ".join(_link(x["name"]) for x in _by_strength(ppl)[:5]))
+                for c, ppl in sorted(chans.items(), key=lambda kv: -len(kv[1]))[:20]]
+        lines.append(_table(rows, ["Channel", "Members", "Ask"]))
+        lines.append("")
+    if not (ranked_topics or depts or chans):
+        lines += ["_No expertise signal yet — rebuild with company exports "
+                  "(LinkedIn Company / Workspace / Slack) to populate this map._", ""]
+    lines += ["## ▶ Ask your AI to act", "",
+              "> When I ask \"who knows X?\" or \"who owns Y?\", answer from the map "
+              "above plus each person's note in `10-people/` — name the best person, "
+              "their team and channel, one backup, and how warm my path to them is "
+              "(status/strength). If nobody fits, say so honestly."]
+    return "whoknows.md", "\n".join(lines)
+
+
 GOALS = {
     "fundraising": build_fundraising,
     "bd": build_bd,
     "jobsearch": build_jobsearch,
     "datamining": build_datamining,
     "personalization": build_personalization,
+    "onboarding": build_onboarding,
+    "whoknows": build_whoknows,
 }
 
 # ---------------------------------------------------------------------------
@@ -576,8 +734,8 @@ def build_dashboard(brain, people, goals):
     L += ["## Top company clusters (static snapshot)", ""]
     L += [f"- {_link(c)} — {n}" for c, n in clusters]
     L += ["", "## Places", "",
-          "Your saved/reviewed locations live in `85-places/` (each note has `lat`/`lng`). "
-          "Install the **Map View** community plugin to see them on a map.", "",
+          f"Your saved/reviewed locations live in `{_L(brain, 'places')}/` (each note has "
+          "`lat`/`lng`). Install the **Map View** community plugin to see them on a map.", "",
           "**See it all connected:** open the global **Graph view** (colored by source + type — "
           "see [[_GRAPH]]) and the data-point catalog [[_DATA_POINTS]].", "",
           "See goal workspaces in `95-goals/`. For open-ended questions, use **Obsidian "
@@ -642,10 +800,17 @@ COPILOT_PROMPTS = {
 }
 
 
-def write_copilot_prompts(dest: Path):
-    """Write the /command prompt files into `dest` (created if missing)."""
+def write_copilot_prompts(dest: Path, lay=None):
+    """Write the /command prompt files into `dest` (created if missing). The
+    prompt bodies are written in person-variant folder wording; `lay`
+    (layer_key → folder) rewrites those folder names for company brains — a
+    person layout maps every name to itself, so output is unchanged there."""
     dest.mkdir(parents=True, exist_ok=True)
     for name, body in COPILOT_PROMPTS.items():
+        if lay:
+            body = (body.replace("85-places", lay["places"])
+                        .replace("30-voice", lay["voice"])
+                        .replace("50-mirror", lay["mirror"]))
         (dest / f"{name}.md").write_text(body + "\n", encoding="utf-8")
     return len(COPILOT_PROMPTS)
 
@@ -703,6 +868,7 @@ def write_graph_config(graph_json: Path):
 
 def write_graph_guide(brain: Path):
     """Write `_GRAPH.md` — how to read the cross-source global graph + the legend."""
+    _, lay = brain_layout(brain)
     legend = "\n".join(
         f"- **{q}** → " + ("source: " + q.split('/', 1)[1] if q.startswith("source/")
                             else "type: " + q.split('/', 1)[1])
@@ -717,8 +883,9 @@ def write_graph_guide(brain: Path):
             "## Useful graph filters (type in the graph search box)", "",
             "- `tag:#source/facebook` — only Facebook-derived nodes (swap the source name)",
             "- `tag:#person and tag:#source/linkedin` — people from LinkedIn",
-            "- `tag:#mirror` — how the algorithms model you (50-mirror)",
-            "- `path:10-people` — just your network · `path:85-places` — just places",
+            f"- `tag:#mirror` — how the algorithms model you ({lay['mirror']})",
+            f"- `path:{lay['people']}` — just your network · "
+            f"`path:{lay['places']}` — just places",
             "- `tag:#place/check-in` — Facebook check-ins", "",
             "> Tip: if colors don't show, run `analyze.py … --graph-config <vault>/.obsidian/graph.json` "
             "to install the color groups (it preserves your existing graph settings and writes a `.bak`).",
@@ -763,11 +930,14 @@ def link_from_home(brain: Path, goals):
              "- [[_GRAPH]] — the cross-source global graph (colored by source + type)"]
     label = {"fundraising": "Fundraising paths", "bd": "Sales / BD",
              "jobsearch": "Job search", "datamining": "Data mining",
-             "personalization": "For me (personalized recommendations)"}
+             "personalization": "For me (personalized recommendations)",
+             "onboarding": "Onboarding (company)",
+             "whoknows": "Who knows what (company)"}
     for g in goals:
         if g in label:
             stem = {"fundraising": "fundraising", "bd": "sales-bd", "jobsearch": "job-search",
-                    "datamining": "data-mining", "personalization": "personalization"}[g]
+                    "datamining": "data-mining", "personalization": "personalization",
+                    "onboarding": "onboarding", "whoknows": "whoknows"}[g]
             block.append(f"- [[{stem}]] — {label[g]}")
     block += ["", "Open-ended questions → **Obsidian Copilot → Vault QA**, or the `/commands` "
               "in `copilot-prompts/`.", ""]
@@ -790,8 +960,8 @@ def main():
     args = ap.parse_args()
 
     brain = Path(args.brain).expanduser()
-    if not (brain / "10-people").is_dir():
-        print(f"error: {brain} doesn't look like a built brain (no 10-people/)."); raise SystemExit(1)
+    if not (brain / _L(brain, "people")).is_dir():
+        print(f"error: {brain} doesn't look like a built brain (no people layer)."); raise SystemExit(1)
     goals = [g.strip() for g in args.goals.split(",") if g.strip() in GOALS]
     if not goals:
         print(f"error: no valid goals in {args.goals!r}; choose from {', '.join(GOALS)}"); raise SystemExit(1)
@@ -812,11 +982,12 @@ def main():
     print("  ✓ _DATA_POINTS.md")
     write_graph_guide(brain)
     print("  ✓ _GRAPH.md")
-    n = write_copilot_prompts(brain / "copilot-prompts")
+    lay = brain_layout(brain)[1]
+    n = write_copilot_prompts(brain / "copilot-prompts", lay)
     print(f"  ✓ copilot-prompts/ ({n} commands)")
     if args.copilot_dir:
         try:
-            write_copilot_prompts(Path(args.copilot_dir).expanduser())
+            write_copilot_prompts(Path(args.copilot_dir).expanduser(), lay)
             print(f"  ✓ copied Copilot prompts → {args.copilot_dir}")
         except Exception as e:
             print(f"  ! could not copy to --copilot-dir: {e}")

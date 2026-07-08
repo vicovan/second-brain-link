@@ -1,360 +1,1208 @@
 {
-  "_comment": "Facebook (JSON export, 'Download your information') source mapping — interpreted by engine/scripts/mapping.py; WINS over the same-named Python adapter (sources/personal/facebook.py is a resilience fallback). Comprehensive coverage of all signal-bearing files: people (friends/followers/requests), voice (posts/comments/reactions), interests (liked/followed pages), the algorithmic MIRROR (ad-interests/advertisers/off-Meta/predictions -> 50-mirror via the mirror/ad_segment emits), places (check-ins/cities/locations), events, orgs (your pages/groups/connected apps), search, and identity. EVERY rule is scoped with path_contains:['facebook'] because a mapping's extract() sees the whole entity tree (all sibling sources share all_paths) — the entity's source subfolder is .../facebook/..., so this reliably scopes to FB files only. Pure UI/config settings (dark mode, audio, push, watch, etc.) are intentionally NOT mapped: the universal harvester summarizes them into 99-uncategorized/ (nothing lost, flagged in _COVERAGE.md). Rules declare semantic 'tags' (person/*, place/*, company/*) that join the renderer's automatic source/facebook + type tags so all data points are colorable/filterable in the Obsidian graph. quarantine entries are exact norm_file(name) keys (extension + _N shard stripped, alphanumerics only) — in --full owner mode these fold into 00-me/my-*.md.",
-  "name": "facebook",
-  "subject": "person",
-  "detect": {
-    "path_contains": ["facebook"],
-    "any_key_prefix": ["friends", "profileinformation", "yourposts", "yourfacebookactivity"]
-  },
-  "quarantine": [
-    "ipaddressactivity",
-    "browsercookies",
-    "devicelogincookies",
-    "paymenthistory",
-    "yourpaymentaccountactivityhistory",
-    "youraccountpasswordinformation",
-    "loginsandlogouts",
-    "accountactivity",
-    "yourfundraiserdonationsinformation",
-    "contactsuploadedbefore",
-    "contactsuploadedbefore2021",
-    "contactsuploadedfromyourphone",
-    "yourimportedcontacts",
-    "twofactorauthentication"
+ "_comment": "Facebook (JSON export, 'Download your information') source mapping — interpreted by engine/scripts/mapping.py; WINS over the same-named Python adapter (sources/personal/facebook.py is a resilience fallback). Comprehensive coverage of all signal-bearing files: people (friends/followers/requests), voice (posts/comments/reactions), interests (liked/followed pages), the algorithmic MIRROR (ad-interests/advertisers/off-Meta/predictions -> 50-mirror via the mirror/ad_segment emits), places (check-ins/cities/locations), events, orgs (your pages/groups/connected apps), search, and identity. EVERY rule is scoped with path_contains:['facebook'] because a mapping's extract() sees the whole entity tree (all sibling sources share all_paths) — the entity's source subfolder is .../facebook/..., so this reliably scopes to FB files only. Pure UI/config settings (dark mode, audio, push, watch, etc.) are intentionally NOT mapped: the universal harvester summarizes them into 99-uncategorized/ (nothing lost, flagged in _COVERAGE.md). Rules declare semantic 'tags' (person/*, place/*, company/*) that join the renderer's automatic source/facebook + type tags so all data points are colorable/filterable in the Obsidian graph. quarantine entries are exact norm_file(name) keys (extension + _N shard stripped, alphanumerics only) — in --full owner mode these fold into 00-me/my-*.md.",
+ "name": "facebook",
+ "subject": "person",
+ "detect": {
+  "path_contains": [
+   "facebook"
   ],
-  "records": [
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["your_friends"], "suffix": ".json" },
-      "locate": "walk",
-      "emit": "person",
-      "tags": ["person/friend"],
-      "fields": {
-        "name": "name",
-        "date": ["timestamp", "contact_point"],
-        "role": { "const": "facebook friend" }
-      }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["people_who_followed"], "suffix": ".json" },
-      "locate": "walk",
-      "emit": "person",
-      "tags": ["person/follower"],
-      "fields": { "name": "name", "date": "timestamp", "role": { "const": "facebook follower" } }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["ve_followed"], "suffix": ".json" },
-      "locate": "walk",
-      "emit": "person",
-      "tags": ["person/following"],
-      "fields": { "name": "name", "date": "timestamp", "role": { "const": "facebook following" } }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["sent_friend_requests"], "suffix": ".json" },
-      "locate": "walk",
-      "emit": "person",
-      "tags": ["person/friend-request-sent"],
-      "fields": { "name": "name", "date": "timestamp", "role": { "const": "facebook friend request (sent)" } }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["received_friend_requests"], "suffix": ".json" },
-      "locate": "walk",
-      "emit": "person",
-      "tags": ["person/friend-request-received"],
-      "fields": { "name": "name", "date": "timestamp", "role": { "const": "facebook friend request (received)" } }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["removed_friends"], "suffix": ".json" },
-      "locate": "walk",
-      "emit": "person",
-      "tags": ["person/removed"],
-      "fields": { "name": "name", "date": ["timestamp", "removed_timestamp"], "role": { "const": "facebook removed friend" } }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["rejected_friend_requests"], "suffix": ".json" },
-      "locate": "walk",
-      "emit": "person",
-      "tags": ["person/rejected"],
-      "fields": { "name": "name", "date": "timestamp", "role": { "const": "facebook rejected request" } }
-    },
-
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["your_posts"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "post",
-      "tags": ["post/facebook"],
-      "fields": {
-        "text": ["data[].post", "data[].update.text", "title", "post", "message"],
-        "date": ["timestamp", "creation_timestamp"],
-        "kind": { "const": "post" }
-      }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["your_contributions"], "suffix": ".json" },
-      "locate": "walk",
-      "emit": "post",
-      "tags": ["post/facebook-group"],
-      "fields": { "text": ["data[].post", "title"], "date": "timestamp", "kind": { "const": "group post" } }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["comments"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "comment",
-      "fields": {
-        "text": ["data[].comment.comment", "title"],
-        "date": "timestamp"
-      }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["likes_and_reactions"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "reaction",
-      "fields": { "kind": ["data[].reaction.reaction", "title"] }
-    },
-
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["_liked"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "interest",
-      "fields": { "tag": ["name", "title"] }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["you_follow"], "suffix": ".json" },
-      "locate": "walk",
-      "emit": "interest",
-      "fields": { "tag": ["name", "title"] }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["books"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "interest",
-      "fields": { "tag": ["name", "title"] }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["saved_items"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "interest",
-      "fields": { "tag": ["title", "name", "data[].name"] }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["unfollowed"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "interest",
-      "fields": { "tag": ["name", "title"] }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["posts_from_apps"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "post",
-      "tags": ["post/facebook-app"],
-      "fields": { "text": ["data[].post", "title", "name"], "date": "timestamp", "kind": { "const": "app post" } }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["archived_stories"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "post",
-      "tags": ["post/facebook-story"],
-      "fields": { "text": ["title", "data[].post"], "date": ["timestamp", "creation_timestamp"], "kind": { "const": "story" } }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["group_membership_activity"], "suffix": ".json" },
-      "locate": "walk",
-      "emit": "org",
-      "tags": ["company/facebook-group"],
-      "fields": { "name": ["name", "group_name"], "category": { "const": "facebook group (joined)" } }
-    },
-
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["ads_interests", "ads_topics"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "mirror",
-      "fields": { "text": ["topics_v2[]", "topics[]", "label_values[].value"] }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["ad_preferences", "other_categories_used_to_reach_you"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "ad_segment",
-      "fields": { "text": ["label_values[].value", "name", "title"] }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["advertisers_using", "advertisers_you"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "ad_segment",
-      "fields": { "text": ["label_values[].value", "advertiser_name", "name", "title"] }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["apps_detected"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "ad_segment",
-      "fields": { "text": ["label_values[].value", "name", "title"] }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["activity_off_meta", "off_meta_technologies"], "suffix": ".json" },
-      "locate": "walk",
-      "emit": "mirror",
-      "fields": { "text": ["name", "title", "label_values[].value"] }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["age_group_prediction"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "mirror",
-      "fields": { "text": ["label_values[].value"] }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["languages_you_may_know"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "mirror",
-      "fields": { "text": ["label_values[].value", "name"] }
-    },
-
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["check-ins"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "place",
-      "tags": ["place/check-in"],
-      "fields": {
-        "name": ["data[].place.name", "label_values[0].value", "title"],
-        "lat": ["data[].place.coordinate.latitude"],
-        "lng": ["data[].place.coordinate.longitude"],
-        "date": "timestamp",
-        "kind": { "const": "check-in" }
-      }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["cities_you_have_checked_into"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "place",
-      "tags": ["place/city"],
-      "fields": { "name": ["label_values[0].value", "name", "title"], "kind": { "const": "city" } }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["places_you", "your_places"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "place",
-      "tags": ["place/created"],
-      "fields": { "name": ["name", "label_values[0].value", "title"], "kind": { "const": "place" } }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["locations_of_interest"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "place",
-      "tags": ["place/interest"],
-      "fields": { "name": ["label_values[0].value", "name", "title"], "kind": { "const": "location of interest" } }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["sampled_locations"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "place",
-      "tags": ["place/sampled"],
-      "fields": { "name": ["label_values[0].value", "name"], "kind": { "const": "sampled location" } }
-    },
-
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["event_invitations"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "event",
-      "tags": ["events"],
-      "fields": { "name": "name", "date": ["start_timestamp", "start_date"] }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["event_responses"], "suffix": ".json" },
-      "locate": "walk",
-      "emit": "event",
-      "tags": ["events"],
-      "fields": { "name": "name", "date": ["start_timestamp", "start_date"] }
-    },
-
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["your_pages"], "suffix": ".json" },
-      "locate": "walk",
-      "emit": "org",
-      "tags": ["company/facebook-page"],
-      "fields": { "name": "name", "category": { "const": "page (you manage)" } }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["your_groups"], "suffix": ".json" },
-      "locate": "walk",
-      "emit": "org",
-      "tags": ["company/facebook-group"],
-      "fields": { "name": "name", "category": { "const": "facebook group" } }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["connected_apps"], "suffix": ".json" },
-      "locate": "walk",
-      "emit": "org",
-      "tags": ["company/connected-app"],
-      "fields": { "name": "name", "category": { "const": "connected app/website" } }
-    },
-
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["search_history"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "search",
-      "fields": { "query": ["data[].text", "data[].value", "title"] }
-    },
-
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["posts_on_other_pages"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "post",
-      "tags": ["post/facebook"],
-      "fields": { "text": "label_values[label=Message].value", "date": "timestamp", "kind": { "const": "post on another profile" } }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["link_history"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "post",
-      "tags": ["post/facebook-link"],
-      "fields": { "text": "label_values[label=link that you visited].value", "date": "timestamp", "kind": { "const": "visited link" } }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["your_videos"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "post",
-      "tags": ["post/facebook-video"],
-      "fields": { "text": ["description", "title"], "date": ["creation_timestamp", "timestamp"], "kind": { "const": "video" } }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["uncategorized_photos"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "post",
-      "tags": ["post/facebook-photo"],
-      "fields": { "text": ["description", "title"], "date": ["creation_timestamp", "timestamp"], "kind": { "const": "photo" } }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["recently_viewed_products"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "interest",
-      "fields": { "tag": "label_values[label=Product names].vec[].value" }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["people_you_may_know", "suggested_friends"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "mirror",
-      "fields": { "text": ["label_values[label=Friend suggestions].vec[].value", "label_values[].vec[].value"] }
-    },
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["story_reactions"], "suffix": ".json" },
-      "locate": "auto_array",
-      "emit": "reaction",
-      "fields": { "kind": ["label_values[label=Reaction].value", "title"] }
-    },
-
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["profile_information"], "suffix": ".json" },
-      "locate": "dict",
-      "emit": "identity",
-      "_note": "name + location only — LinkedIn owns the professional headline and set_identity is first-non-empty-wins, so a FB about/bio must not override it.",
-      "fields": {
-        "name": ["profile_v2.name.full_name", "profile.name.full_name", "name.full_name", "name"],
-        "location": ["profile_v2.current_city.name", "current_city.name"]
-      }
-    },
-
-    {
-      "match": { "path_contains": ["facebook"], "name_contains": ["messag"], "suffix": ".json" },
-      "locate": "dict",
-      "emit": "message_signal",
-      "fields": { "name": "messages[].sender_name", "date": "messages[].timestamp_ms" }
-    }
+  "any_key_prefix": [
+   "yourfriends",
+   "profileinformation",
+   "yourposts",
+   "yourfacebookactivity"
   ]
+ },
+ "quarantine": [
+  "ipaddressactivity",
+  "browsercookies",
+  "devicelogincookies",
+  "paymenthistory",
+  "yourpaymentaccountactivityhistory",
+  "youraccountpasswordinformation",
+  "loginsandlogouts",
+  "accountactivity",
+  "yourfundraiserdonationsinformation",
+  "contactsuploadedbefore",
+  "contactsuploadedbefore2021",
+  "contactsuploadedfromyourphone",
+  "yourimportedcontacts",
+  "twofactorauthentication"
+ ],
+ "records": [
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "your_friends"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "person",
+   "tags": [
+    "person/friend"
+   ],
+   "fields": {
+    "name": "name",
+    "date": [
+     "timestamp",
+     "contact_point"
+    ],
+    "role": {
+     "const": "facebook friend"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "people_who_followed"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "person",
+   "tags": [
+    "person/follower"
+   ],
+   "fields": {
+    "name": "name",
+    "date": "timestamp",
+    "role": {
+     "const": "facebook follower"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "ve_followed"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "person",
+   "tags": [
+    "person/following"
+   ],
+   "fields": {
+    "name": "name",
+    "date": "timestamp",
+    "role": {
+     "const": "facebook following"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "sent_friend_requests"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "person",
+   "tags": [
+    "person/friend-request-sent"
+   ],
+   "fields": {
+    "name": "name",
+    "date": "timestamp",
+    "role": {
+     "const": "facebook friend request (sent)"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "received_friend_requests"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "person",
+   "tags": [
+    "person/friend-request-received"
+   ],
+   "fields": {
+    "name": "name",
+    "date": "timestamp",
+    "role": {
+     "const": "facebook friend request (received)"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "removed_friends"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "person",
+   "tags": [
+    "person/removed"
+   ],
+   "fields": {
+    "name": "name",
+    "date": [
+     "timestamp",
+     "removed_timestamp"
+    ],
+    "role": {
+     "const": "facebook removed friend"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "rejected_friend_requests"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "person",
+   "tags": [
+    "person/rejected"
+   ],
+   "fields": {
+    "name": "name",
+    "date": "timestamp",
+    "role": {
+     "const": "facebook rejected request"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "your_posts"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "post",
+   "tags": [
+    "post/facebook"
+   ],
+   "fields": {
+    "text": [
+     "data[].post",
+     "data[].update.text",
+     "title",
+     "post",
+     "message"
+    ],
+    "date": [
+     "timestamp",
+     "creation_timestamp"
+    ],
+    "kind": {
+     "const": "post"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "your_contributions"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "post",
+   "tags": [
+    "post/facebook-group"
+   ],
+   "fields": {
+    "text": [
+     "data[].post",
+     "title"
+    ],
+    "date": "timestamp",
+    "kind": {
+     "const": "group post"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "comments"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "comment",
+   "fields": {
+    "text": [
+     "data[].comment.comment",
+     "title"
+    ],
+    "date": "timestamp"
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "likes_and_reactions"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "reaction",
+   "fields": {
+    "kind": [
+     "data[].reaction.reaction",
+     "title"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "_liked"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "interest",
+   "fields": {
+    "tag": [
+     "name",
+     "title"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "you_follow"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "interest",
+   "fields": {
+    "tag": [
+     "name",
+     "title"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "books"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "interest",
+   "fields": {
+    "tag": [
+     "name",
+     "title"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "saved_items"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "interest",
+   "fields": {
+    "tag": [
+     "title",
+     "name",
+     "data[].name"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "unfollowed"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "interest",
+   "fields": {
+    "tag": [
+     "name",
+     "title"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "posts_from_apps"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "post",
+   "tags": [
+    "post/facebook-app"
+   ],
+   "fields": {
+    "text": [
+     "data[].post",
+     "title",
+     "name"
+    ],
+    "date": "timestamp",
+    "kind": {
+     "const": "app post"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "archived_stories"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "post",
+   "tags": [
+    "post/facebook-story"
+   ],
+   "fields": {
+    "text": [
+     "title",
+     "data[].post"
+    ],
+    "date": [
+     "timestamp",
+     "creation_timestamp"
+    ],
+    "kind": {
+     "const": "story"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "group_membership_activity"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "org",
+   "tags": [
+    "company/facebook-group"
+   ],
+   "fields": {
+    "name": [
+     "name",
+     "group_name"
+    ],
+    "category": {
+     "const": "facebook group (joined)"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "ads_interests",
+     "ads_topics"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "mirror",
+   "fields": {
+    "text": [
+     "topics_v2[]",
+     "topics[]",
+     "label_values[].value"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "ad_preferences",
+     "other_categories_used_to_reach_you"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "ad_segment",
+   "fields": {
+    "text": [
+     "label_values[].value",
+     "name",
+     "title"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "advertisers_using",
+     "advertisers_you"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "ad_segment",
+   "fields": {
+    "text": [
+     "label_values[].value",
+     "advertiser_name",
+     "name",
+     "title"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "apps_detected"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "ad_segment",
+   "fields": {
+    "text": [
+     "label_values[].value",
+     "name",
+     "title"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "activity_off_meta",
+     "off_meta_technologies"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "mirror",
+   "fields": {
+    "text": [
+     "name",
+     "title",
+     "label_values[].value"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "age_group_prediction"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "mirror",
+   "fields": {
+    "text": [
+     "label_values[].value"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "languages_you_may_know"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "mirror",
+   "fields": {
+    "text": [
+     "label_values[].value",
+     "name"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "check-ins"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "place",
+   "tags": [
+    "place/check-in"
+   ],
+   "fields": {
+    "name": [
+     "data[].place.name",
+     "label_values[0].value",
+     "title"
+    ],
+    "lat": [
+     "data[].place.coordinate.latitude"
+    ],
+    "lng": [
+     "data[].place.coordinate.longitude"
+    ],
+    "date": "timestamp",
+    "kind": {
+     "const": "check-in"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "cities_you_have_checked_into"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "place",
+   "tags": [
+    "place/city"
+   ],
+   "fields": {
+    "name": [
+     "label_values[0].value",
+     "name",
+     "title"
+    ],
+    "kind": {
+     "const": "city"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "places_you",
+     "your_places"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "place",
+   "tags": [
+    "place/created"
+   ],
+   "fields": {
+    "name": [
+     "name",
+     "label_values[0].value",
+     "title"
+    ],
+    "kind": {
+     "const": "place"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "locations_of_interest"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "place",
+   "tags": [
+    "place/interest"
+   ],
+   "fields": {
+    "name": [
+     "label_values[0].value",
+     "name",
+     "title"
+    ],
+    "kind": {
+     "const": "location of interest"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "sampled_locations"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "place",
+   "tags": [
+    "place/sampled"
+   ],
+   "fields": {
+    "name": [
+     "label_values[0].value",
+     "name"
+    ],
+    "kind": {
+     "const": "sampled location"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "event_invitations"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "event",
+   "tags": [
+    "events"
+   ],
+   "fields": {
+    "name": "name",
+    "date": [
+     "start_timestamp",
+     "start_date"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "your_pages"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "org",
+   "tags": [
+    "company/facebook-page"
+   ],
+   "fields": {
+    "name": "name",
+    "category": {
+     "const": "page (you manage)"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "your_groups"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "org",
+   "tags": [
+    "company/facebook-group"
+   ],
+   "fields": {
+    "name": "name",
+    "category": {
+     "const": "facebook group"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "connected_apps"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "org",
+   "tags": [
+    "company/connected-app"
+   ],
+   "fields": {
+    "name": "name",
+    "category": {
+     "const": "connected app/website"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "search_history"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "search",
+   "fields": {
+    "query": [
+     "data[].text",
+     "data[].value",
+     "title"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "posts_on_other_pages"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "post",
+   "tags": [
+    "post/facebook"
+   ],
+   "fields": {
+    "text": "label_values[label=Message].value",
+    "date": "timestamp",
+    "kind": {
+     "const": "post on another profile"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "link_history"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "post",
+   "tags": [
+    "post/facebook-link"
+   ],
+   "fields": {
+    "text": "label_values[label=link that you visited].value",
+    "date": "timestamp",
+    "kind": {
+     "const": "visited link"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "your_videos"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "post",
+   "tags": [
+    "post/facebook-video"
+   ],
+   "fields": {
+    "text": [
+     "description",
+     "title"
+    ],
+    "date": [
+     "creation_timestamp",
+     "timestamp"
+    ],
+    "kind": {
+     "const": "video"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "uncategorized_photos"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "post",
+   "tags": [
+    "post/facebook-photo"
+   ],
+   "fields": {
+    "text": [
+     "description",
+     "title"
+    ],
+    "date": [
+     "creation_timestamp",
+     "timestamp"
+    ],
+    "kind": {
+     "const": "photo"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "recently_viewed_products"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "interest",
+   "fields": {
+    "tag": "label_values[label=Product names].vec[].value"
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "people_you_may_know",
+     "suggested_friends"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "mirror",
+   "fields": {
+    "text": [
+     "label_values[label=Friend suggestions].vec[].value",
+     "label_values[].vec[].value"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "story_reactions"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "auto_array",
+   "emit": "reaction",
+   "fields": {
+    "kind": [
+     "label_values[label=Reaction].value",
+     "title"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "profile_information"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "dict",
+   "emit": "identity",
+   "_note": "name + location only — LinkedIn owns the professional headline and set_identity is first-non-empty-wins, so a FB about/bio must not override it.",
+   "fields": {
+    "name": [
+     "profile_v2.name.full_name",
+     "profile.name.full_name",
+     "name.full_name",
+     "name"
+    ],
+    "location": [
+     "profile_v2.current_city.name",
+     "current_city.name"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "messag"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "dict",
+   "emit": "message_signal",
+   "fields": {
+    "name": "messages[].sender_name",
+    "date": "messages[].timestamp_ms"
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "event_responses"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "dict",
+   "emit": "event",
+   "tags": [
+    "events",
+    "event/going"
+   ],
+   "fields": {
+    "name": [
+     "event_responses_v2.events_joined[].name",
+     "event_responses.events_joined[].name"
+    ],
+    "date": [
+     "event_responses_v2.events_joined[].start_timestamp",
+     "event_responses.events_joined[].start_timestamp"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "event_responses"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "dict",
+   "emit": "event",
+   "tags": [
+    "events",
+    "event/interested"
+   ],
+   "fields": {
+    "name": [
+     "event_responses_v2.events_interested[].name",
+     "event_responses.events_interested[].name"
+    ],
+    "date": [
+     "event_responses_v2.events_interested[].start_timestamp",
+     "event_responses.events_interested[].start_timestamp"
+    ]
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "notes"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "post",
+   "tags": [
+    "post/note"
+   ],
+   "fields": {
+    "text": [
+     "text",
+     "title"
+    ],
+    "date": [
+     "created_timestamp",
+     "updated_timestamp"
+    ],
+    "kind": {
+     "const": "note"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "reviews"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "post",
+   "tags": [
+    "post/review"
+   ],
+   "fields": {
+    "text": [
+     "review_text",
+     "text",
+     "story"
+    ],
+    "date": [
+     "created_timestamp",
+     "timestamp"
+    ],
+    "kind": {
+     "const": "review"
+    }
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook",
+     "marketplace"
+    ],
+    "name_contains": [
+     "listing"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "post",
+   "tags": [
+    "post/listing"
+   ],
+   "fields": {
+    "text": [
+     "title",
+     "description"
+    ],
+    "date": [
+     "created_timestamp",
+     "creation_timestamp"
+    ],
+    "kind": {
+     "const": "listing"
+    }
+   }
+  }
+ ]
 }

@@ -1,5 +1,12 @@
 # Digital-Twin Vault — LinkedIn Export Blueprint (generic)
 
+> **Scope note:** this blueprint is the deep, file-by-file data model for the
+> **LinkedIn** export (the founding source). The engine now ships **24 sources**;
+> the authoritative per-source coverage table (what each adapter parses, which
+> layer it feeds, and its privacy posture) lives in the repo-root `CLAUDE.md` §9,
+> and each JSON mapping documents itself in its `_comment` header. The layer
+> semantics below (00–99, synthesis, quarantine) apply to every source.
+
 The structure the transform generates for **any** LinkedIn professional. Every account's export contains the same set of files, so the same mapping applies whether the user is a job seeker, salesperson, founder, freelancer, recruiter, student, or executive. The vault adapts to the person through *what's in their data*, not through configuration.
 
 The design separates two things:

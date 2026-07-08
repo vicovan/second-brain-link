@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 profile_export.py — multi-source schema map ("data dictionary") for any supported
-export (LinkedIn, Facebook, Instagram, Google Takeout — and unknowns).
+export (all registered sources — the registry is auto-discovered — and unknowns).
 
 Detects which source(s) the export belongs to, then catalogs every data file:
 type, columns/keys, fill-rate, a privacy-safe sample, and whether an adapter is
@@ -23,7 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sources as _sources
-from sources import detect_sources, BY_NAME
+from sources import detect_sources
 from sources.common import (norm_file, nk, read_csv, read_json, EMAIL_RE, PHONE_RE,
                             SENSITIVE_COL_HINTS)
 import selfheal
@@ -173,6 +173,12 @@ def main():
 
         # ---- visualizations (PII-safe; built from the catalog, not raw data) ----
         import diagrams
+        # a company export designs a company-named brain (30-content, 85-locations,
+        # …) — re-apply the layout under the company variant so the mindmap +
+        # designed structure preview exactly what the builder will emit.
+        if any(getattr(m, "SUBJECT", "person") == "company" for m in sources):
+            import mapping as _mapping
+            diagrams.apply_layout(_mapping.load_brain_layout(), "company")
         # name outputs after the single detected source (e.g. linkedin_mindmap.md)
         stem = src_names[0] if len(src_names) == 1 else "schema_map"
         root_label = (src_names[0].title() + " export") if len(src_names) == 1 else "Export"

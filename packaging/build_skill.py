@@ -54,6 +54,14 @@ def build(provider: str):
         if (ENGINE / sub).exists():
             shutil.copytree(ENGINE / sub, out_dir / sub,
                             ignore=shutil.ignore_patterns(*SKIP))
+    # ship the user-facing export/import guide inside the skill (as
+    # references/SOURCES.md — SKILL.md points the agent at it) so the installed
+    # agent can answer "how do I export X" offline for all 24 sources.
+    for doc in ("SOURCES.md", "ENTITY-MAP.md"):
+        src_doc = REPO / "docs" / doc
+        if src_doc.exists():
+            (out_dir / "references").mkdir(exist_ok=True)
+            shutil.copy2(src_doc, out_dir / "references" / doc)
     # the provider manifest becomes the skill's SKILL.md
     shutil.copy2(manifest, out_dir / "SKILL.md")
     # copy any other provider-specific files alongside the manifest (e.g. the

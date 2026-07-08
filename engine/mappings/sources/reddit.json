@@ -1,0 +1,96 @@
+{
+  "_comment": "Reddit GDPR data-request export (ZIP of CSVs) — interpreted by engine/scripts/mapping.py. Posts/comments → 30-voice (often a person's most candid written voice), subscribed subreddits → 60-learning interests, search history → 80-search. Pseudonymous by nature. Privacy: gender/ads/IP/identity-linkage files are quarantined; chat_history (message bodies) is quarantined outright — private chats never enter the vault. Quarantine entries are EXACT norm_file keys.",
+  "name": "reddit",
+  "subject": "person",
+  "detect": {
+    "any_key": ["subscribedsubreddits", "postheaders"],
+    "any_key_prefix": ["subscribedsubreddits"]
+  },
+  "quarantine": [
+    "accountgender", "sensitiveadspreferences", "iplogs", "linkedidentities",
+    "linkedphonenumber", "chathistory", "twitterusername", "birthdate",
+    "personainferences"
+  ],
+  "records": [
+    {
+      "match": { "name_prefix": "posts", "suffix": ".csv" },
+      "emit": "post",
+      "fields": {
+        "text": ["body", "title"],
+        "date": "date",
+        "url": "permalink",
+        "kind": { "const": "post" }
+      },
+      "tags": ["post/reddit"]
+    },
+    {
+      "match": { "name_prefix": "comments", "suffix": ".csv" },
+      "emit": "comment",
+      "fields": {
+        "text": "body",
+        "date": "date"
+      }
+    },
+    {
+      "match": { "name_prefix": "subscribed_subreddits", "suffix": ".csv" },
+      "emit": "interest",
+      "fields": { "tag": "subreddit" }
+    },
+    {
+      "match": { "name_prefix": "saved_posts", "suffix": ".csv" },
+      "emit": "interest",
+      "fields": { "tag": ["title", "subreddit"] }
+    },
+    {
+      "match": { "name_prefix": "friends", "suffix": ".csv" },
+      "emit": "person",
+      "fields": {
+        "name": "username",
+        "handle": "username",
+        "role": { "const": "reddit friend" }
+      },
+      "tags": ["person/friend"]
+    },
+    {
+      "match": { "name_prefix": "multireddits", "suffix": ".csv" },
+      "emit": "interest",
+      "fields": { "tag": ["display_name", "name"] }
+    },
+    {
+      "match": { "name_prefix": "messages", "suffix": ".csv", "path_contains": ["reddit"] },
+      "emit": "message_signal",
+      "fields": { "name": "from", "date": "date" }
+    },
+    {
+      "match": { "name_prefix": "messages", "suffix": ".csv", "path_contains": ["reddit"] },
+      "emit": "person",
+      "fields": {
+        "name": "from",
+        "handle": "from",
+        "role": { "const": "reddit chat" }
+      },
+      "tags": ["person/chat"]
+    },
+    {
+      "match": { "name_prefix": "post_headers", "suffix": ".csv" },
+      "emit": "post",
+      "fields": {
+        "text": "title",
+        "date": "date",
+        "url": "permalink",
+        "kind": { "const": "post" }
+      },
+      "tags": ["post/reddit"]
+    },
+    {
+      "match": { "name_prefix": "search_history", "suffix": ".csv" },
+      "emit": "search",
+      "fields": { "query": ["search query", "query"] }
+    },
+    {
+      "match": { "name_prefix": "statistics", "suffix": ".csv" },
+      "emit": "identity",
+      "fields": { "name": "account name" }
+    }
+  ]
+}

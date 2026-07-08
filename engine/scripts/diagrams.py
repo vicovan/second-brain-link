@@ -20,6 +20,7 @@ cell *values* never appear.
 Used by profile_export.py. Source-agnostic: known files route to a layer, unknown
 files surface under "❓ unmapped".
 """
+import re
 from collections import OrderedDict
 
 # ---------------------------------------------------------------------------
@@ -97,9 +98,13 @@ LAYER_PURPOSE = {
 # Optionally override the routing/titles/purpose from engine/mappings/brain/layout.json
 # (and any --mappings override dir). Falls back to the constants above if absent, so
 # default output is unchanged. This is what makes the brain layout JSON-configurable.
-def apply_layout(layout):
-    """Rebuild LAYER_ROUTES/LAYER_TITLES/LAYER_PURPOSE from a brain layout dict."""
-    global LAYER_ROUTES, LAYER_TITLES, LAYER_PURPOSE
+# `subject` picks the folder-name variant (layout.json `variants`): a company
+# export designs a company-named brain (30-content, 85-locations, …) — same
+# resolver the builder uses, so the profiler's preview matches what gets built.
+def apply_layout(layout, subject="person"):
+    """Rebuild LAYER_ROUTES/LAYER_TITLES/LAYER_PURPOSE (+ canvas colors) from a
+    brain layout dict, renamed to the `subject` variant's folder names."""
+    global LAYER_ROUTES, LAYER_TITLES, LAYER_PURPOSE, _LAYER_COLOR, _DYNAMIC_LAYERS
     layers = (layout or {}).get("layers")
     if not layers:
         return
@@ -108,7 +113,20 @@ def apply_layout(layout):
         f = L["folder"]
         routes[f] = L.get("route_keys", [])
         titles[f] = L.get("title", f)
-        purpose[f] = L.get("purpose", "")
+        purpose[f] = (L.get("purpose_company") or L.get("purpose", "")) \
+            if subject == "company" else L.get("purpose", "")
+    var = (layout or {}).get("variants") or {}
+    if subject == "company" and var.get("company"):
+        person, company = var.get("person") or {}, var["company"]
+        ren = {person[k]: company[k] for k in company
+               if k in person and person[k] != company[k]}
+        routes = OrderedDict((ren.get(k, k), v) for k, v in routes.items())
+        titles = {ren.get(k, k): (v.replace(k, ren[k]) if k in ren and k in v else v)
+                  for k, v in titles.items()}
+        purpose = {ren.get(k, k): v for k, v in purpose.items()}
+        _LAYER_COLOR = {ren.get(k, k): v for k, v in _LAYER_COLOR.items()}
+        _DYNAMIC_LAYERS = {"people": ren.get("10-people", "10-people"),
+                           "voice": ren.get("30-voice", "30-voice")}
     titles.setdefault("_quarantine", "🔒 quarantine (catalogued, never imported)")
     titles.setdefault("_unmapped", "❓ unmapped (needs an override / adapter)")
     LAYER_ROUTES, LAYER_TITLES, LAYER_PURPOSE = routes, titles, purpose
@@ -168,12 +186,28 @@ ENTITY_SOURCES = OrderedDict([
 # classification helpers
 # ---------------------------------------------------------------------------
 
+# layers whose folder name dynamic keys resolve to (kept variant-correct by
+# apply_layout — "10-people" is invariant, voice becomes 30-content for company)
+_DYNAMIC_LAYERS = {"people": "10-people", "voice": "30-voice"}
+
+
 def route_layer(key):
-    """Return the canonical layer for a normalized file key, or None if unknown."""
+    """Return the canonical layer for a normalized file key, or None if unknown.
+    Exact matches win across ALL layers before any prefix match, so e.g.
+    `opportunities` (LinkedIn services) and `opportunity` (Salesforce pipeline)
+    route independently."""
+    for layer, keys in LAYER_ROUTES.items():
+        if key in keys:
+            return layer
     for layer, keys in LAYER_ROUTES.items():
         for k in keys:
-            if key == k or key.startswith(k):
+            if key.startswith(k):
                 return layer
+    # dynamic keys no static route can name:
+    if key.isdigit() and len(key) == 8:          # Slack day-file (message signal → people)
+        return _DYNAMIC_LAYERS["people"]
+    if re.search(r"db[0-9a-f]{16,}", key):       # Notion database export → content
+        return _DYNAMIC_LAYERS["voice"]
     return None
 
 def classify(entry, quarantine_keys):

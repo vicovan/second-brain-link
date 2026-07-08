@@ -8,7 +8,9 @@ A Workspace admin export (Admin console / org Takeout) contains the org director
 Privacy: employee email/phone pass through; the Collector strips them unless
 --full. HR/payroll/security/admin-log files are quarantined (see QUARANTINE).
 """
-from ..common import read_csv, read_json, nk, iso_date, canonical_url
+import re
+
+from ..common import read_csv, read_json, nk, iso_date, canonical_url, EMAIL_RE
 
 NAME = "google_workspace"
 SUBJECT = "company"
@@ -81,28 +83,56 @@ def extract(root, file_index, all_paths, col):
         col.add_org(NAME, org_name, "self")
         col.set_identity(NAME, name=org_name, industry="")
 
-    # users → employees
+    # users → employees. The Org Unit column is the org STRUCTURE — each unit
+    # becomes a department org note, and the person carries a dept/<slug> tag so
+    # the org chart / who-knows-what analyses can group by team.
     users = rows("users", "useraccounts", "domainusers")
     mark("users", "useraccounts", "domainusers")
+    depts = set()
     for r in users:
         name = (_col(r, "First Name", "Given Name") + " " +
                 _col(r, "Last Name", "Family Name")).strip() or _col(r, "Name", "Full Name")
         if not name:
             continue
+        ou = _col(r, "Org Unit", "Org Unit Path", "Organizational Unit", "Department")
+        dept = ou.strip("/").split("/")[-1].strip() if ou else ""
+        tags = []
+        if dept:
+            depts.add(dept)
+            tags.append("dept/" + re.sub(r"[^a-z0-9]+", "-", dept.lower()).strip("-"))
         col.add_person(NAME, name,
                        company=org_name,
                        role=_col(r, "Title", "Job Title", "Role"),
                        email=_col(r, "Email", "Email Address", "Primary Email"),
+                       dept=dept,
+                       tags=tags,
                        extra={k: v for k, v in r.items()
                               if k and nk(k) not in ("firstname", "givenname",
                               "lastname", "familyname", "name", "fullname",
                               "title", "jobtitle", "role", "email", "emailaddress",
                               "primaryemail")})
+    for dept in depts:
+        col.add_org(NAME, dept, "department", tags=["org/department"])
 
-    # shared calendars → events
+    # shared calendars → events, WITH the collaboration signal a calendar
+    # actually carries: attendees (names only — email-shaped entries are skipped
+    # in default mode; the Collector would strip them anyway), organizer, location.
     for r in rows("sharedcalendars", "calendarevents", "events"):
-        col.events.append({"name": _col(r, "Summary", "Event Name", "Title"),
-                           "date": iso_date(_col(r, "Start", "Date", "Start Date"))})
+        attendees = []
+        raw = _col(r, "Attendees", "Guests", "Participants")
+        organizer = _col(r, "Organizer", "Creator")
+        for who in ([organizer] if organizer else []) + re.split(r"[;,]", raw or ""):
+            who = (who or "").strip()
+            if not who or EMAIL_RE.search(who):
+                continue  # attendee lists are often emails — never store those
+            attendees.append(who)
+            col.add_person(NAME, who, company=org_name)
+        col.add_event(NAME, _col(r, "Summary", "Event Name", "Title"),
+                      date=_col(r, "Start", "Date", "Start Date"),
+                      kind="meeting" if attendees else "event",
+                      location=_col(r, "Location", "Where"),
+                      description=_col(r, "Description"),
+                      attendees=attendees)
     mark("sharedcalendars", "calendarevents", "events")
 
     # shared drives → orgs/projects (light)
@@ -111,6 +141,16 @@ def extract(root, file_index, all_paths, col):
         if nm:
             col.add_org(NAME, nm, "project")
     mark("shareddrives", "drives")
+
+    # groups → orgs (mailing lists/teams are real structure; member emails are
+    # never stored — the group NAME is the signal)
+    for r in rows("groups", "groupmembers"):
+        nm = _col(r, "Group Name", "Name", "Group Email")
+        if nm and "@" in nm:
+            nm = nm.split("@", 1)[0]
+        if nm:
+            col.add_org(NAME, nm, "group", tags=["org/group"])
+    mark("groups", "groupmembers")
 
     if org_name or users:
         col.note(f"[google_workspace] org '{org_name or '?'}': {len(users)} users")

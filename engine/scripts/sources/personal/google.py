@@ -24,14 +24,20 @@ Coverage:
   Maps/My labeled places/Labeled places -> places   (Home/Work/…)
   Saved/*.csv  (place lists)            -> places
   Maps/Your local followed places/*.csv -> places
+  Semantic Location History/*.json      -> places   (visits, aggregated top 200)
+  My Activity/Search/MyActivity.*       -> searches (capped)
+  My Activity/Ads/MyActivity.json       -> ad segments (50-mirror)
+  Google Photos/*.jpg.json sidecars     -> places   (photo spots, aggregated; never images)
   YouTube subscriptions.csv             -> interests (channels)
-  YouTube playlists.csv                 -> interests (playlist titles)
+  YouTube playlists.csv + likes.csv     -> interests (+ like count)
+  YouTube comments/comments.csv         -> voice    (own comments)
   YouTube history/watch-history.html    -> interests (channels, deduped + capped)
   YouTube history/search-history.html   -> searches  (queries, capped)
+  Chrome bookmarks/reading list (.html) -> interests
 
-Huge/low-signal products (Photos, Drive, Gmail MBOX, Chrome history/bookmarks) are
-intentionally left to the universal harvester / quarantine — nothing is lost, just
-summarized into 99-uncategorized/.
+Excluded BY DESIGN and shown honestly as `skipped` in _COVERAGE.md (never silent):
+raw Location History pings (Records.json), Chrome history, Gmail MBOX, Fit, Drive,
+Keep, Play — personal email/health/files don't belong in a brain (see docs).
 """
 import re
 import html as _html
@@ -109,8 +115,9 @@ _WATCH_CAP = 500
 _SEARCH_CAP = 500
 
 # YouTube channel anchors in watch-history.html; search-query anchors in search-history.html.
-_RE_CHANNEL = re.compile(r'href="https://www\.youtube\.com/(?:channel/|user/|@)[^"]+">([^<]+)</a>')
-_RE_QUERY = re.compile(r'href="https://www\.youtube\.com/results\?search_query=[^"]*">([^<]+)</a>')
+# YouTube HTML patterns are SHARED with the standalone youtube.py adapter
+# (sources/personal/_youtube_common.py) so the two can't drift.
+from ._youtube_common import RE_CHANNEL as _RE_CHANNEL, RE_QUERY as _RE_QUERY  # noqa: E402
 
 
 def detect(file_index):
@@ -121,8 +128,11 @@ def detect(file_index):
     paths = [str(p).lower() for paths_list in file_index.values() for p in paths_list]
     blob = " ".join(paths)
     # strong product-folder signals (archive-agnostic — Takeout / Takeout 2 / loose folders)
+    # NOTE: "youtube and youtube music" alone is NOT a google signal — a
+    # standalone YouTube slice belongs to youtube.py; google owns it only when
+    # it sits inside a real Takeout tree (the "takeout" signal covers that).
     for sig in ("takeout", "maps (your places)", "maps(your places)",
-                "youtube and youtube music", "my labeled places", "google account"):
+                "my labeled places", "google account"):
         if sig in blob:
             return True
     if "googleprofile" in joined:
@@ -218,6 +228,9 @@ def extract(root, file_index, all_paths, col):
     low = lambda p: str(p).lower()
 
     pc = cc = ec = pl = yc = wc = sc = 0  # counters
+    visits = {}   # nk(place name) -> {"name","address","lat","lng","n"}  (Semantic Location History)
+    photos = {}   # rounded (lat,lng) -> {"lat","lng","n","first_date"}   (Photos EXIF sidecars)
+    ac = mac = 0  # My Activity: searches / ad segments
 
     for p in all_paths:
         sfx = p.suffix.lower()
@@ -283,10 +296,8 @@ def extract(root, file_index, all_paths, col):
             except Exception:
                 continue
             for summary, dt, loc, desc in _ics_events(text):
-                col.events.append({"name": summary, "date": dt,
-                                   "location": strip_pii(loc),
-                                   "description": strip_pii(desc)[:500],
-                                   "source": NAME})
+                col.add_event(NAME, summary, date=dt, location=strip_pii(loc),
+                              description=strip_pii(desc))
                 ec += 1
             consumed.add(key)
             continue
@@ -395,11 +406,143 @@ def extract(root, file_index, all_paths, col):
             consumed.add(key)
             continue
 
-        # ---- Chrome history / settings / extensions (accounted, not imported) ----
-        # No importable entity (and history can be enormous) — mark consumed so these
-        # are accounted-for Chrome data, not unmapped noise in 99-uncategorized.
+        # ---- Chrome history / settings / extensions (skipped, by design) ----
+        # No importable entity (and history can be enormous) — consumed AND flagged
+        # `skipped` so _COVERAGE.md reports it honestly (never a silent drop).
         if "chrome" in lp and sfx in (".json", ".html", ".csv"):
             consumed.add(key)
+            col.skipped_keys.add(key)
+            continue
+
+        # ---- Semantic Location History -> aggregated place visits ---------
+        # Takeout/Location History (or Timeline)/Semantic Location History/<year>/
+        # <year>_<MONTH>.json — placeVisit entries carry name/address + E7 coords.
+        # Aggregate by place (visit count), emit the top places after the loop —
+        # a decade of visits must become a map layer, not 50k notes.
+        if sfx == ".json" and "semantic location history" in lp:
+            data = read_json(p) or {}
+            for obj in (data.get("timelineObjects") or []):
+                v = obj.get("placeVisit") if isinstance(obj, dict) else None
+                if not isinstance(v, dict):
+                    continue
+                loc = v.get("location") or {}
+                nm = (loc.get("name") or "").strip()
+                if not nm:
+                    continue
+                lat, lng = loc.get("latitudeE7"), loc.get("longitudeE7")
+                rec = visits.setdefault(nk(nm), {
+                    "name": nm, "address": (loc.get("address") or "").split("\n")[0],
+                    "lat": (lat / 1e7) if isinstance(lat, (int, float)) else "",
+                    "lng": (lng / 1e7) if isinstance(lng, (int, float)) else "",
+                    "n": 0})
+                rec["n"] += 1
+            consumed.add(key)
+            continue
+
+        # ---- raw Location History pings / Timeline edits (skipped, by design) ----
+        # Records.json is surveillance-grade raw GPS (can be GB-scale). Deliberately
+        # never parsed — visits above carry the human-meaningful signal.
+        if sfx == ".json" and ("location history" in lp or "timeline" in lp):
+            consumed.add(key)
+            col.skipped_keys.add(key)
+            continue
+
+        # ---- My Activity -> searches (Search) / ad segments (Ads) ---------
+        # Takeout/My Activity/<Product>/MyActivity.json|.html. Search history is a
+        # strong long-run intent graph; Ads activity is the algorithmic mirror.
+        # Other products (Maps, Assistant, …) are skipped-by-design.
+        if "my activity" in lp and p.stem.lower() == "myactivity":
+            product = p.parent.name.lower()
+            if product == "search" and ac < _SEARCH_CAP:
+                if sfx == ".json":
+                    for e in (read_json(p) or []):
+                        t = (e.get("title") or "") if isinstance(e, dict) else ""
+                        if t.lower().startswith("searched for"):
+                            q = t[12:].strip()
+                            if q:
+                                col.add_search(NAME, q)
+                                ac += 1
+                                if ac >= _SEARCH_CAP:
+                                    break
+                elif sfx == ".html":
+                    try:
+                        text = p.read_text(encoding="utf-8", errors="ignore")
+                    except Exception:
+                        text = ""
+                    for raw in re.findall(
+                            r"Searched for\s*(?:<a[^>]*>)?([^<]{1,120})", text)[:_SEARCH_CAP - ac]:
+                        q = _html.unescape(raw).strip()
+                        if q:
+                            col.add_search(NAME, q)
+                            ac += 1
+                consumed.add(key)
+            elif product == "ads":
+                if sfx == ".json":
+                    for e in (read_json(p) or [])[:200]:
+                        t = (e.get("title") or "") if isinstance(e, dict) else ""
+                        if t:
+                            col.add_ad_segment(NAME, t)
+                            mac += 1
+                consumed.add(key)
+                if sfx == ".html":
+                    col.skipped_keys.add(key)  # ads html variant: skipped (json preferred)
+            else:
+                consumed.add(key)
+                col.skipped_keys.add(key)
+            continue
+
+        # ---- YouTube liked videos (likes.csv / Liked videos.csv) ----------
+        if sfx == ".csv" and p.name.lower() in ("likes.csv", "liked videos.csv"):
+            n_likes, titled = 0, 0
+            for r in read_csv(p):
+                n_likes += 1
+                t = (r.get("Video Title") or r.get("Title") or "").strip()
+                if t:
+                    col.add_interest(NAME, t)
+                    titled += 1
+            if n_likes:
+                col.add_reaction(NAME, "like")
+                col.reactions["like"] += n_likes - 1
+                yc += titled
+            consumed.add(key)
+            continue
+
+        # ---- YouTube comments (comments.csv) -> voice ----------------------
+        if sfx == ".csv" and "comment" in lp and "youtube" in lp:
+            for r in read_csv(p):
+                txt = (r.get("Comment Text") or r.get("Comment text") or "").strip()
+                if txt:
+                    col.add_comment(NAME, txt,
+                                    iso_date(r.get("Comment Create Timestamp")
+                                             or r.get("Timestamp") or ""))
+            consumed.add(key)
+            continue
+
+        # ---- Google Photos EXIF sidecars -> aggregated photo places -------
+        # <IMG>.jpg.json sidecars carry photoTakenTime + geoData; never the image.
+        # Aggregate by ~1 km cell so a day of shots in one area becomes one pin.
+        if sfx == ".json" and ("google photos" in lp or "/photos from " in lp):
+            data = read_json(p) or {}
+            geo = data.get("geoData") or {}
+            lat, lng = geo.get("latitude"), geo.get("longitude")
+            if isinstance(lat, (int, float)) and isinstance(lng, (int, float)) \
+                    and (lat, lng) != (0.0, 0.0):
+                cell = (round(lat, 2), round(lng, 2))
+                ts = _dig(data, "photoTakenTime", "timestamp")
+                rec = photos.setdefault(cell, {"lat": lat, "lng": lng, "n": 0,
+                                               "date": iso_date(str(ts))})
+                rec["n"] += 1
+            consumed.add(key)
+            continue
+
+        # ---- Mail mbox / Fit / Drive / Keep / Play (excluded by design) ----
+        # Personal email, health data, raw files and app libraries never enter a
+        # brain (see docs) — consumed + flagged skipped so coverage stays honest.
+        if sfx == ".mbox" or any(seg in ("fit", "drive", "keep", "google play store",
+                                         "google pay", "mail")
+                                 for seg in (s.lower() for s in p.parts)):
+            consumed.add(key)
+            col.skipped_keys.add(key)
             continue
 
         # ---- YouTube subscriptions.csv -> interests ---------------------
@@ -463,13 +606,38 @@ def extract(root, file_index, all_paths, col):
             for raw in _RE_QUERY.findall(text):
                 q = _html.unescape(raw).strip()
                 if q:
-                    col.searches.append(q)
+                    col.add_search(NAME, q)
                     sc += 1
                     if sc >= _SEARCH_CAP:
                         break
             consumed.add(key)
             continue
 
+    # ---- emit aggregated Semantic Location History visits (top 200) --------
+    for rec in sorted(visits.values(), key=lambda r: -r["n"])[:200]:
+        note = f"{rec['n']} visit(s) recorded in Location History" if rec["n"] > 1 else ""
+        col.add_place(NAME, name=rec["name"], address=rec["address"],
+                      lat=rec["lat"], lng=rec["lng"], kind="visited",
+                      note=note, tags=["place/visited"])
+    # ---- emit aggregated Photos EXIF places (top 200 cells) ---------------
+    # NOTE: keep titles digit-light — "Photo spot 2024-04-01 (3 photos)" reads
+    # like a phone number to PII sweeps; the date/count go in note + frontmatter.
+    for i, rec in enumerate(sorted(photos.values(), key=lambda r: -r["n"])[:200]):
+        col.add_place(NAME, name=f"Photo spot {i + 1}",
+                      lat=rec["lat"], lng=rec["lng"], kind="photo",
+                      date=rec["date"],
+                      note=f"{rec['n']} photo(s) taken here"
+                           + (f" around {rec['date']}" if rec["date"] else ""),
+                      tags=["place/photo"])
+
+    if visits:
+        col.note(f"[google] {sum(v['n'] for v in visits.values())} location-history "
+                 f"visits → {min(len(visits), 200)} places")
+    if photos:
+        col.note(f"[google] {sum(v['n'] for v in photos.values())} geotagged photos "
+                 f"→ {min(len(photos), 200)} photo spots (EXIF sidecars only)")
+    if ac or mac:
+        col.note(f"[google] My Activity: {ac} searches, {mac} ad segments")
     if pc:
         col.note(f"[google] {pc} contacts")
     if ec:

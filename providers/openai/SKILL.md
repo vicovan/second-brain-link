@@ -1,6 +1,6 @@
 ---
 name: second-brain-link
-description: Turn a personal OR company data export — LinkedIn, Facebook, Instagram, Google Takeout, LinkedIn Company, Google Workspace, Slack — into a private, local, queryable "digital twin" or Company Brain for your OpenAI agent (Codex). Self-adapting — detects which export(s) you have, profiles every file and column, and normalizes them into one canonical graph, merging people seen in more than one source. Default output is an Obsidian vault (with an AGENTS.md guide); it can also emit a GBrain repo (--emit gbrain|both). Use whenever the user points at a data export (.zip or folder), or says things like "build my second brain from my LinkedIn data", "bootstrap a company brain from our Workspace/Slack export", "turn my download into an Obsidian vault", "map my export", or "import my data into GBrain". Trigger even without the words "Obsidian", "GBrain", or "second brain" — any request to process, profile, or build a knowledge base from a personal or company archive. New sources/outputs are drop-in.
+description: Turn a personal OR company data export into a private, local, AI-queryable "digital twin" or Company Brain — an Obsidian vault (optionally a GBrain repo). 24 sources auto-detected — LinkedIn, Facebook, Instagram, Google Takeout, X, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok; company-side LinkedIn Page, Google Workspace, Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, mail archives, Microsoft 365, Teams — plus a self-adapting mapper for unknown exports. 100% local, zero network, message text never read. Use whenever the user points at a data export (.zip or folder) or asks to build/map/import their data into a second brain, digital twin, knowledge vault, or company brain — even without those exact words.
 ---
 
 # Second Brain Link — multi-source digital-twin / Company Brain (OpenAI)
@@ -18,8 +18,13 @@ nothing is uploaded (the only opt-in networked step is `--gbrain-import`).
 ## Architecture (read before running)
 
 Sources are **drop-in adapters** under `scripts/sources/personal/` (linkedin,
-facebook, instagram, google) and `scripts/sources/company/` (linkedin_company,
-google_workspace, slack). Each knows one export's format (CSV/JSON/ICS) and pushes
+google, x, whatsapp, github, youtube, strava, …) and `scripts/sources/company/`
+(linkedin_company, google_workspace, slack, notion, confluence, jira, salesforce,
+hubspot, zendesk, email, microsoft365, teams) — or **declarative JSON mappings**
+under `mappings/sources/` (facebook, instagram, reddit, spotify, tiktok; a mapping
+wins on a name clash). 24 sources total; per-source export/import steps live in
+`references/SOURCES.md`. Each knows one export's format (CSV/JSON/ICS/JS/TXT/MD/
+XML/MBOX/EML/GPX) and pushes
 records into one canonical `Collector` (`scripts/sources/common.py`). Output
 targets are **drop-in emitters** under `scripts/emitters/` (obsidian = default,
 gbrain = opt-in). The builder (`scripts/build_vault.py`) renders from the
@@ -77,6 +82,11 @@ the mirror emit). The full self-improvement loop is in step 6b.
 4. **Build** with `--provider openai` (+ `--subject`/`--emit`/`--full` as needed).
    - **Personal + company sources in one export → two sibling vaults**:
      `personal-brain/` (rooted `00-me/`) and `company-brain/` (rooted `00-org/`).
+   - **Company brains use company-named layers**: `20-brand/`, `30-content/`,
+     `40-pipeline/` (one note per deal/campaign), `50-market-view/`,
+     `60-knowledge/` (meetings.md + events.md), `70-support/`, `80-signals/`,
+     `85-locations/` — same layer keys, subject-appropriate folder names
+     (`_STRUCTURE.md` in the vault maps them).
    - `--emit both` writes Obsidian + a GBrain repo under separate subdirs.
 5. **Verify** `_COVERAGE.md` (+ `_SUMMARY.md` for the seed counts at a glance);
    refine overrides + rebuild into a fresh dir (cap ~3). On a non-zero exit, read
@@ -129,7 +139,7 @@ multi-tenant.
 - "What companies/roles have I actually targeted vs my stated preferences?"
 
 ## Notes
-- Re-running into a non-empty directory is refused — use a fresh dir.
+- Re-running into a non-empty directory is refused — use a fresh dir, OR pass `--refresh` to UPDATE the existing vault in place (keeps the user's notes/edits; conflicts land beside as `*.new.md`; read `_UPDATE_REPORT.md` after and summarize its counts). `_notes/` is the user's own space — never write generated content there, but DO save user-requested notes there.
 - Facebook/Instagram exports must be requested in **JSON**.
 - Full data model + per-source mapping: `references/blueprint.md`.
 - Adding a source = one file in `scripts/sources/personal|company/` (see

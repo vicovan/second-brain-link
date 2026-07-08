@@ -1,4 +1,8 @@
 [
-  {"id": "C001", "name": "general"},
-  {"id": "C002", "name": "engineering"}
+  {"id": "C001", "name": "general", "members": ["U001", "U002"],
+   "topic": {"value": "Company-wide announcements"},
+   "purpose": {"value": "The whole team"}},
+  {"id": "C002", "name": "engineering", "members": ["U001"],
+   "topic": {"value": "Ship it"},
+   "purpose": {"value": "Engineering discussion"}}
 ]

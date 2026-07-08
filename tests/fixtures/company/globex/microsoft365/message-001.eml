@@ -1,0 +1,6 @@
+From: Hank Scorpio <fixture@example.com>
+To: Monty Burns <fixture@example.com>
+Date: Wed, 3 Apr 2024 10:00:00 +0000
+Subject: secret-body-do-not-leak quarterly numbers
+
+secret-body-do-not-leak eml body

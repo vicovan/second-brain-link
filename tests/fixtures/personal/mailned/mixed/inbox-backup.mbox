@@ -1,0 +1,7 @@
+From MAILER-DAEMON Tue Apr  2 10:00:00 2024
+From: Todd Flanders <fixture@example.com>
+To: Ned Flanders <fixture@example.com>
+Date: Tue, 2 Apr 2024 10:00:00 +0000
+Subject: secret-body-do-not-leak loose mbox subject
+
+secret-body-do-not-leak loose mbox body

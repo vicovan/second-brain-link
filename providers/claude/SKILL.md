@@ -1,15 +1,15 @@
 ---
 name: second-brain-link
-description: Turn a personal OR company data export — LinkedIn, Facebook, Instagram, Google Takeout, LinkedIn Company, Google Workspace, Slack — into a private, local, Claude-queryable "digital twin" or Company Brain. Self-adapting — detects which export(s) you have, profiles every file and column, and normalizes them into one canonical graph, merging people seen in more than one source. Default output is a unified Obsidian vault; it can also emit a GBrain repo (--emit gbrain|both). Use whenever the user points at a data export (.zip or folder), or says things like "build my second brain from my LinkedIn data", "bootstrap a company brain from our Workspace/Slack export", "turn my download into an Obsidian vault", "make a digital twin", "map my export", or "import my data into GBrain". Trigger even without the words "Obsidian", "GBrain", or "second brain" — any request to process, profile, map, or build a knowledge base from a personal or company archive. New sources/outputs are drop-in.
+description: Turn a personal OR company data export into a private, local, AI-queryable "digital twin" or Company Brain — an Obsidian vault (optionally a GBrain repo). 24 sources auto-detected — LinkedIn, Facebook, Instagram, Google Takeout, X, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok; company-side LinkedIn Page, Google Workspace, Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, mail archives, Microsoft 365, Teams — plus a self-adapting mapper for unknown exports. 100% local, zero network, message text never read. Use whenever the user points at a data export (.zip or folder) or asks to build/map/import their data into a second brain, digital twin, knowledge vault, or company brain — even without those exact words.
 ---
 
 # Second Brain Link — multi-source digital-twin second brain
 
-Build ONE unified, private, Obsidian-native vault from any supported data export so the user (and their Claude) can reason over their professional and social history. Supported sources: **LinkedIn, Facebook, Instagram, Google Takeout** — and unknown files are caught, never dropped. Everything runs locally; nothing is uploaded.
+Build ONE unified, private, Obsidian-native vault from any supported data export so the user (and their Claude) can reason over their professional and social history. **24 sources ship** — personal: LinkedIn, Facebook, Instagram, Google Takeout, X/Twitter, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok; company: LinkedIn Company, Google Workspace, Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email (mbox), Microsoft 365, Teams (full export + import steps per source: `references/SOURCES.md`) — and unknown files are caught, never dropped. Everything runs locally; nothing is uploaded.
 
 ## Architecture (read before running)
 
-Each source has a **drop-in adapter** in `scripts/sources/` (`linkedin.py`, `facebook.py`, `instagram.py`, `google.py`). An adapter knows its export's format (CSV/JSON/ICS) and pushes records into one canonical `Collector` (`scripts/sources/common.py`). The builder (`scripts/build_vault.py`) then renders a single vault from the collector — so multiple sources merge into one graph, and **a person who is both a LinkedIn connection and a Facebook friend becomes one note tagged with both sources.** Adding a future network = one new adapter file.
+Each source is a **drop-in adapter** in `scripts/sources/{personal,company}/` or a **declarative JSON mapping** in `mappings/sources/` (mappings win on a name clash). An adapter knows its export's format (CSV/JSON/ICS) and pushes records into one canonical `Collector` (`scripts/sources/common.py`). The builder (`scripts/build_vault.py`) then renders a single vault from the collector — so multiple sources merge into one graph, and **a person who is both a LinkedIn connection and a Facebook friend becomes one note tagged with both sources.** Adding a future network = one new adapter file.
 
 Two cost tiers, same as before: a **deterministic core** (detection, parsing, the whole vault) runs with zero API tokens; **intelligence is spent only on the residual** — unknown files and the two judgment-heavy synthesis notes. The efficiency rule still holds: **read `schema_map.md` and `_COVERAGE.md`, never the raw files or thousands of person notes.**
 
@@ -26,7 +26,7 @@ Ask for the path if you don't have it. Accepts a `.zip` or an unzipped folder. I
 
 **Multiple identities / companies (named entities):** organize as `data/personal/<identity>/<source>/…` and `data/company/<company>/<source>/…` — **the folder name is the entity**. Point the builder at the `data/` root (or any dir with `personal/`+`company/` children) and it builds ONE brain per entity into `vault/personal/<id>-brain/` + `vault/company/<co>-brain/`, then (when ≥2 entities) a **`vault/_correlations/`** brain linking the same person across brains, shared orgs, and identity↔company `works_at` edges (`--no-correlate` to skip). A single un-foldered export still builds one brain.
 
-If the user hasn't downloaded it yet, point them to the README's "How to download" section for their network(s). In short: LinkedIn → Settings & Privacy → Data Privacy → Get a copy of your data (larger archive). Facebook → Settings → Your information → Download your information (**format: JSON**). Instagram → Accounts Center → Your information and permissions → Download your information (**JSON**). Google → takeout.google.com (select Contacts, Calendar, YouTube, Profile at minimum).
+If the user hasn't downloaded it yet, read them the steps from `references/SOURCES.md` (all 24 sources, verified vendor flows). In short: LinkedIn → Settings & Privacy → Data Privacy → Get a copy of your data (larger archive). Facebook → Settings → Your information → Download your information (**format: JSON**). Instagram → Accounts Center → Your information and permissions → Download your information (**JSON**). Google → takeout.google.com (select Contacts, Calendar, YouTube, Profile at minimum).
 
 **Company exports** (for a Company Brain — use `--subject company`, auto-detected): LinkedIn **Company Page** export (org profile, employees, followers, posts), **Google Workspace** admin export (directory/users → employees, shared calendars → events), **Slack** workspace export (users + channels; messages → signal only, never bodies). These root the brain on the organization and carry the same privacy guarantees (employee emails/phones stripped by default; HR/payroll/security/admin-log files quarantined).
 
@@ -81,7 +81,7 @@ that join the automatic `source/<name>` + type tags on every note. A mapping ove
 same-named Python adapter. The full self-improvement loop is below.
 
 **Subject + output target (`--subject`, `--emit`):**
-- `--subject person|company` (default **auto** — picks `company` if a company-subject adapter fired, e.g. LinkedIn Company / Google Workspace / Slack). Person roots on `00-me/`; company roots on `00-org/` (people→employees/contacts; `15-organizations/`→customers/vendors/partners) and writes a `data-handling.md` note ("you are the data controller; processed locally; here's what was quarantined").
+- `--subject person|company` (default **auto** — picks `company` if a company-subject adapter fired, e.g. LinkedIn Company / Google Workspace / Slack). Person roots on `00-me/`; company roots on `00-org/` (people→employees/contacts; `15-organizations/`→customers/vendors/partners) and writes a `data-handling.md` note ("you are the data controller; processed locally; here's what was quarantined"). **Company brains use company-named layers** — `20-brand/`, `30-content/`, `40-pipeline/` (one note per deal/campaign), `50-market-view/`, `60-knowledge/` (meetings.md + events.md), `70-support/`, `80-signals/`, `85-locations/` — same layer keys, subject-appropriate folder names (`_STRUCTURE.md` in the vault maps them).
 - `--emit obsidian|gbrain|both` (default **obsidian** — today's vault, unchanged). `gbrain` emits a GBrain-compatible markdown repo (`people/`, `companies/`, `writing/`, `notes/` + typed-edge wikilinks + `gbrain.manifest.json`); `both` writes Obsidian to `<out>/obsidian/` and the GBrain repo to `<out>/gbrain/`. Optional `--gbrain-import` then shells out to `gbrain import <dir>` **only if** the `gbrain` CLI is on PATH (opt-in; the sole non-core/networked step; clean no-op otherwise). The GBrain repo respects the same privacy mode as Obsidian.
 
 **Full-fidelity / owner mode (`--full`):** by default the build is privacy-safe (third-party emails/phones stripped, message bodies never read, sensitive files quarantined). For the user's OWN brain on their OWN machine, add `--full` to capture **everything** — emails, phones, every extra column on every entity (rendered in a `## Details` section + frontmatter), and the otherwise-quarantined personal files folded into `00-me/` as `my-*.md` tables, so **no field is ever dropped**. Still 100% local; `vault/` stays git-ignored. Use it when the user says they want all their data; keep the default for anything shared, distributed, or company/multi-tenant.
@@ -92,9 +92,9 @@ Read `<vault-dir>/_COVERAGE.md` — it reports detected sources and how many fil
 ### 6b. Activate for the user's GOALS (do this — it's where the value is)
 A brain is only useful once pointed at a goal. **Ask the user what they want to use it
 for** (offer the menu: **fundraising · sales/BD · job-search · datamining · personalization
-· hiring · reconnect-dormant · positioning · travel**), then generate goal workspaces:
+· hiring · reconnect-dormant · positioning · travel** — and for a COMPANY brain also **onboarding · who-knows-what**), then generate goal workspaces:
 ```bash
-python3 scripts/analyze.py "<vault-dir>" --goals fundraising,bd,jobsearch,datamining,personalization \
+python3 scripts/analyze.py "<vault-dir>" --goals fundraising,bd,jobsearch,datamining,personalization \   # company: add onboarding,whoknows
   [--icp "<who they sell to>"] [--thesis "<what they raise for>"] \
   [--copilot-dir "<their Obsidian Copilot custom-prompts folder>"] \
   [--graph-config "<vault>/.obsidian/graph.json"]
@@ -179,7 +179,7 @@ Tell the user which sources were detected and what they produced (from `_BUILD_R
 - The schema map redacts sensitive columns and masks emails/phones in samples.
 
 ## Notes
-- Re-running into a non-empty directory is refused — use a fresh dir.
+- Re-running into a non-empty directory is refused — use a fresh dir, OR pass `--refresh` to UPDATE the existing vault in place (keeps the user's notes/edits; conflicts land beside as `*.new.md`; read `_UPDATE_REPORT.md` after and summarize its counts). `_notes/` is the user's own space — never write generated content there, but DO save user-requested notes there.
 - Facebook/Instagram exports must be requested in **JSON** format (HTML is not parsed).
 - Source formats drift; adapters parse defensively and unknowns are summarized, so partial coverage degrades gracefully rather than failing.
 - Full data model + per-source mapping: see `references/blueprint.md`.

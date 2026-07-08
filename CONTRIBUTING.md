@@ -70,7 +70,7 @@ You almost never need to write Python:
    tree, so a name-only match can hit a sibling source's file.
 3. A mapping **overrides** a same-named Python adapter, and can live in a
    `--mappings <dir>` override dir (no engine edit). See the shipped
-   `instagram.json` / `google.json` / `facebook.json` for worked examples (Facebook is
+   `instagram.json` / `spotify.json` / `facebook.json` for worked examples (Facebook is
    the most complete — 46 rules across people/voice/interests/mirror/places/events/orgs).
 4. **Self-improve** (don't stop at coverage): after the new source builds, read
    `_DATA_POINTS.md` — the *field-enrichment-by-source* matrix should show the new

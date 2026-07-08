@@ -1,0 +1,80 @@
+{
+  "_comment": "Spotify data export ('Download your data' — tick EXTENDED streaming history) — interpreted by engine/scripts/mapping.py. Listening history (endsong_*.json extended / StreamingHistory*.json standard) → artist interests in 60-learning (the taste graph), Inferences.json → 50-mirror (how Spotify's algorithm models you), Marquee.json → ad segments, SearchQueries.json → 80-search, Identity.json → identity. Privacy: Userdata.json (email/birthdate/address) and payment files are quarantined. Quarantine entries are EXACT norm_file keys.",
+  "name": "spotify",
+  "subject": "person",
+  "detect": {
+    "any_key_prefix": ["endsong", "streaminghistory"],
+    "any_key": ["yourlibrary", "marquee"]
+  },
+  "quarantine": [
+    "userdata", "payments", "paymentinfo", "familyplan", "useraddress"
+  ],
+  "records": [
+    {
+      "match": { "name_prefix": "endsong", "suffix": ".json" },
+      "locate": "auto_array",
+      "emit": "interest",
+      "fields": { "tag": "master_metadata_album_artist_name" }
+    },
+    {
+      "match": { "name_prefix": "StreamingHistory", "suffix": ".json" },
+      "locate": "auto_array",
+      "emit": "interest",
+      "fields": { "tag": "artistName" }
+    },
+    {
+      "match": { "name_prefix": "YourLibrary", "suffix": ".json" },
+      "locate": "walk",
+      "emit": "interest",
+      "fields": { "tag": "artist" }
+    },
+    {
+      "match": { "name_prefix": "YourLibrary", "suffix": ".json" },
+      "locate": "dict",
+      "emit": "interest",
+      "fields": { "tag": "shows[].name" }
+    },
+    {
+      "match": { "name_prefix": "Follow", "suffix": ".json" },
+      "locate": "dict",
+      "emit": "interest",
+      "fields": { "tag": ["followedArtists[]", "artistNames[]"] }
+    },
+    {
+      "match": { "name_prefix": "Playlist", "suffix": ".json" },
+      "locate": "dict",
+      "emit": "interest",
+      "fields": { "tag": "playlists[].name" }
+    },
+    {
+      "match": { "name_prefix": "Playlist", "suffix": ".json" },
+      "locate": "dict",
+      "emit": "interest",
+      "fields": { "tag": "playlists[].items[].track.artistName" }
+    },
+    {
+      "match": { "name_prefix": "Inferences", "suffix": ".json" },
+      "locate": "dict",
+      "emit": "mirror",
+      "fields": { "text": "inferences[]" }
+    },
+    {
+      "match": { "name_prefix": "Marquee", "suffix": ".json" },
+      "locate": "auto_array",
+      "emit": "ad_segment",
+      "fields": { "text": "segment" }
+    },
+    {
+      "match": { "name_prefix": "SearchQueries", "suffix": ".json" },
+      "locate": "auto_array",
+      "emit": "search",
+      "fields": { "query": "searchQuery" }
+    },
+    {
+      "match": { "name_prefix": "Identity", "suffix": ".json" },
+      "locate": "dict",
+      "emit": "identity",
+      "fields": { "name": ["displayName", "firstName"] }
+    }
+  ]
+}
