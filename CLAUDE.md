@@ -12,7 +12,7 @@
 ## 1. What this is, in one paragraph
 
 **Second Brain Link** turns a person's *or* a company's own platform data exports —
-24 sources: LinkedIn, Facebook, Instagram, Google Takeout, X/Twitter, WhatsApp, GitHub,
+25 sources: LinkedIn, Facebook, Instagram, Google Takeout, Amazon, X/Twitter, WhatsApp, GitHub,
 YouTube, Strava, Reddit, Spotify, TikTok (personal); LinkedIn Company, Google Workspace,
 Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email/mbox, Microsoft 365,
 Teams (company; see §9 for depth/privacy per source) — into a single, private, local,
@@ -273,7 +273,7 @@ second-brain-link/
 │   ├── claude/second-brain-link.skill     # committed installable (unpacked folder git-ignored)
 │   └── openai/second-brain-link.skill
 ├── tests/
-│   ├── run.py                    # stdlib test harness (currently 554 checks)
+│   ├── run.py                    # stdlib test harness (currently 585 checks)
 │   └── fixtures/{personal,company}/<entity>/<source>/   # synthetic exports
 └── .github/                      # CI + issue/PR templates
 ```
@@ -287,11 +287,12 @@ appears **once** — no per-provider duplication.
 `00-me/` identity (or `00-org/` for a company; +positions, education/skills/certs/
 languages) · `10-people/` (one merged note per person) · `15-organizations/` ·
 `20-reputation/` · `30-voice/` (posts, comments, reactions, interests, saved) ·
+`35-shopping/` (purchases — one note per order: item, merchant, amount, date) ·
 `40-career/` (applications, preferences, saved-jobs, reusable-answers) · `50-mirror/`
 (inferences, ad-profile) · `60-learning/` · `70-services/` · `80-search/` ·
 **`85-places/`** (saved/reviewed/checked-in locations) · `90-synthesis/` (network-map,
 target-companies, positions-i-hold [draft], positioning-gaps [draft]) ·
-`_notes/` (YOURS — never regenerated) · `99-uncategorized/` · `_quarantine/`. **Company brains use company-named folders** for the middle layers (20-brand, 30-content, 40-pipeline w/ one note per deal, 50-market-view, 60-knowledge w/ meetings.md, 70-support, 80-signals, 85-locations) — driven by `mappings/brain/layout.json` `variants` via `VaultWriter.L(key)` (never hardcode a layer folder). Full field reference: `docs/ENTITY-MAP.md`.
+`_notes/` (YOURS — never regenerated) · `99-uncategorized/` · `_quarantine/`. **Company brains use company-named folders** for the middle layers (20-brand, 30-content, 35-procurement, 40-pipeline w/ one note per deal, 50-market-view, 60-knowledge w/ meetings.md, 70-support, 80-signals, 85-locations) — driven by `mappings/brain/layout.json` `variants` via `VaultWriter.L(key)` (never hardcode a layer folder). Full field reference: `docs/ENTITY-MAP.md`.
 
 Generated reports/artifacts at the brain root, each documented in `_STRUCTURE.md`:
 `_STRUCTURE.md` (ALWAYS — the vault map: every folder/file + its role) · `_SUMMARY.md`
@@ -404,6 +405,7 @@ Multiple entities → one brain each under `vault/personal/` + `vault/company/`,
 | Reddit | personal | CSV | JSON mapping: posts/comments→voice, subreddits→interests, search→80-search; gender/ads/IP/chat files quarantined |
 | Spotify | personal | JSON | JSON mapping: listening history→artist interests, Inferences→**50-mirror**, Marquee→ad segments, searches→80-search; Userdata/payments quarantined |
 | TikTok | personal | JSON (single file) | JSON mapping: following→people, searches→80-search, hashtags→interests, profile→identity; DM text in-file but never selected |
+| Amazon | personal | CSV/JSON (Request My Data) | JSON mapping: orders/subscriptions→**35-shopping** (new purchase layer/bucket), reviews+seller feedback→30-voice, search→80-search, Prime Video/Kindle→interests, Amazon Audiences+advertiser clicks→**50-mirror**; payment/IP/address/serials/message-bodies quarantined |
 | LinkedIn Company | company | CSV | Python adapter (org+HQ location, employees + **Department→dept orgs/tags**, followers, posts, **analytics→50-mirror**) |
 | Google Workspace | company | mixed | Python adapter (users→employees + **Org Unit→dept orgs/tags**, calendars→events **with attendees/location**, drives→projects) |
 | Slack | company | JSON | Python adapter (members→people, channels→orgs **with topic/membership tags `channel/<slug>`**, messages→signal only; day-files consumed — coverage bug fixed; JSON-type detection so it coexists with Workspace in one export) |
@@ -430,7 +432,7 @@ structure tags adapters emit).
 Real-world validation build (IG + Google Maps + LinkedIn + **Facebook**, `--full`): cross-source
 merge verified, `source/*` tags on every note, `_STRUCTURE.md`/`_DATA_POINTS.md`/`_GRAPH.md`
 present, default-mode PII sweep clean. Both providers package + install + run end-to-end.
-`tests/run.py` → **554 checks, 0 failed** (selector mini-language, mapping-wins,
+`tests/run.py` → **585 checks, 0 failed** (selector mini-language, mapping-wins,
 IG/Google fixture build, places + review note, harvester rescue, multi-entity 3-brain
 build, cross-person note, `works_at` edge, negative no-merge, multi-vault PII sweep, Codex
 `agents/openai.yaml` + `--install`, two-sibling-vault split, **Facebook full mapping +
@@ -498,7 +500,7 @@ python3 packaging/build_skill.py all --install
 #   claude → ~/.claude/skills/   openai → ~/.agents/skills/
 
 # test (stdlib only; must stay green)
-python3 tests/run.py            # → 554 passed, 0 failed
+python3 tests/run.py            # → 585 passed, 0 failed
 ```
 **Testing approach:** synthetic exports under
 `tests/fixtures/{personal,company}/<entity>/<source>/`; assert valid YAML on every

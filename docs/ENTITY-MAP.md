@@ -1,14 +1,14 @@
 # Entity Map — every brain entity, every source, every field
 
 > The complete reference for what a Second Brain Link vault contains: each note
-> type's frontmatter fields, which of the 24 sources fills them, how content
+> type's frontmatter fields, which of the 25 sources fills them, how content
 > routes into folders per subject (personal vs company), and how incremental
 > updates (`--refresh`) treat every file. Companion: [`SOURCES.md`](SOURCES.md)
 > (export/download + import steps per source). Kept in sync with
 > `engine/scripts/sources/common.py` (the Collector — the single canonical model)
 > and `engine/mappings/brain/layout.json` (the folder layout variants).
 
-Sources legend — personal: `linkedin, facebook, instagram, google, x, whatsapp,
+Sources legend — personal: `linkedin, facebook, instagram, google, amazon, x, whatsapp,
 github, youtube, strava, reddit, spotify, tiktok` · company: `linkedin_company,
 google_workspace, slack, notion, confluence, jira, salesforce, hubspot, zendesk,
 email, microsoft365, teams`.
@@ -24,6 +24,7 @@ email, microsoft365, teams`.
 | orgs | `15-organizations/` | `15-organizations/` | companies/departments/teams/channels (`_mentions/` = thin one-offs) |
 | reputation | `20-reputation/` | `20-brand/` | recommendations/endorsements · reviews/brand |
 | voice | `30-voice/` | `30-content/` | posts (one note each), comments/reactions/interests/saved aggregates |
+| shopping | `35-shopping/` | `35-procurement/` | one note per purchase — item, merchant, amount, date (the "what you buy & consume" taste graph) |
 | career | `40-career/` | `40-pipeline/` | applications/prefs/saved-jobs · **one note per deal/campaign** |
 | mirror | `50-mirror/` | `50-market-view/` | algorithmic inferences + ad/audience segments |
 | learning | `60-learning/` | `60-knowledge/` | events.md, meetings.md (company), coaching |
@@ -70,11 +71,15 @@ Layout source of truth: `layout.json → variants` (builder resolves via
 kind: post/tweet/note-tweet/share/repost/media/page/note/review/listing/repo ·
 fields: text (strip_pii'd), created, source, url, tags. Filled by: linkedin,
 facebook, instagram, x, github(repos), reddit, tiktok(comments→comments.md),
-notion/confluence (pages, company).
+amazon(reviews+seller feedback), notion/confluence (pages, company).
 
 ### deal (`40-pipeline/<Name>.md`, company only) — one note per deal/campaign
 kind: deal/campaign · fields: date, value, sources. Filled by: salesforce
 (Opportunities+Campaigns), hubspot (Deals). Personal builds keep these in events.md.
+
+### purchase (`35-shopping/<item>.md` personal, `35-procurement/<item>.md` company) — one note per order/purchase
+fields: item, merchant, amount, currency, category, created. Filled by: amazon
+(retail + digital orders and subscriptions — the "what you buy & consume" taste graph).
 
 ### event / meeting (`<learning>/events.md` + company `meetings.md`)
 Canonical record via `add_event`: name, date, kind (event/meeting/deal/campaign/
@@ -94,7 +99,7 @@ instagram (locations/media EXIF), strava (GPX start points).
 - `interests.md` — grouped BY SOURCE, counts, cap 500 (+ "and N more"); interest_meta keeps sources+first date. Filled by: every source.
 - `reactions.md` — per-kind counts with source attribution (likes, story polls, favorites…).
 - `comments.md` — dated, source-tagged lines (owner's words, strip_pii'd).
-- `search-log.md` — per-query `— source · date`, cap 500. Filled by: linkedin, google (My Activity + YouTube), youtube, reddit, spotify, tiktok.
+- `search-log.md` — per-query `— source · date`, cap 500. Filled by: linkedin, google (My Activity + YouTube), youtube, reddit, spotify, tiktok, amazon.
 - `saved.md`, `preferences.md`, `saved-jobs.md`, `reusable-answers.md`, `applications.md` (career), recommendations/endorsements (reputation).
 - mirror: `inferences.md` + `ad-profile.md` (caps 500) — linkedin, facebook, spotify, instagram, google(Ads), linkedin_company (page analytics → company market view).
 

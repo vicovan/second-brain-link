@@ -1,6 +1,6 @@
 # Supported sources — export & import guide
 
-> **24 sources.** Everything runs 100% locally — zero network calls. Message, chat
+> **25 sources.** Everything runs 100% locally — zero network calls. Message, chat
 > and email **text is never read** (only who + when — a per-person frequency signal);
 > sensitive files (passwords, logins, payment data) are **quarantined**, never imported.
 > Details: the [privacy model](https://secondbrainlink.com/privacy-model).
@@ -21,6 +21,7 @@
 | Reddit | personal | posts/comments (candid voice), subreddits, friends | PMs signal-only | 🟢 2–30 d |
 | Spotify | personal | listening taste, playlists, algorithmic inferences | — | 🟢 up to 30 d |
 | TikTok | personal | follows, searches, hashtags, comments, like counts | DM text never selected | 🟡 days |
+| Amazon | personal | orders/purchases → shopping, reviews (voice), searches, Prime Video/Kindle taste, ad-audiences (mirror) | payment/IP/address/serials quarantined | 🟢 Request Your Data (up to days) |
 | LinkedIn Company | company | org, employees+departments, followers, posts, page analytics | — | 🟡 per report |
 | Google Workspace | company | employees+org units, calendars+attendees, drives, groups | audit logs quarantined | 🟡 admin |
 | Slack | company | members, channels+membership, decisions signal | **text never read** | 🟡 admin |
@@ -56,10 +57,12 @@ python3 engine/scripts/analyze.py vault/<your>-brain --goals jobsearch,personali
 ### What to expect in the vault
 
 - **Personal brain** — layers rooted on `00-me/`: `10-people/`, `15-organizations/`,
-  `20-reputation/`, `30-voice/`, `40-career/`, `50-mirror/`, `60-learning/`,
+  `20-reputation/`, `30-voice/`, `35-shopping/` (purchases — orders, item, merchant,
+  amount, date), `40-career/`, `50-mirror/`, `60-learning/`,
   `70-services/`, `80-search/`, `85-places/`, `90-synthesis/`.
 - **Company brain** — same layer keys, **company-named folders** rooted on `00-org/`:
-  `20-brand/`, `30-content/`, `40-pipeline/` (one note per deal/campaign),
+  `20-brand/`, `30-content/`, `35-procurement/` (purchases bucket), `40-pipeline/`
+  (one note per deal/campaign),
   `50-market-view/`, `60-knowledge/` (meetings + events), `70-support/`,
   `80-signals/`, `85-locations/`. A mixed export builds two sibling vaults plus a
   `_correlations/` brain linking people across them.
@@ -189,6 +192,21 @@ ever selects it.
 **Download:** app → Profile → ☰ → Settings → Account → *Download your data* →
 **Format: JSON (machine-readable)** → ready in days (download within 4 days).
 **Import:** folder `tiktok`.
+
+### Amazon
+**You get:** retail + digital orders and subscriptions → **35-shopping** (one note
+per purchase — item, merchant, amount, date; the "what you buy & consume" taste
+graph), your customer reviews + seller feedback → voice, retail search queries →
+search history, Prime Video viewing + Kindle reading + wishlist → interests,
+Amazon Audiences + advertiser clicks/audiences → the algorithmic mirror. Your
+profile fills identity (name only). Payment instruments, IP addresses, auth
+tokens, item serial numbers, saved/billing/shipping addresses, buyer-seller & chat
+message bodies, and device/impression files are quarantined — never imported.
+**Download:** amazon.com → Account → *Request Your Data* (or *Request My Data*) →
+choose **All Data Categories** (or pick specific categories) → confirm by email →
+delivery can take up to a few days.
+**Import:** folder `amazon` — drop in the "All Data Categories" folder/zip of
+per-topic CSV/JSON files.
 
 ---
 

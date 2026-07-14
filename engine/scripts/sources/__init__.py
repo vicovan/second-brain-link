@@ -38,6 +38,7 @@ def _load_py(subpkg, default_subject):
 ALL = []
 BY_NAME = {}
 ALL_QUARANTINE = set()
+ALL_QUARANTINE_PREFIX = ()        # union of mappings' quarantine_prefix (startswith match)
 _PY_ADAPTERS = _load_py("personal", "person") + _load_py("company", "company")
 
 
@@ -45,7 +46,7 @@ def register_mappings(extra_mapping_dirs=None):
     """(Re)build ALL/BY_NAME/ALL_QUARANTINE from Python adapters + JSON mappings.
     JSON mappings win on NAME clash. Called at import with defaults, and again by
     the builder when --mappings override dirs are given."""
-    global ALL, BY_NAME, ALL_QUARANTINE
+    global ALL, BY_NAME, ALL_QUARANTINE, ALL_QUARANTINE_PREFIX
     try:
         import mapping  # top-level (scripts dir on sys.path)
         maps = mapping.load_mappings(extra_mapping_dirs)
@@ -56,9 +57,12 @@ def register_mappings(extra_mapping_dirs=None):
     ALL = sorted(by_name.values(), key=lambda m: m.NAME)
     BY_NAME = by_name
     ALL_QUARANTINE = set()
+    prefixes = []
     for _m in ALL:
         # union of every adapter's sensitive-file set; builder/profiler quarantine these
         ALL_QUARANTINE |= set(getattr(_m, "QUARANTINE", set()))
+        prefixes.extend(getattr(_m, "QUARANTINE_PREFIX", ()) or ())
+    ALL_QUARANTINE_PREFIX = tuple(prefixes)
     return ALL
 
 

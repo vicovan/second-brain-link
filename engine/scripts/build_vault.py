@@ -31,14 +31,38 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 ENGINE_DIR = Path(__file__).resolve().parent.parent   # engine/ (scripts' parent)
 import sources as _sources
 from sources import detect_sources, BY_NAME, ALL
-def _quar():  # always read the live registry (rebuilt when --mappings overrides)
-    """Return the live union of every adapter's quarantine set.
+class _QuarMatch:
+    """Membership test for quarantine: `key in _quar()` is True when the key is in
+    the exact set OR starts with any registered quarantine PREFIX. Returning this
+    from _quar() means every existing `in _quar()` call honors prefixes with no site
+    changes. Iterating/len reflect the exact set only (prefix families are matched,
+    not enumerated)."""
+    __slots__ = ("keys", "prefixes")
 
-    Reads `sources.ALL_QUARANTINE` live (via the module object, not a by-value
-    import) so a `--mappings` rebuild — which re-registers adapters and rebuilds
-    the registry — takes effect for callers in this same run.
+    def __init__(self, keys, prefixes):
+        self.keys = keys
+        self.prefixes = tuple(prefixes or ())
+
+    def __contains__(self, key):
+        return key in self.keys or (bool(self.prefixes) and str(key).startswith(self.prefixes))
+
+    def __iter__(self):
+        return iter(self.keys)
+
+    def __len__(self):
+        return len(self.keys)
+
+
+def _quar():  # always read the live registry (rebuilt when --mappings overrides)
+    """Return a membership object over the live union of every adapter's quarantine
+    set + prefixes. `key in _quar()` matches exact keys and prefix families.
+
+    Reads `sources.ALL_QUARANTINE(_PREFIX)` live (via the module object, not a
+    by-value import) so a `--mappings` rebuild — which re-registers adapters and
+    rebuilds the registry — takes effect for callers in this same run.
     """
-    return _sources.ALL_QUARANTINE
+    return _QuarMatch(_sources.ALL_QUARANTINE,
+                      getattr(_sources, "ALL_QUARANTINE_PREFIX", ()))
 from sources.common import (Collector, norm_file, obsidian_name, link, iso_date,
                             nk, SENSITIVE_COL_HINTS, EMAIL_RE, read_csv, read_json)
 import selfheal
@@ -217,7 +241,8 @@ def keywords(text, n=20):
 # layer folder string again — go through VaultWriter.L(key) / layout_for().
 _LAYERS_PERSON = {
     "root": "00-me", "people": "10-people", "orgs": "15-organizations",
-    "reputation": "20-reputation", "voice": "30-voice", "career": "40-career",
+    "reputation": "20-reputation", "voice": "30-voice", "shopping": "35-shopping",
+    "career": "40-career",
     "mirror": "50-mirror", "learning": "60-learning", "services": "70-services",
     "search": "80-search", "places": "85-places", "synthesis": "90-synthesis",
     "uncategorized": "99-uncategorized", "quarantine": "_quarantine",
@@ -225,7 +250,8 @@ _LAYERS_PERSON = {
 }
 _LAYERS_COMPANY = {
     "root": "00-org", "people": "10-people", "orgs": "15-organizations",
-    "reputation": "20-brand", "voice": "30-content", "career": "40-pipeline",
+    "reputation": "20-brand", "voice": "30-content", "shopping": "35-procurement",
+    "career": "40-pipeline",
     "mirror": "50-market-view", "learning": "60-knowledge", "services": "70-support",
     "search": "80-signals", "places": "85-locations", "synthesis": "90-synthesis",
     "uncategorized": "99-uncategorized", "quarantine": "_quarantine",
@@ -243,6 +269,8 @@ _LAYER_ROLE_TEXT = {
                    "BRAND — reviews and public reputation signals."),
     "voice": ("Your own content: posts/, comments, reactions, interests/follows, saved.",
               "CONTENT — the company's published voice: posts, wiki pages, comments."),
+    "shopping": ("SHOPPING — one note per purchase/order/subscription (what you buy & consume); merchant wikilinked.",
+                 "PROCUREMENT — vendor spend: purchases and subscriptions (one note each)."),
     "career": ("Applications log, job-seeker preferences, saved jobs, reusable answers.",
                "PIPELINE — deals and campaigns from the CRM (one note per deal)."),
     "mirror": ("HOW THE ALGORITHMS SEE YOU — inferences + ad-targeting segments (fed by the mirror/ad_segment emits).",
@@ -284,8 +312,8 @@ def layer_roles(subject):
     """LAYER_ROLES equivalent for `subject`: [(folder/, role), …] in layer order."""
     lay = layout_for(subject)
     idx = 1 if subject == "company" else 0
-    order = ["root", "people", "orgs", "reputation", "voice", "career", "mirror",
-             "learning", "services", "search", "places", "synthesis",
+    order = ["root", "people", "orgs", "reputation", "voice", "shopping", "career",
+             "mirror", "learning", "services", "search", "places", "synthesis",
              "notes", "uncategorized", "quarantine"]
     return [(lay[k] + "/", _LAYER_ROLE_TEXT[k][idx]) for k in order]
 
@@ -296,6 +324,7 @@ LAYER_ROLES = [
     ("15-organizations/", "Companies: employers, targets, vendors, pages/groups followed. `_mentions/` holds thin one-off orgs (links still resolve)."),
     ("20-reputation/", "Recommendations received/given + endorsement summary."),
     ("30-voice/", "Your own content: posts/, comments, reactions, interests/follows, saved."),
+    ("35-shopping/", "SHOPPING — one note per purchase/order/subscription (what you buy & consume). `35-procurement/` in company mode."),
     ("40-career/", "Applications log, job-seeker preferences, saved jobs, reusable answers."),
     ("50-mirror/", "HOW THE ALGORITHMS SEE YOU — inferences + ad-targeting segments (fed by the mirror/ad_segment emits)."),
     ("60-learning/", "Courses/coaching + events."),
@@ -360,6 +389,7 @@ class VaultWriter:
         self.organizations()
         self.reputation()
         self.voice()
+        self.shopping()
         self.career()
         self.mirror()
         self.misc()
@@ -890,6 +920,44 @@ class VaultWriter:
             self._search_terms = keywords(" ".join(c.searches), 20)
 
     # 85 — places (saved/reviewed locations: Google Maps, IG locations)
+    def shopping(self):
+        """Write the `35-shopping/` layer from the Collector's purchases bucket
+        (Amazon orders/subscriptions): ONE note per purchase, filename==item name
+        (obsidian_name), each carrying item, merchant (wikilinked to its org note),
+        amount, currency, category and order date — exactly like places/people get
+        one note each. Every note tagged `source/<name>` + `purchase`. No aggregate
+        index (an index that links thousands of purchases becomes a graph hub).
+        No-op when there are no purchases."""
+        c = self.col
+        if not getattr(c, "purchases", None):
+            return
+        d = self.out / self.L("shopping")
+        seen_s = set()
+        for p in c.purchases:
+            cat = p.get("category", "")
+            cat_tags = [f"purchase/{_tag_slug(cat)}"] if cat else []
+            fmd = {"type": "purchase", "title": obsidian_name(p["item"]),
+                   "tags": note_tags(["purchase"] + cat_tags,
+                                     [p["source"]], p.get("tags")),
+                   "merchant": link(p["merchant"]) if p.get("merchant") else "",
+                   "amount": p.get("amount", ""), "currency": p.get("currency", ""),
+                   "category": cat, "url": p.get("url", ""),
+                   "created": p.get("date", ""), "sources": [p["source"]]}
+            body = fm(fmd) + f"\n\n# {p['item']}\n"
+            if p.get("merchant"):
+                body += f"\nBought from {link(p['merchant'])}\n"
+            if p.get("amount"):
+                body += f"\n{p['amount']} {p.get('currency','')}".rstrip() + "\n"
+            if p.get("url"):
+                body += f"\n[View order]({p['url']})\n"
+            title = obsidian_name(p["item"])
+            base = title; si = 2
+            while base.lower() in seen_s:
+                base = f"{title} {si}"; si += 1
+            seen_s.add(base.lower())
+            write(d / f"{base}.md", body)
+        self._shopping_count = len(seen_s)
+
     def places(self):
         """Write the `85-places/` layer from the Collector's places bucket (Google
         Maps saved/reviewed, IG locations): ONE note per place, filename==place name
@@ -1024,7 +1092,8 @@ class VaultWriter:
         _ll = self.lay
         layers_line = (f"`{_ll['root']}/` identity · `{_ll['people']}/` people · "
                        f"`{_ll['orgs']}/` organizations · `{_ll['reputation']}/` · "
-                       f"`{_ll['voice']}/` · `{_ll['career']}/` · `{_ll['mirror']}/` · "
+                       f"`{_ll['voice']}/` · `{_ll['shopping']}/` · `{_ll['career']}/` · "
+                       f"`{_ll['mirror']}/` · "
                        f"`{_ll['learning']}/` · `{_ll['services']}/` · `{_ll['search']}/` · "
                        f"`{_ll['places']}/` · `{_ll['notes']}/` your own notes")
         body = f"""{fm({"type": "moc", "tags": ["moc", "home"], "title": "Home",
@@ -1131,15 +1200,29 @@ Everything is plain Markdown you own.
 # Orchestration
 # ---------------------------------------------------------------------------
 
-def index_files(root: Path):
+def index_files(root: Path, exclude=()):
     """Walk `root` recursively. Returns (file_index, all_paths): file_index maps a
     normalized filename (norm_file — the key adapters/mappings must return as
     consumed) to the list of paths sharing it, limited to data suffixes; all_paths
-    is every file on disk (the harvester/adapters may look beyond the index)."""
+    is every file on disk (the harvester/adapters may look beyond the index).
+
+    `exclude` is a set of source names to skip entirely: any file whose path (under
+    `root`) has a folder segment matching an excluded name is dropped from BOTH the
+    index and all_paths — so the source is never detected, extracted OR harvested
+    (the Studio's per-source "disable" toggle rides on this). Data layout is
+    `data/<kind>/<entity>/<source>/…`, so the segment match is the source folder."""
     idx = {}
     all_paths = []
+    exclude = {str(x).strip().lower() for x in (exclude or ()) if str(x).strip()}
     for p in root.rglob("*"):
         if p.is_file():
+            if exclude:
+                try:
+                    segs = {seg.lower() for seg in p.relative_to(root).parts}
+                except ValueError:
+                    segs = set()
+                if segs & exclude:
+                    continue
             all_paths.append(p)
             # data suffixes across all supported sources (.js = X archive JSON,
             # .txt = WhatsApp chats, .md = Notion pages, .xml = Confluence/Jira,
@@ -1192,7 +1275,13 @@ def build_uncategorized_and_coverage(col, out, file_index, all_paths, consumed_k
             rows = read_csv(p)
             headers = list(rows[0].keys()) if rows else []
             for h in headers:
-                vals = [(r.get(h) or "").strip() for r in rows[:200]]
+                # a CSV with duplicate column headers makes DictReader return a
+                # list for that key (seen in Amazon exports) — coerce to a scalar.
+                def _scalar(v):
+                    if isinstance(v, list):
+                        v = next((x for x in v if x), "") if v else ""
+                    return (v or "").strip()
+                vals = [_scalar(r.get(h)) for r in rows[:200]]
                 ne = [v for v in vals if v]
                 sample = "[redacted]" if any(s in nk(h) for s in SENSITIVE_COL_HINTS) else (ne[0][:48] if ne else "")
                 cols.append(f"- **{h}** — {len(ne)}/{len(vals)} filled · e.g. `{sample}`")
@@ -1555,14 +1644,17 @@ def discover_entities(root: Path):
     return entities
 
 
-def run_multi(root: Path, out: Path, emit_names="obsidian", full=False, correlate=True):
+def run_multi(root: Path, out: Path, emit_names="obsidian", full=False, correlate=True,
+              exclude=()):
     """Multi-entity orchestrator: build one brain per named entity under
     personal/<name> + company/<name>, then (if ≥2 entities) a cross-entity
     correlation vault. Falls back to single-brain run() when there are no entity
-    folders. Returns (entities, [collectors])."""
+    folders. Returns (entities, [collectors]). `exclude` = source names to skip
+    (the Studio per-source disable toggle)."""
     entities = discover_entities(root)
     if not entities:
-        col, used = run(root, out, emit_names=emit_names, subject="auto", full=full)
+        col, used = run(root, out, emit_names=emit_names, subject="auto", full=full,
+                        exclude=exclude)
         return [], [col]
 
     print(f"Discovered {len(entities)} entit{'y' if len(entities)==1 else 'ies'}: "
@@ -1578,7 +1670,7 @@ def run_multi(root: Path, out: Path, emit_names="obsidian", full=False, correlat
             print(f"  ! {target} exists and is not empty — skipping {e['name']} "
                   f"(remove it or use a fresh -o dir)")
             continue
-        fi, ap_ = index_files(e["path"])
+        fi, ap_ = index_files(e["path"], exclude=exclude)
         srcs = detect_sources(fi)
         mods = [m for m in srcs
                 if (getattr(m, "SUBJECT", "person") == "company") == (e["kind"] == "company")]
@@ -1664,14 +1756,16 @@ def run_multi(root: Path, out: Path, emit_names="obsidian", full=False, correlat
     return entities, cols
 
 
-def run(root: Path, out: Path, emit_names="obsidian", subject="auto", full=False):
+def run(root: Path, out: Path, emit_names="obsidian", subject="auto", full=False,
+        exclude=()):
     """Single-export / back-compat path: build a brain (or two sibling brains)
     from a plain `root` with no named-entity folders. `--subject` forces one
     brain; `auto` builds two SIBLING vaults (personal-brain/ + company-brain/)
     when BOTH personal and company sources fire. A pre-pass computes each group's
     consumed keys so each sibling treats the other group's files as owned-
-    elsewhere (not uncategorized). Returns (last collector, [source names])."""
-    file_index, all_paths = index_files(root)
+    elsewhere (not uncategorized). `exclude` = source names to skip (the Studio
+    per-source disable toggle). Returns (last collector, [source names])."""
+    file_index, all_paths = index_files(root, exclude=exclude)
     if not file_index:
         print("No recognizable data files (.csv/.json/.ics) found in the export.")
         sys.exit(1)
@@ -1847,6 +1941,10 @@ def main():
                     help="extra mapping dir(s) with sources/<name>.json and/or "
                          "brain/layout.json that override/extend the shipped mappings "
                          "(repeatable; later wins). No Python needed to add a source.")
+    ap.add_argument("--exclude", action="append", default=[], metavar="SOURCE",
+                    help="skip a source ENTIRELY — its files are never detected, "
+                         "imported or harvested (matches the source folder name, e.g. "
+                         "'linkedin'). Repeatable. Powers the Studio per-source disable.")
     args = ap.parse_args()
     PROVIDER = args.provider
     MIN_ORG_REFS = max(1, args.min_org_refs)
@@ -1933,11 +2031,13 @@ def main():
         try:
             if use_multi:
                 multi_ents, _ = run_multi(work, build_target, emit_names=args.emit,
-                                          full=args.full, correlate=not args.no_correlate)
+                                          full=args.full, correlate=not args.no_correlate,
+                                          exclude=args.exclude)
                 col, sources_used = None, []
             else:
                 col, sources_used = run(work, build_target, emit_names=args.emit,
-                                        subject=args.subject, full=args.full)
+                                        subject=args.subject, full=args.full,
+                                        exclude=args.exclude)
             if args.refresh and refresh_tmp is not None:
                 print(f"\n→ refreshing {out} from the new build …")
                 refresh_tree(refresh_tmp, out)

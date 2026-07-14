@@ -1,6 +1,6 @@
 ---
 name: second-brain-link
-description: Turn a personal OR company data export into a private, local, AI-queryable "digital twin" or Company Brain — an Obsidian vault (optionally a GBrain repo). 24 sources auto-detected — LinkedIn, Facebook, Instagram, Google Takeout, X, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok; company-side LinkedIn Page, Google Workspace, Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, mail archives, Microsoft 365, Teams — plus a self-adapting mapper for unknown exports. 100% local, zero network, message text never read. Use whenever the user points at a data export (.zip or folder) or asks to build/map/import their data into a second brain, digital twin, knowledge vault, or company brain — even without those exact words.
+description: Turn a personal OR company data export into a private, local, AI-queryable "digital twin" or Company Brain — an Obsidian vault (optionally a GBrain repo). 25 sources auto-detected — LinkedIn, Facebook, Instagram, Google Takeout, Amazon, X, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok; company-side LinkedIn Page, Google Workspace, Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, mail archives, Microsoft 365, Teams — plus a self-adapting mapper for unknown exports. 100% local, zero network, message text never read. Use whenever the user points at a data export (.zip or folder) or asks to build/map/import their data into a second brain, digital twin, knowledge vault, or company brain — even without those exact words.
 ---
 
 # Second Brain Link — multi-source digital-twin / Company Brain (OpenAI)
@@ -21,8 +21,8 @@ Sources are **drop-in adapters** under `scripts/sources/personal/` (linkedin,
 google, x, whatsapp, github, youtube, strava, …) and `scripts/sources/company/`
 (linkedin_company, google_workspace, slack, notion, confluence, jira, salesforce,
 hubspot, zendesk, email, microsoft365, teams) — or **declarative JSON mappings**
-under `mappings/sources/` (facebook, instagram, reddit, spotify, tiktok; a mapping
-wins on a name clash). 24 sources total; per-source export/import steps live in
+under `mappings/sources/` (facebook, instagram, reddit, spotify, tiktok, amazon; a mapping
+wins on a name clash). 25 sources total; per-source export/import steps live in
 `references/SOURCES.md`. Each knows one export's format (CSV/JSON/ICS/JS/TXT/MD/
 XML/MBOX/EML/GPX) and pushes
 records into one canonical `Collector` (`scripts/sources/common.py`). Output

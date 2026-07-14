@@ -128,10 +128,12 @@ def main():
         sources = detect_sources(idx)
         src_names = [m.NAME for m in sources]
         quar = _sources.ALL_QUARANTINE
+        quar_pfx = getattr(_sources, "ALL_QUARANTINE_PREFIX", ())
         catalog, summary = [], Counter()
         for key, paths in sorted(idx.items()):
             p = paths[0]
-            kind = ("quarantine" if key in quar else "known" if src_names else "unknown")
+            is_quar = key in quar or (bool(quar_pfx) and key.startswith(quar_pfx))
+            kind = ("quarantine" if is_quar else "known" if src_names else "unknown")
             summary[kind] += 1
             if p.suffix.lower() == ".csv": nrows, cols = profile_csv(p)
             elif p.suffix.lower() == ".json": nrows, cols = profile_json(p)

@@ -495,7 +495,7 @@ def test_new_sources():
             r = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"),
                                 str(ned), "-o", str(out)],
                                capture_output=True, text=True)
-            check("new: ned entity builds (8 personal sources)", r.returncode == 0,
+            check("new: ned entity builds (9 personal sources)", r.returncode == 0,
                   r.stderr[-300:])
             cov = (out / "_COVERAGE.md").read_text() if (out / "_COVERAGE.md").exists() else ""
             check("new: ned coverage — 0 uncategorized", "(0 uncategorized" in cov,
@@ -540,6 +540,29 @@ def test_new_sources():
             # tiktok → following person
             check("new: tiktok following person",
                   (out / "10-people" / "woodworkdaily.md").exists())
+            # amazon → order becomes a purchase note in 35-shopping (the new layer)
+            shop = out / "35-shopping" / "Left-Handed Notebook.md"
+            check("new: amazon order → 35-shopping purchase", shop.exists(),
+                  "no shopping note")
+            stxt = shop.read_text() if shop.exists() else ""
+            check("new: amazon purchase note typed + merchant-linked",
+                  "type: purchase" in stxt and "[[Amazon]]" in stxt, stxt[:300])
+            # amazon → review lands in voice; search in 80-search; audience in mirror
+            check("new: amazon review in voice",
+                  "sturdy and well made for lefties" in allmd.lower())
+            check("new: amazon search in 80-search", "left handed stapler" in allmd)
+            check("new: amazon audience → 50-mirror", "Left-Handed Living" in allmd)
+            check("new: amazon prime-video title → interest", "The Sinister Left" in allmd)
+            # amazon → payment instruments quarantined (card + needle never imported)
+            check("new: amazon payment quarantined",
+                  "paymentoptionspaymentinstruments` — quarantined" in cov, cov[:400])
+            check("new: amazon card number never leaks", "4416" not in allmd)
+            # amazon → cart item surfaces as an interest (consideration signal)
+            check("new: amazon cart item → interest",
+                  "Left-Handed Coffee Mug" in allmd)
+            # amazon → Digital.Content.Ownership.5.json quarantined by PREFIX (not uncategorized)
+            check("new: amazon content-ownership prefix-quarantined",
+                  "digitalcontentownership5` — quarantined" in cov, cov[:600])
 
     if glx.is_dir():
         with tempfile.TemporaryDirectory() as d:

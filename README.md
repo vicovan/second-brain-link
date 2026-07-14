@@ -23,7 +23,7 @@
 
 > Your life is scattered across platforms — connections on LinkedIn, friends on Facebook, follows on Instagram, contacts and calendar in Google. Each gives you a data export, and each sits dead in a zip. Second Brain Link pulls them into **one** structured knowledge vault your AI can think with — and the same person across two networks becomes a single, richer note. Give it a goal — **Get Me Hired**, **Get My Startup Funded** — and it works your whole network to get you there.
 
-**Multi-source by design.** **24 sources ship today** — 12 personal (LinkedIn, Facebook, Instagram, Google Takeout, X/Twitter, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok) and 12 company (LinkedIn Company, Google Workspace, Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email/mbox, Microsoft 365, Teams) — with export + import steps for each in **[docs/SOURCES.md](docs/SOURCES.md)**. The architecture adds any future network with a data export through a drop-in adapter file or a declarative JSON mapping. One vault, every source — and every note tagged by source so the **graph** shows all of it connected.
+**Multi-source by design.** **25 sources ship today** — 13 personal (LinkedIn, Facebook, Instagram, Google Takeout, Amazon, X/Twitter, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok) and 12 company (LinkedIn Company, Google Workspace, Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email/mbox, Microsoft 365, Teams) — with export + import steps for each in **[docs/SOURCES.md](docs/SOURCES.md)**. The architecture adds any future network with a data export through a drop-in adapter file or a declarative JSON mapping. One vault, every source — and every note tagged by source so the **graph** shows all of it connected.
 
 ---
 
@@ -126,13 +126,15 @@ Nothing is uploaded. No account, no server, no telemetry. The output is plain Ma
 
 ### Supported sources
 
-**24 sources.** Full per-source detail — what each pulls in, exact export/download
+**25 sources.** Full per-source detail — what each pulls in, exact export/download
 steps at every vendor, and import instructions — lives in **[docs/SOURCES.md](docs/SOURCES.md)**.
 
 **Personal** (build a *digital twin*): LinkedIn *(most complete)* · Facebook *(full
 mapping incl. the algorithmic mirror + check-ins→map)* · Instagram · Google Takeout
 *(contacts, calendar, Maps places + Location-History visits + photo spots → map,
-My-Activity searches, YouTube taste)* · X/Twitter *(tweets + note-tweets → voice)* ·
+My-Activity searches, YouTube taste)* · Amazon *(orders/subscriptions → shopping,
+reviews → voice, searches, Prime Video/Kindle taste, ad-audiences → mirror)* ·
+X/Twitter *(tweets + note-tweets → voice)* ·
 WhatsApp *(contact signal only — chat text never read)* · GitHub *(code voice)* ·
 YouTube · Strava *(training spots → map)* · Reddit · Spotify *(taste + inferences)* ·
 TikTok.
@@ -356,7 +358,7 @@ Both use the same `SKILL.md` (Agent Skills open standard); the OpenAI build also
 
 ### Step 1 — Download your data archive(s)
 Grab one source or several — the tool detects and merges whatever you give it.
-Steps for **all 24 sources** are in **[docs/SOURCES.md](docs/SOURCES.md)**; the four
+Steps for **all 25 sources** are in **[docs/SOURCES.md](docs/SOURCES.md)**; the four
 classics:
 
 **LinkedIn** *(most complete)*
@@ -539,7 +541,7 @@ file in `engine/scripts/emitters/`.
 - **v0.5 — multi-source.** Facebook, Instagram, and Google Takeout; one unified vault that merges a person across networks. ✅
 - **v0.7 — personal *and* company.** Company sources (LinkedIn Company, Google Workspace, Slack), sibling personal/company vaults, `--full` owner mode, GBrain emitter, self-heal. ✅
 - **v0.8 — cross-model + multi-entity + self-adapt.** One engine, two providers (Claude + OpenAI Codex); multiple identities/companies → per-entity brains + `_correlations/`; declarative JSON source mappings + universal harvester + an `85-places/` layer. ✅
-- **v1 — 24 sources.** Personal: X/Twitter, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok. Company: Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email, Microsoft 365, Teams. Plus offline geocoding (places → map), subject-aware company vault layout, and `--refresh` incremental updates (`_GENERATED.json` manifest, edits kept, `_notes/` untouchable). ✅ *(this release)*
+- **v1 — 25 sources.** Personal: X/Twitter, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok, Amazon. Company: Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email, Microsoft 365, Teams. Plus offline geocoding (places → map), subject-aware company vault layout, and `--refresh` incremental updates (`_GENERATED.json` manifest, edits kept, `_notes/` untouchable). ✅ *(this release)*
 - **v1.2 — sharper entity resolution.** Stable IDs + precision-biased fuzzy matching beyond name-only merge (still conservative — a wrong merge is worse than a miss).
 - **v1.5 — always fresh.** Local re-import shipped in v1 (`--refresh`); next is scheduled/managed sync so the snapshot stops being a snapshot without manual re-exports.
 - **v2 — the agent.** The twin acts: meeting prep, drafting in your voice, flagging relationships to revive.

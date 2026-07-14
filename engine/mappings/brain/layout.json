@@ -136,6 +136,26 @@
    ]
   },
   {
+   "folder": "35-shopping",
+   "title": "35-shopping",
+   "buckets": [
+    "purchases"
+   ],
+   "purpose": "Purchases / orders / subscriptions — what you buy and consume",
+   "purpose_company": "Procurement: vendor spend, purchases and subscriptions",
+   "route_keys": [
+    "retailorderhistory",
+    "orderhistory",
+    "orders",
+    "digitalorders",
+    "digitalitems",
+    "retailorders",
+    "subscriptions",
+    "returns",
+    "buyagain"
+   ]
+  },
+  {
    "folder": "40-career",
    "title": "40-career",
    "buckets": [
@@ -270,6 +290,7 @@
    "orgs": "15-organizations",
    "reputation": "20-reputation",
    "voice": "30-voice",
+   "shopping": "35-shopping",
    "career": "40-career",
    "mirror": "50-mirror",
    "learning": "60-learning",
@@ -287,6 +308,7 @@
    "orgs": "15-organizations",
    "reputation": "20-brand",
    "voice": "30-content",
+   "shopping": "35-procurement",
    "career": "40-pipeline",
    "mirror": "50-market-view",
    "learning": "60-knowledge",

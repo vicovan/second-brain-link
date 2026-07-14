@@ -1,0 +1,190 @@
+{
+  "_comment": "Amazon 'Request My Data' export (folder of per-topic CSV/JSON under 'All Data Categories/…') — interpreted by engine/scripts/mapping.py. Retail + digital orders and subscriptions → 35-shopping (the purchase/consumption taste graph, one note per order via the `purchase` emit); customer reviews + seller feedback → 30-voice (the owner's own written opinions, kind=review); Retail search queries → 80-search; Prime Video viewing + Kindle reading + Audible + wishlist → 60-learning interests (media/reading taste); Amazon Audiences + advertiser clicks/audiences → 50-mirror ad_segments (how the algorithms segment you); profile → 00-me identity (name only). Privacy: payment instruments, IP addresses, auth tokens, item serial numbers, saved/billing/shipping addresses, buyer-seller & chat message bodies, avatars, device notifications and consent/attribute files are QUARANTINED (exact norm_file keys) — never imported. Embedded shipping/gift-recipient columns in order rows are simply never selected. Quarantine entries are EXACT norm_file keys (lowercased, punctuation/spaces stripped, numeric shard kept).",
+  "name": "amazon",
+  "subject": "person",
+  "detect": {
+    "any_key_prefix": ["retailorderhistory", "primevideoviewinghistory"],
+    "path_contains": ["all data categories", "your audible account"]
+  },
+  "quarantine": [
+    "paymentoptionspaymentinstruments", "paymentoptionsexternallymanagedpayments",
+    "legacypaymentinformation", "retailordersreturnedpayments2",
+    "digitalprimevideoipaddresses", "digitalprimevideolocationdata",
+    "retailauthentication", "retailauthenticationtokens",
+    "addresses", "addressdetails", "addresssummary", "addresspreferences",
+    "registration", "retailavatars",
+    "frustrationfreesetupcredentials",
+    "accountsettingsprivacypreferencesconsents2", "primevideooutofapprecommendationsconsent",
+    "digitalcustomerattributes1", "digitalcustomerattributes2", "digitalcustomerattributes3",
+    "retailcustomerprofileprofileattributes", "retailcustomercontacts",
+    "customercommunicationexperiencepreferences", "customercommunicationexperiencepreferencesemailhistory",
+    "buyersellermessaging", "retailinstantmessagingwhatsapp",
+    "retailchattranscriptsmessagetranscriptscampfire",
+    "beneficiaries",
+    "kindledeviceskindleinappsentnotifications",
+    "outboundnotificationsamazonapplicationupdatehistory",
+    "outboundnotificationsemaildeliverystatusfeedback",
+    "outboundnotificationspushsentdata",
+    "retailautomotiveeugarage", "retailautomotivenagarage",
+    "deviceengagement", "threepappusagedatasetting", "deviceactivations",
+    "retailregionauthority2", "digitalvideosearch", "primevideowatchevent1",
+    "digitalprimevideoonboardinglifecycle", "digitalprimevideocustomertitlerelevancerecommendations",
+    "requestallyourdatadetailpageglanceviewimpressions",
+    "requestallyourdatabuyagaincustomershoppingimpressions",
+    "amazonlistsreadme", "description", "pdi",
+    "accountdetails", "accountinfo", "accountinformation", "accountpreferences",
+    "deviceactivations", "deviceconfiguration", "deviceengagement", "devicestate",
+    "connecteddevices", "billingandrefundsdata", "billingscheduleitems", "billingschedules",
+    "lightweightaggregates", "lightweightinteractions", "customerinteraction"
+  ],
+  "_quarantine_prefix_comment": "Sharded / low-value families quarantined by norm_file PREFIX (catalogued, never imported): content-rights shards (430×), Kindle device/doc/session metadata, notifications, settings, aggregates, billing, redundant digital-orders billing/returns, non-audience advertising, device telemetry. Every prefix is verified NOT to collide with a mapped key (orderhistory/digitalitems/subscriptions/customerreviews/sellerfeedback/searchdata/viewinghistory/reading-insights-sessions/useruniquetitles/amazonaudiences/advertiser*/profiledata/cartitems/watchlist/wishlist/team_store_list).",
+  "quarantine_prefix": [
+    "digitalcontentownership", "digitalcustomerattributes", "digitalorders",
+    "digitalprimevideoip", "digitalprimevideolocation", "digitalprimevideoonboarding",
+    "digitalprimevideocustomertitle", "digitalprimevideopin", "digitalprimevideopromo",
+    "digitalprimevideoparental", "digitalvideosearch",
+    "kindledevices", "kindlekindle", "kindlesaga", "kindlereadinginsightsday",
+    "outboundnotifications",
+    "primevideoviewcounts", "primevideooutofapp", "primevideowatchevent",
+    "retailcommunitytrust", "retailautomotive", "retailcustomerreturns",
+    "retailproblemwithorder", "retailreturnsreceivable", "retailordersreturned",
+    "retailordersmanage", "retailpromotions", "retailuipreferences",
+    "retailinternationalization", "retaildeliveryfeedback", "retailfollow",
+    "retaillightweight", "retailcustomerprofile", "retailcustomercontacts",
+    "retailauthentication", "retailregionauthority", "retailavatars",
+    "retailchattranscripts", "retailinstantmessaging",
+    "requestallyourdata",
+    "customercommunication", "customerinteraction", "advertisingconversion",
+    "advertisingoptout", "amazongames", "amazongenie", "amazondrive",
+    "deviceactivations", "deviceconfiguration", "deviceengagement", "devicestate",
+    "connecteddevices",
+    "paymentoptions", "legacypayment", "frustrationfree", "lifecyclepromotion",
+    "subscriptionsamazonprime", "subscriptionslifecycle", "subscriptionsdigitalbilling",
+    "subscriptionproblems", "subscriptionperiods", "subscriptionstatus",
+    "nodemetadata", "countryofresidence", "filedescriptions", "ordersandreturns",
+    "appstoreentitlements", "photoondelivery"
+  ],
+  "records": [
+    {
+      "match": { "name_prefix": "retail.orderhistory", "suffix": ".csv" },
+      "emit": "purchase",
+      "fields": {
+        "item": "Product Name",
+        "date": "Order Date",
+        "amount": "Total Owed",
+        "currency": "Currency",
+        "merchant": { "const": "Amazon" },
+        "url": { "template": "https://www.amazon.com/dp/{ASIN}" }
+      },
+      "tags": ["purchase/order"]
+    },
+    {
+      "match": { "name_prefix": "digital items", "suffix": ".csv" },
+      "emit": "purchase",
+      "fields": {
+        "item": "ProductName",
+        "date": "OrderDate",
+        "amount": "OurPrice",
+        "currency": "OurPriceCurrencyCode",
+        "merchant": { "const": "Amazon" },
+        "category": { "const": "digital" },
+        "url": { "template": "https://www.amazon.com/dp/{ASIN}" }
+      },
+      "tags": ["purchase/digital"]
+    },
+    {
+      "match": { "name_prefix": "subscriptions", "suffix": ".csv" },
+      "emit": "purchase",
+      "fields": {
+        "item": "ServiceProvider",
+        "date": "SubscriptionStartDate",
+        "merchant": { "const": "Amazon" },
+        "category": { "const": "subscription" }
+      },
+      "tags": ["purchase/subscription"]
+    },
+    {
+      "match": { "name_contains": ["customerreviews"], "suffix": ".csv" },
+      "emit": "post",
+      "fields": {
+        "text": ["Text", "Title"],
+        "date": "SubmissionTime",
+        "kind": { "const": "review" },
+        "url": { "template": "https://www.amazon.com/dp/{ASIN}" }
+      },
+      "tags": ["post/review", "post/amazon"]
+    },
+    {
+      "match": { "name_contains": ["sellerfeedback"], "suffix": ".csv" },
+      "emit": "post",
+      "fields": {
+        "text": "Feedback Text",
+        "date": "Feedback Date",
+        "kind": { "const": "review" }
+      },
+      "tags": ["post/review", "post/amazon"]
+    },
+    {
+      "match": { "name_contains": ["search-data"], "suffix": ".csv" },
+      "emit": "search",
+      "fields": { "query": "First Search Query String" }
+    },
+    {
+      "match": { "name_prefix": "primevideo.viewinghistory", "suffix": ".csv" },
+      "emit": "interest",
+      "fields": { "tag": "Title", "date": "Playback Start Datetime (UTC)" },
+      "tags": ["interest/video"]
+    },
+    {
+      "match": { "name_contains": ["reading-insights-sessions"], "suffix": ".csv" },
+      "emit": "interest",
+      "fields": { "tag": "product_name", "date": "start_time" },
+      "tags": ["interest/reading"]
+    },
+    {
+      "match": { "name_contains": ["useruniquetitlescompleted"], "suffix": ".csv" },
+      "emit": "interest",
+      "fields": { "tag": "product_name" },
+      "tags": ["interest/reading"]
+    },
+    {
+      "match": { "name_contains": ["cartitems"], "suffix": ".csv" },
+      "emit": "interest",
+      "fields": { "tag": "ProductName", "date": "DateAddedToCart" },
+      "tags": ["interest/cart"]
+    },
+    {
+      "match": { "name_contains": ["watchlist"], "suffix": ".csv" },
+      "emit": "interest",
+      "fields": { "tag": "catalogTitle", "date": "itemAddedDate" },
+      "tags": ["interest/watchlist"]
+    },
+    {
+      "match": { "name_contains": ["wishlist", "team_store_list"], "suffix": ".json" },
+      "locate": "walk",
+      "emit": "interest",
+      "fields": { "tag": "ASIN.Product Name" },
+      "tags": ["interest/wishlist"]
+    },
+    {
+      "match": { "name_contains": ["amazonaudiences"], "suffix": ".csv" },
+      "emit": "ad_segment",
+      "fields": { "text": "Amazon Audiences in which you are included" }
+    },
+    {
+      "match": { "name_contains": ["advertiseraudiences"], "suffix": ".csv" },
+      "emit": "ad_segment",
+      "fields": { "text": ["Advertiser Audiences in which you are included", "Advertisers"] }
+    },
+    {
+      "match": { "name_contains": ["advertiserclicks"], "suffix": ".csv" },
+      "emit": "ad_segment",
+      "fields": { "text": "Advertisers whose ads you clicked" }
+    },
+    {
+      "match": { "name_prefix": "retail.profiledata", "suffix": ".json" },
+      "emit": "identity",
+      "fields": { "name": "First Name" }
+    }
+  ]
+}

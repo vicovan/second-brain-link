@@ -42,6 +42,7 @@ on every entity note the rule emits. They join the renderer's automatic
 Obsidian graph, Bases, and Dataview. Use `/`-nested tags for a clean taxonomy.
 """
 import json
+import re
 from pathlib import Path
 
 from sources.common import (read_json, read_csv, walk_json_arrays, iso_date, nk,
@@ -129,6 +130,20 @@ def resolve_field(obj, spec):
             return [spec["const"]]
         if "first_of" in spec:
             return resolve_field(obj, spec["first_of"])
+        if "template" in spec:
+            # Build a string from a template with {Field} placeholders resolved
+            # against the record (first value of each). If ANY referenced field is
+            # empty, the whole template yields nothing — so we never emit a broken
+            # URL like ".../dp/" with a missing id. Generic (any source can use it).
+            tmpl = str(spec["template"])
+            out = tmpl
+            for fld in re.findall(r"\{([^}]+)\}", tmpl):
+                got = _resolve(obj, fld)
+                v = str(got[0]).strip() if got else ""
+                if not v:
+                    return []
+                out = out.replace("{" + fld + "}", v)
+            return [out]
         return []
     if isinstance(spec, list):
         for s in spec:
@@ -302,6 +317,15 @@ def _emit(col, source, kind, fields, rec, tags=None):
                           url=str(g("url", i)), kind=str(g("kind", i) or "place"),
                           note=str(g("note", i)), date=str(g("date", i)), tags=tags)
         return len(names)
+    if kind == "purchase":
+        items = resolved.get("item") or resolved.get("name") or []
+        for i, _ in enumerate(items):
+            col.add_purchase(source, item=str(g("item", i) or g("name", i)),
+                             merchant=str(g("merchant", i)), date=str(g("date", i)),
+                             amount=str(g("amount", i)), currency=str(g("currency", i)),
+                             category=str(g("category", i)), url=str(g("url", i)),
+                             tags=tags)
+        return len(items)
     if kind == "identity":
         col.set_identity(source, name=str(_first(resolved.get("name") or [])),
                          headline=str(_first(resolved.get("headline") or [])),
@@ -362,6 +386,11 @@ class JsonMapping:
         self.NAME = spec["name"]
         self.SUBJECT = spec.get("subject", "person")
         self.QUARANTINE = set(spec.get("quarantine", []))
+        # prefix form (mirror of detect.any_key_prefix): a file whose norm_file key
+        # STARTS WITH any listed prefix is quarantined too — lets one entry cover a
+        # whole sharded family (e.g. digitalcontentownership.270 …) without listing
+        # every exact key.
+        self.QUARANTINE_PREFIX = tuple(spec.get("quarantine_prefix", []))
         self._src = src_path
 
     def detect(self, file_index):

@@ -311,6 +311,9 @@ class Collector:
                                             #   location,description,attendees,tags,url,value}
         self.places = {}                    # key -> {name,address,lat,lng,url,kind,note,lists}
         self._place_index = {}              # nk(name) -> [place rec, …] (merge lookup)
+        self.purchases = []                 # canonical via add_purchase: {item,merchant,date,
+                                            #   amount,currency,category,url,source,tags}
+        self._purchase_keys = set()         # (source, nk(item), date, amount) dedupe
         self.learning_count = 0
         self.services = Counter()           # label -> n
         self.msg_signal = {}                # nk(name) -> {"n","first","last","by":Counter(source)}
@@ -626,6 +629,38 @@ class Collector:
         if value:
             ev["value"] = str(value).strip()
         self.events.append(ev)
+
+    # ---- shopping / commerce (35-shopping): what the owner buys & consumes.
+    def add_purchase(self, source, item="", merchant="", date="", amount="",
+                     currency="", category="", url="", tags=None):
+        """A commerce/consumption record — an order/purchase/subscription (e.g.
+        Amazon orders). ONE note per purchase, rendered in the 35-shopping layer.
+        Privacy boundary: there is deliberately NO card=/address= parameter — the
+        adapter must never pass payment cards, billing/shipping addresses, IPs or
+        serial numbers (they are read past, exactly like email/phone). `merchant`
+        is registered as an org so a [[merchant]] wikilink resolves. Idempotent on
+        (source, nk(item), date, amount)."""
+        item = fix_mojibake((item or "").strip())
+        if not item or nk(item) in ("notapplicable", "notavailable"):
+            return  # skip Amazon's pervasive placeholder rows
+        d = iso_date(date)
+        amt = str(amount or "").strip()
+        k = (source, nk(item), d, amt)
+        if k in self._purchase_keys:
+            return
+        self._purchase_keys.add(k)
+        self.sources.add(source)
+        merchant = fix_mojibake((merchant or "").strip())
+        if merchant:
+            # register a real org (carries the source tag) so the [[merchant]]
+            # wikilink resolves to a proper, attributed note — not an empty stub.
+            self.add_org(source, merchant, category="merchant")
+        tags = sorted({str(t).strip() for t in (tags or []) if str(t).strip()})
+        self.purchases.append({
+            "item": item, "merchant": merchant, "date": d, "amount": amt,
+            "currency": (currency or "").strip(), "category": (category or "").strip(),
+            "url": url or "", "source": source, "tags": tags,
+        })
 
     # ---- the algorithmic mirror (50-mirror): how the platforms model the user.
     # These are inferences/segments DERIVED about the owner by a platform (FB ad
