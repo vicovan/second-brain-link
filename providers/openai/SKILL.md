@@ -106,6 +106,13 @@ the mirror emit). The full self-improvement loop is in step 6b.
    `.obsidian/graph.json`, writes a `.bak`), and `copilot-prompts/` (`/warm-intro`,
    `/investor-paths`, `/reconnect`, `/job-fit`, `/ask-my-network`, **`/mine`**, **`/for-me`**).
    Then act on the prompts in the user's voice.
+   **Answer questions by traversing `graph.json`** (schema sbl-graph/1, at every brain
+   root): nodes (id = note path sans `.md`) + TYPED weighted edges (`works_at`/`member_of`/
+   `attended`/`purchased_from`/`correlated`/`linked`, `w` ∈ (0,1]) + ordered layers.
+   Resolve the question's entities by title → follow `correlated`/`works_at` first, then
+   high-`w` edges 1–2 hops → read ONLY those notes (frontmatter first) → cite what you used
+   as `[[wikilinks]]`. Never read all notes. `_HEALTH.md` lists orphans / duplicate
+   suspicions / conflicts to fix WITH the user (never auto-merge).
 6b. **Self-improve on every new source (the loop).** When a new source/export version is
    integrated, ratchet the whole system: (1) profile → schema map flags new files/fields;
    (2) close `_COVERAGE.md` "Needs a mapping" by extending the mapping, adding an `emit` if a

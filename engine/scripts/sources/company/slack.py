@@ -86,9 +86,14 @@ def extract(root, file_index, all_paths, col):
                 continue
             members[u.get("id", nm)] = nm
             prof = u.get("profile") or {}
+            # avatar_url = the profile image URL the export itself carries —
+            # stored verbatim, never fetched (Studios use it only behind an
+            # explicit opt-in network toggle).
             col.add_person(NAME, nm, company=col.subject_entity or ws,
                            role=prof.get("title", ""),
-                           email=prof.get("email", ""))   # Collector strips unless --full
+                           email=prof.get("email", ""),   # Collector strips unless --full
+                           avatar_url=(prof.get("image_512")
+                                       or prof.get("image_192") or ""))
 
     # channels → org notes carrying topic/purpose (extra, --full only) and, via
     # semantic person tags (channel/<slug>), WHO is in each channel — the

@@ -1098,6 +1098,100 @@ def test_multi_entity_and_correlation():
         check("multi: PII sweep clean across all brains", not leaks, str(leaks[:3]))
 
 
+def test_graphdata_and_avatars():
+    """graph.json (sbl-graph/1) sidecar + avatar extraction: emitted for personal
+    AND company brains + _correlations, edges typed/weighted with endpoints that
+    exist, company-variant folders respected, PII-clean, manifest-managed (exactly
+    one after --refresh), the analyze.py --graph-data retrofit works, and the
+    owner's vCard photo lands in _assets/avatars/ with `avatar:` frontmatter."""
+    import json as _json
+    with tempfile.TemporaryDirectory() as d:
+        out = Path(d) / "v"
+        r = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"),
+                            str(FIXTURES), "-o", str(out)],
+                           capture_output=True, text=True)
+        check("graphdata: multi build runs", r.returncode == 0, r.stderr[-300:])
+        ada_g = out / "personal" / "ada-brain" / "graph.json"
+        acme_g = out / "company" / "acme-brain" / "graph.json"
+        corr_g = out / "_correlations" / "graph.json"
+        check("graphdata: graph.json at every brain root",
+              ada_g.exists() and acme_g.exists() and corr_g.exists())
+        ga = _json.loads(ada_g.read_text(encoding="utf-8"))
+        gc = _json.loads(acme_g.read_text(encoding="utf-8"))
+        check("graphdata: schema sbl-graph/1",
+              ga.get("schema") == "sbl-graph/1" and gc.get("schema") == "sbl-graph/1")
+        ids = {n["id"] for n in ga["nodes"]}
+        dangling = [e for e in ga["edges"] if e["a"] not in ids or e["b"] not in ids]
+        check("graphdata: every edge endpoint is a node", not dangling,
+              str(dangling[:2]))
+        on_disk = [n for n in ga["nodes"]
+                   if not (out / "personal" / "ada-brain" / n["path"]).exists()]
+        check("graphdata: every node path exists on disk", not on_disk,
+              str(on_disk[:2]))
+        check("graphdata: ada has a typed works_at edge",
+              any(e["type"] == "works_at" for e in ga["edges"]))
+        check("graphdata: edge weights in (0,1]",
+              all(0 < e["w"] <= 1 for e in ga["edges"] + gc["edges"]))
+        # company brains use the company-named variant folders in layers[]
+        folders = {l["folder"] for l in gc["layers"]}
+        check("graphdata: company layer variant folders",
+              not ({"20-reputation", "30-voice"} & folders),
+              str(sorted(folders)))
+        check("graphdata: correlations graph has a correlated edge",
+              any(e["type"] == "correlated"
+                  for e in _json.loads(corr_g.read_text())["edges"]))
+        check("graphdata: PII sweep (no emails in graph.json)",
+              not EMAIL.search(ada_g.read_text() + acme_g.read_text()))
+        # avatar: owner's vCard photo → _assets/avatars/ + frontmatter + graph node
+        owner = out / "personal" / "owner-brain"
+        av = owner / "_assets" / "avatars" / "Ada Byron.jpg"
+        check("avatar: vCard photo written to _assets/avatars/", av.exists())
+        note = (owner / "10-people" / "Ada Byron.md")
+        check("avatar: frontmatter carries avatar path",
+              note.exists() and "avatar: _assets/avatars/Ada Byron.jpg"
+              in note.read_text(encoding="utf-8"))
+        man = _json.loads((owner / "_GENERATED.json").read_text(encoding="utf-8"))
+        check("avatar: image manifest-tracked",
+              "_assets/avatars/Ada Byron.jpg" in man["files"])
+        go = _json.loads((owner / "graph.json").read_text(encoding="utf-8"))
+        check("avatar: graph.json node carries avatar field",
+              any(n.get("avatar") for n in go["nodes"]))
+        # --refresh keeps exactly one graph.json + doesn't duplicate the avatar
+        r2 = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"),
+                             str(FIXTURES), "-o", str(out), "--refresh"],
+                            capture_output=True, text=True)
+        check("graphdata: --refresh runs", r2.returncode == 0, r2.stderr[-300:])
+        check("graphdata: one graph.json per brain after refresh",
+              sum(1 for _ in (out / "personal" / "ada-brain").rglob("graph.json")) == 1
+              and sum(1 for _ in owner.rglob("*.jpg")) == 1)
+        # analyze.py --graph-data retrofit: delete + regenerate without rebuild
+        ada_g.unlink()
+        r3 = subprocess.run([sys.executable, str(SCRIPTS / "analyze.py"),
+                             str(out / "personal" / "ada-brain"),
+                             "--goals", "jobsearch", "--graph-data"],
+                            capture_output=True, text=True)
+        check("graphdata: --graph-data retrofit regenerates",
+              r3.returncode == 0 and ada_g.exists(), r3.stderr[-300:])
+        # smart-brain layer (health.py, run by analyze): health report + graph
+        # insights + overview canvas — deterministic, suspicions-only, PII-clean
+        ada = out / "personal" / "ada-brain"
+        hj = ada / "_HEALTH.json"
+        check("health: _HEALTH.md + .json written",
+              (ada / "_HEALTH.md").exists() and hj.exists())
+        if hj.exists():
+            h = _json.loads(hj.read_text(encoding="utf-8"))
+            check("health: schema + honest link stats",
+                  h.get("schema") == "sbl-health/1"
+                  and h["links"]["unresolved"] <= h["links"]["total"])
+            check("health: PII sweep (no emails)",
+                  not EMAIL.search(hj.read_text(encoding="utf-8")))
+        check("health: graph-insights synthesis note",
+              (ada / "90-synthesis" / "graph-insights.md").exists())
+        cv = ada / "_canvas" / "brain-overview.canvas"
+        check("health: overview canvas is valid JSON Canvas",
+              cv.exists() and "nodes" in _json.loads(cv.read_text(encoding="utf-8")))
+
+
 def test_mapping_engine():
     """The JSON mapping interpreter: selector mini-language, mapping-wins-over-.py,
     and IG/Google mappings extract from the synthetic fixtures."""
@@ -1571,6 +1665,7 @@ def main():
     test_geocoder()
     test_sibling_split_and_providers()
     test_multi_entity_and_correlation()
+    test_graphdata_and_avatars()
     test_mapping_engine()
     test_places_and_mappings_build()
     test_google_takeout_subsources()

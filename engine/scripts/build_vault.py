@@ -146,7 +146,9 @@ def fm(d):
 # VaultWriter`, a separate module object whose globals would be stale; see
 # CLAUDE.md §10).
 from sources.common import (manifest_begin, manifest_take,          # noqa: E402
-                            record_write, sha256_text as _sha256_text)
+                            record_write, record_write_bytes,
+                            sha256_text as _sha256_text,
+                            sha256_bytes as _sha256_bytes)
 
 
 def manifest_end(root: Path):
@@ -166,6 +168,15 @@ def write(path: Path, text: str):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text.rstrip() + "\n", encoding="utf-8")
     record_write(path, text)
+
+
+def write_bytes_file(path: Path, data: bytes):
+    """Binary sibling of write() (avatar images under `_assets/avatars/`):
+    creates parents, writes verbatim, records into the manifest so --refresh
+    manages the file like any generated note."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    record_write_bytes(path, data)
 
 def slug(s):
     """Slugify a string for a NON-entity filename (coverage/owner/service notes).
@@ -336,7 +347,8 @@ LAYER_ROLES = [
     ("_quarantine/", "Sensitive files catalogued but NEVER imported (default mode). In --full they fold into 00-me/my-*.md."),
 ]
 # artifacts written during/after the build; ANALYZE_ARTIFACTS come from analyze.py
-ANALYZE_ARTIFACTS = {"Dashboard.md", "_DATA_POINTS.md", "_GRAPH.md", "95-goals/", "copilot-prompts/"}
+ANALYZE_ARTIFACTS = {"Dashboard.md", "_DATA_POINTS.md", "_GRAPH.md", "95-goals/",
+                     "copilot-prompts/", "_HEALTH.md", "_canvas/"}
 ARTIFACT_ROLES = [
     ("Home.md", "Map of Content — the human entry point; start here."),
     ("CLAUDE.md", "In-vault agent guide (AGENTS.md for the OpenAI provider) — how an agent should read this brain."),
@@ -344,11 +356,15 @@ ARTIFACT_ROLES = [
     ("_SUMMARY.md", "Seed counts — per-layer note counts + the coverage line (+ goal layer once analyzed)."),
     ("_COVERAGE.md", "Per-file coverage: mapped / routed / harvested / uncategorized / quarantined, + a 'Needs a mapping' backlog."),
     ("_BUILD_REPORT.md", "What this build detected/extracted (sources, notes, log)."),
+    ("graph.json", "Machine-readable typed graph (sbl-graph/1): nodes + weighted edges + layers — what the Studio Neural view / retrieval and agents traverse. (NOT `.obsidian/graph.json`, which is Obsidian's own graph-styling config.)"),
+    ("_assets/", "Bundled media copied from the export (avatars under `_assets/avatars/`); nothing is ever fetched."),
     ("Dashboard.md", "Live Dataview tables (warm/dormant ties, clusters, by-source) — written by analyze.py."),
     ("_DATA_POINTS.md", "Catalog of every node type + relation + which source enriched each field — written by analyze.py."),
     ("_GRAPH.md", "How to read the cross-source global graph + the color legend — written by analyze.py."),
     ("95-goals/", "Goal workspaces (ranked tables + a ready AI prompt per goal) — written by analyze.py."),
     ("copilot-prompts/", "Obsidian-Copilot `/commands` (warm-intro, investor-paths, mine, …) — written by analyze.py."),
+    ("_HEALTH.md", "Brain self-check: orphans, unresolved links, per-source snapshot freshness, duplicate SUSPICIONS, conflicts (+ machine twin `_HEALTH.json`) — written by analyze.py."),
+    ("_canvas/", "JSON Canvas overview map (`brain-overview.canvas` — one node per layer, real cross-layer link counts) — written by analyze.py."),
 ]
 
 # ---------------------------------------------------------------------------
@@ -399,6 +415,24 @@ class VaultWriter:
         self.user_notes_space()
         self.scaffolding()
 
+    def _save_avatar(self, title, rec):
+        """Write a record's bundled avatar image (if any) to `_assets/avatars/`
+        and return {avatar: relpath} / plus {avatar_url} passthrough. Bytes come
+        only from the export itself (vCard PHOTO etc. — see Collector); nothing
+        is ever fetched. Extension sniffed from magic bytes; jpg default."""
+        out = {}
+        au = (rec.get("avatar_url") or "").strip()
+        if au:
+            out["avatar_url"] = au
+        data = rec.get("avatar_bytes")
+        if data:
+            ext = (".png" if data[:8] == b"\x89PNG\r\n\x1a\n"
+                   else ".gif" if data[:3] == b"GIF" else ".jpg")
+            rel = f"_assets/avatars/{obsidian_name(title)}{ext}"
+            write_bytes_file(self.out / rel, data)
+            out["avatar"] = rel
+        return out
+
     # 00 — identity (company mode roots on the org; person mode on the user)
     @staticmethod
     def _geo(location):
@@ -436,6 +470,7 @@ class VaultWriter:
                "industry": i.get("industry", ""),
                "sources": sorted(i.get("sources", []))}
         fmd.update(self._geo(i.get("location", "")))
+        fmd.update(self._save_avatar(name or "Me", i))
         body = [fm(fmd), "", f"# {name or 'Me'}\n"]
         if i.get("headline"): body.append(f"**{i['headline']}**\n")
         if i.get("about"): body.append("## About\n\n" + i["about"] + "\n")
@@ -559,6 +594,7 @@ class VaultWriter:
                    "dept": link(r["dept"]) if r.get("dept") else "",
                    "location": r.get("location", "")}
             fmd.update(self._geo(r.get("location", "")))
+            fmd.update(self._save_avatar(base, r))
             # conflicting claims from other sources — preserved, never silently lost
             alt = r.get("alt") or {}
             for f_ in ("company", "role"):
@@ -1484,6 +1520,16 @@ def _build_one(mods, root, file_index, all_paths, out, subj, emit_names, full,
     # seed-counts snapshot (per-layer note counts + coverage) for a quick read
     write_seed_summary(cov_dir, col, sources_used, subj,
                        [e.name for e in chosen], stats)
+    # machine-readable typed graph sidecar (sbl-graph/1) — what the Studio
+    # Neural view + graph-augmented retrieval (and any agent) traverse. Written
+    # BEFORE manifest_end so --refresh manages it. Never fatal to a build.
+    try:
+        import graphdata
+        g = graphdata.write_graph_json(cov_dir, subject=subj, write_fn=write)
+        col.note(f"vault: graph.json — {g['stats']['nodes']} nodes, "
+                 f"{g['stats']['edges']} edges ({g['stats']['cross_source_edges']} cross-source)")
+    except Exception as e:                                    # pragma: no cover
+        col.note(f"[graphdata] graph.json skipped: {type(e).__name__}: {e}")
     manifest_end(out)
     return col, sources_used, consumed_keys
 
@@ -1524,6 +1570,11 @@ def refresh_sync(new_dir: Path, live_dir: Path):
     def _on_disk_sha(path: Path):
         try:
             return _sha256_text(path.read_text(encoding="utf-8"))
+        except UnicodeDecodeError:
+            try:                     # binary generated file (e.g. _assets/avatars/*)
+                return _sha256_bytes(path.read_bytes())
+            except Exception:
+                return None
         except Exception:
             return None
 

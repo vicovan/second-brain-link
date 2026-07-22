@@ -310,3 +310,14 @@ Personal email inboxes (as a *personal* source), health & wearables, message/cha
 what you care about* — not your inbox or your heart-rate log. See the source
 catalog in the docs repo for the reasoning, and `_COVERAGE.md` in every build for
 the honest per-file account (mapped / skipped-by-design / quarantined).
+
+## Avatars (profile images)
+
+Images bundled **inside** an export are copied to `_assets/avatars/` and stamped as
+`avatar:` frontmatter (1 MB cap; manifest-tracked so `--refresh` manages them). Remote
+image URLs an export carries are stamped verbatim as `avatar_url:` and **never fetched**
+(zero network) — Studios use them only behind an explicit opt-in toggle. Honest per-source
+availability: Google Contacts vCard `PHOTO` → per-person avatars; LinkedIn connection
+exports carry **no** photos; Facebook/Instagram carry your own profile media only;
+Slack/Workspace exports carry avatar **URLs** (`image_512`); most other sources carry none —
+the Studio's initials chips are the designed default, not a failure state.

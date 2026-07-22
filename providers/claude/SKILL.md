@@ -119,15 +119,24 @@ intros/asks/recommendations in the user's voice.
 ### Operating the brain — leverage layers (tell the user)
 1. **Dataview/Bases dashboards** (`Dashboard.md`) — structured, exact, always-current;
    `_DATA_POINTS.md` is the map of every data point + relation.
-2. **The cross-source graph** — every note is tagged `source/<name>` + its type (+ semantic
+2. **The typed graph (`graph.json`, schema sbl-graph/1)** — every brain root carries a
+   machine-readable graph: nodes (id = note path sans `.md`), TYPED weighted edges
+   (`works_at`/`member_of`/`attended`/`purchased_from`/`correlated`/`linked`, `w` ∈ (0,1])
+   and ordered layers. **Answer questions by traversing it, never by reading all notes:**
+   resolve the question's entities to node ids by title → follow `correlated`/`works_at`
+   first, then high-`w` edges 1–2 hops → read ONLY those notes (frontmatter first) → cite
+   what you used as `[[wikilinks]]`. This is spreading activation over the real graph —
+   the same traversal the Studio's Neural view animates. `_HEALTH.md` reports orphans /
+   duplicate suspicions / conflicts an agent may fix WITH the user (never auto-merge).
+3. **The cross-source graph** — every note is tagged `source/<name>` + its type (+ semantic
    tags like `person/friend`, `mirror/ad-segment`), so the global **Graph view** shows all
    data points from all networks, colored/filterable by source and type (see `_GRAPH.md`).
-3. **Obsidian Copilot** — **Vault QA** answers natural questions across all notes
+4. **Obsidian Copilot** — **Vault QA** answers natural questions across all notes
    semantically; the generated **custom prompts** are one-click `/commands`. Point Copilot's
    custom-prompts folder at `copilot-prompts/` (or pass `--copilot-dir`).
-4. **An AI agent (Claude Code / Codex)** — deep multi-step reasoning + writing notes back
+5. **An AI agent (Claude Code / Codex)** — deep multi-step reasoning + writing notes back
    (read `_STRUCTURE.md`+`_SUMMARY.md`+`_DATA_POINTS.md`+synthesis+frontmatter, never all notes).
-5. **Plugins** — **Map View** for `85-places/` (notes carry lat/lng — great with Facebook
+6. **Plugins** — **Map View** for `85-places/` (notes carry lat/lng — great with Facebook
    check-ins + Google Maps); **Graph/Local Graph** for the people↔company network.
 
 ### Self-healing (the skill debugs + fixes itself)

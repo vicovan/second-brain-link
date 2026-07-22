@@ -273,7 +273,7 @@ second-brain-link/
 │   ├── claude/second-brain-link.skill     # committed installable (unpacked folder git-ignored)
 │   └── openai/second-brain-link.skill
 ├── tests/
-│   ├── run.py                    # stdlib test harness (currently 585 checks)
+│   ├── run.py                    # stdlib test harness (currently 609 checks)
 │   └── fixtures/{personal,company}/<entity>/<source>/   # synthetic exports
 └── .github/                      # CI + issue/PR templates
 ```
@@ -293,6 +293,20 @@ languages) · `10-people/` (one merged note per person) · `15-organizations/` �
 **`85-places/`** (saved/reviewed/checked-in locations) · `90-synthesis/` (network-map,
 target-companies, positions-i-hold [draft], positioning-gaps [draft]) ·
 `_notes/` (YOURS — never regenerated) · `99-uncategorized/` · `_quarantine/`. **Company brains use company-named folders** for the middle layers (20-brand, 30-content, 35-procurement, 40-pipeline w/ one note per deal, 50-market-view, 60-knowledge w/ meetings.md, 70-support, 80-signals, 85-locations) — driven by `mappings/brain/layout.json` `variants` via `VaultWriter.L(key)` (never hardcode a layer folder). Full field reference: `docs/ENTITY-MAP.md`.
+
+**`graph.json` (schema `sbl-graph/1`)** is ALWAYS written at each brain root (+
+`_correlations/graph.json`): the machine-readable typed graph — `nodes` (id = note path
+sans `.md`, layer/type/sources/strength/geo/avatar), weighted `edges`
+(`works_at`/`member_of`/`attended`/`purchased_from`/`correlated`/`linked`, `w` ∈ (0,1]),
+ordered `layers`. Built by `scripts/graphdata.py` (pure scan of the rendered vault; called
+from `_build_one` before `manifest_end`, so `--refresh` manages it; retrofit any old vault
+via `analyze.py <brain> --graph-data`). This is what the Studio Neural view + retrieval and
+any agent traverse (workflow documented in `_GRAPH.md`). Do NOT confuse with
+`.obsidian/graph.json` (Obsidian's graph-styling config). **Avatars:** images bundled in an
+export (e.g. Google Contacts vCard `PHOTO`) are copied to `_assets/avatars/` and stamped as
+`avatar:` frontmatter (1MB cap, manifest-tracked); remote profile-image URLs the export
+carries (e.g. Slack `image_512`) are stamped verbatim as `avatar_url:` and **never fetched**
+— Studios use them only behind an explicit opt-in network toggle.
 
 Generated reports/artifacts at the brain root, each documented in `_STRUCTURE.md`:
 `_STRUCTURE.md` (ALWAYS — the vault map: every folder/file + its role) · `_SUMMARY.md`
@@ -432,7 +446,7 @@ structure tags adapters emit).
 Real-world validation build (IG + Google Maps + LinkedIn + **Facebook**, `--full`): cross-source
 merge verified, `source/*` tags on every note, `_STRUCTURE.md`/`_DATA_POINTS.md`/`_GRAPH.md`
 present, default-mode PII sweep clean. Both providers package + install + run end-to-end.
-`tests/run.py` → **585 checks, 0 failed** (selector mini-language, mapping-wins,
+`tests/run.py` → **609 checks, 0 failed** (selector mini-language, mapping-wins,
 IG/Google fixture build, places + review note, harvester rescue, multi-entity 3-brain
 build, cross-person note, `works_at` edge, negative no-merge, multi-vault PII sweep, Codex
 `agents/openai.yaml` + `--install`, two-sibling-vault split, **Facebook full mapping +
@@ -500,7 +514,7 @@ python3 packaging/build_skill.py all --install
 #   claude → ~/.claude/skills/   openai → ~/.agents/skills/
 
 # test (stdlib only; must stay green)
-python3 tests/run.py            # → 585 passed, 0 failed
+python3 tests/run.py            # → 609 passed, 0 failed
 ```
 **Testing approach:** synthetic exports under
 `tests/fixtures/{personal,company}/<entity>/<source>/`; assert valid YAML on every

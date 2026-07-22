@@ -889,6 +889,20 @@ def write_graph_guide(brain: Path):
             "- `tag:#place/check-in` — Facebook check-ins", "",
             "> Tip: if colors don't show, run `analyze.py … --graph-config <vault>/.obsidian/graph.json` "
             "to install the color groups (it preserves your existing graph settings and writes a `.bak`).",
+            "",
+            "## For agents — traverse the graph, don't scan the vault", "",
+            "`graph.json` at this brain's root (schema `sbl-graph/1`) is the machine-readable "
+            "graph: `nodes` (id = note path without `.md`, with layer/type/sources/strength), "
+            "typed weighted `edges` (`works_at`, `member_of`, `attended`, `purchased_from`, "
+            "`correlated`, `linked` — `w` ∈ (0,1]), and ordered `layers`. The efficient answer "
+            "workflow:", "",
+            "1. Resolve the entities in the question to node ids (match `title`).",
+            "2. Look up their edges; follow `works_at`/`correlated` first (highest signal), "
+            "then high-`w` edges outward 1–2 hops.",
+            "3. Read ONLY the notes on that activated path (id + `.md`), frontmatter first.",
+            "4. Cite what you used as `[[wikilinks]]`.", "",
+            "This is spreading activation over the real graph — never read all notes. "
+            "(Note: `.obsidian/graph.json` is a different file — Obsidian's own graph styling.)",
             "", "See `_DATA_POINTS.md` for the full catalog of node types and relations."]
     (brain / "_GRAPH.md").write_text("\n".join(body) + "\n", encoding="utf-8")
 
@@ -957,6 +971,11 @@ def main():
                     help="merge source/type color groups into this .obsidian/graph.json "
                          "(preserves your settings; writes a .bak) so the global graph is "
                          "colored by source + type")
+    ap.add_argument("--graph-data", action="store_true",
+                    help="(re)generate the brain's root graph.json (sbl-graph/1 typed "
+                         "node/edge dataset) by scanning the built vault — the retrofit "
+                         "path for vaults built before graph.json existed. No rebuild "
+                         "needed; deterministic; zero network.")
     args = ap.parse_args()
 
     brain = Path(args.brain).expanduser()
@@ -982,6 +1001,16 @@ def main():
     print("  ✓ _DATA_POINTS.md")
     write_graph_guide(brain)
     print("  ✓ _GRAPH.md")
+    # smart-brain layer: health self-check + graph insights + overview canvas
+    # (deterministic; suspicions labelled suspicions, nothing auto-merged)
+    try:
+        import health
+        hh = health.run(brain)
+        print(f"  ✓ _HEALTH.md/.json ({len(hh['orphans'])} orphans, "
+              f"{hh['links']['unresolved']} unresolved links) + "
+              "90-synthesis/graph-insights.md + _canvas/brain-overview.canvas")
+    except Exception as e:
+        print(f"  ! health layer skipped: {e}")
     lay = brain_layout(brain)[1]
     n = write_copilot_prompts(brain / "copilot-prompts", lay)
     print(f"  ✓ copilot-prompts/ ({n} commands)")
@@ -996,6 +1025,14 @@ def main():
             print("  ✓ " + write_graph_config(args.graph_config))
         except Exception as e:
             print(f"  ! could not write --graph-config: {e}")
+    if args.graph_data:
+        try:
+            import graphdata
+            g = graphdata.write_graph_json(brain)
+            print(f"  ✓ graph.json — {g['stats']['nodes']} nodes, "
+                  f"{g['stats']['edges']} edges, {len(g['layers'])} layers")
+        except Exception as e:
+            print(f"  ! could not write --graph-data: {e}")
     link_from_home(brain, goals)
     update_summary(brain, goals, n)         # reflect the goal layer in _SUMMARY.md
     print(f"\n✅ analyzed {len(people)} people for goals: {', '.join(goals)} → {brain}")

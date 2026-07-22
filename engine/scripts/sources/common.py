@@ -55,6 +55,22 @@ def record_write(path, text):
     MANIFEST_CTX["files"][str(rel).replace("\\", "/")] = sha256_text(text)
 
 
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def record_write_bytes(path, data: bytes):
+    """Record a generated BINARY file (e.g. an `_assets/avatars/` image) into the
+    active manifest so --refresh manages it like any generated note."""
+    if MANIFEST_CTX is None:
+        return
+    try:
+        rel = Path(path).resolve().relative_to(MANIFEST_CTX["root"])
+    except ValueError:
+        return
+    MANIFEST_CTX["files"][str(rel).replace("\\", "/")] = sha256_bytes(data)
+
+
 class SearchQuery(str):
     """A search query string that ALSO carries provenance (`source`, `date`).
     Subclassing str keeps every legacy reader working (`" ".join`, f-strings,
@@ -347,9 +363,16 @@ class Collector:
     # Default (privacy-safe): email/phone are NEVER stored; `url` (a public
     # profile link) IS kept. FULL mode (self.full): email/phone/extra ARE stored
     # too — the owner explicitly wants their complete data.
+    # avatar policy: `avatar_url` is a remote pointer the EXPORT ITSELF carried
+    # (e.g. a Slack profile image URL) — stored verbatim, NEVER fetched (zero
+    # network); Studios use it only behind an explicit opt-in toggle.
+    # `avatar_bytes` is image data bundled IN the export (e.g. a vCard PHOTO) —
+    # capped at 1MB, written to `_assets/avatars/` at render time.
+    AVATAR_MAX_BYTES = 1_000_000
+
     def add_person(self, source, name, company="", role="", date="", handle="",
                    url="", email="", phone="", extra=None, tags=None, location="",
-                   connected_on="", dept=""):
+                   connected_on="", dept="", avatar_url="", avatar_bytes=None):
         """Add/merge a person keyed by nk(name); merges across sources (first
         non-empty value wins per field). Privacy invariant: a name matching
         EMAIL_RE is dropped entirely, and email/phone/extra are stored ONLY in full
@@ -381,6 +404,9 @@ class Collector:
         location = fix_mojibake((location or "").strip())
         connected_on = iso_date(connected_on)
         dept = fix_mojibake((dept or "").strip())
+        avatar_url = (avatar_url or "").strip()
+        if avatar_bytes and len(avatar_bytes) > self.AVATAR_MAX_BYTES:
+            avatar_bytes = None            # oversized → skip, never resize (stdlib)
         if rec is None:
             self.people[key] = {
                 "name": name, "company": company, "role": role,
@@ -388,6 +414,7 @@ class Collector:
                 "url": cu, "email": email, "phone": phone, "extra": dict(extra),
                 "location": location, "connected_on": connected_on, "dept": dept,
                 "sources": {source}, "tags": set(tags),
+                "avatar_url": avatar_url, "avatar_bytes": avatar_bytes,
                 # provenance: which source first supplied each field, and any
                 # CONFLICTING later values (first-non-empty still wins, but the
                 # losing claim is preserved and rendered as "Also reported")
@@ -417,6 +444,8 @@ class Collector:
             if connected_on and not rec.get("connected_on"):
                 rec["connected_on"] = connected_on
             if cu and not rec.get("url"): rec["url"] = cu
+            if avatar_url and not rec.get("avatar_url"): rec["avatar_url"] = avatar_url
+            if avatar_bytes and not rec.get("avatar_bytes"): rec["avatar_bytes"] = avatar_bytes
             if email and not rec.get("email"): rec["email"] = email
             if phone and not rec.get("phone"): rec["phone"] = phone
             if extra:

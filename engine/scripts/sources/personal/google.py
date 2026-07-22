@@ -152,8 +152,46 @@ def _vcard_field(card, key):
     return m.group(1).strip() if m else ""
 
 
+def _vcard_photo(block):
+    """Extract an embedded PHOTO from a vCard block → (bytes|None, url).
+    Handles the folded-base64 form (`PHOTO;ENCODING=b;TYPE=JPEG:` + space-indented
+    continuation lines), the v4 `data:image/…;base64,` form, and a plain URL value
+    (returned as a url pointer, never fetched). Decode failures → (None, "")."""
+    m = re.search(r'(?im)^(?:item\d+\.)?PHOTO([^:\r\n]*):(.*)$', block)
+    if not m:
+        return None, ""
+    params, first = m.group(1) or "", m.group(2)
+    # unfold: continuation lines start with a space/tab (RFC 2425)
+    rest = []
+    for line in block[m.end():].splitlines():
+        if line[:1] in (" ", "\t"):
+            rest.append(line.strip())
+        elif line.strip():
+            break
+    val = (first.strip() + "".join(rest)).strip()
+    if not val:
+        return None, ""
+    if val.lower().startswith(("http://", "https://")):
+        return None, val
+    if "base64," in val:                         # v4 data: URI form
+        val = val.split("base64,", 1)[1]
+    elif "encoding=b" not in params.lower() and "base64" not in params.lower():
+        return None, ""
+    try:
+        import base64
+        data = base64.b64decode(re.sub(r"\s+", "", val), validate=False)
+    except Exception:
+        return None, ""
+    # sanity: recognizably an image, and non-trivial
+    if len(data) < 64 or not (data[:2] == b"\xff\xd8" or data[:4] == b"\x89PNG"
+                              or data[:3] == b"GIF"):
+        return None, ""
+    return data, ""
+
+
 def _parse_vcards(text):
-    """Yield (name, org, title) for each VCARD block that has a usable display name."""
+    """Yield (name, org, title, photo_bytes, photo_url) for each VCARD block that
+    has a usable display name. Photos are bundled export data (never fetched)."""
     for block in re.split(r'(?i)BEGIN:VCARD', text):
         if "END:VCARD" not in block.upper():
             continue
@@ -172,7 +210,8 @@ def _parse_vcards(text):
             continue                               # Collector drops these too; skip early
         org = _vcard_field(block, "ORG").split(";")[0].strip()
         title = _vcard_field(block, "TITLE")
-        yield name, org, title
+        photo, purl = _vcard_photo(block)
+        yield name, org, title, photo, purl
 
 
 def _ics_unescape(s):
@@ -264,8 +303,9 @@ def extract(root, file_index, all_paths, col):
                 continue
             if "BEGIN:VCARD" not in text.upper():
                 continue  # not a vCard after all → let the harvester try it
-            for name, org, title in _parse_vcards(text):
-                col.add_person(NAME, name, org, title)
+            for name, org, title, photo, purl in _parse_vcards(text):
+                col.add_person(NAME, name, org, title,
+                               avatar_bytes=photo, avatar_url=purl)
                 if org:
                     col.add_org(NAME, org, "contact-org")
                 pc += 1

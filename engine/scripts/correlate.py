@@ -161,6 +161,43 @@ def build_correlations(collectors, out, provider="claude"):
             lines.append(f"- **{a}** —{pred}→ **{b}**{d}")
         _write(out / "edges.md", "\n".join(lines))
 
+    # ---- graph.json (sbl-graph/1) — the cross-brain typed-edge dataset ------
+    # Node ids are _correlations-relative note paths; cross-vault endpoints use
+    # the same ../<kind>/<entity>-brain/<layer>/<Title> relative form the note
+    # bodies link with, so a multi-vault Studio view can resolve them.
+    import json as _json
+    g_nodes, g_edges = [], []
+    for key, info in cross_people:
+        name = next((a[3].get("name") for a in info["appear"] if a[3].get("name")), key)
+        nid = f"people/{obsidian_name(name)}"
+        g_nodes.append({"id": nid, "path": nid + ".md", "title": obsidian_name(name),
+                        "layer": "correlations", "type": "correlation-person",
+                        "appears_in": sorted({a[0] for a in info["appear"]})})
+        for ent, kind, vault, r in info["appear"]:
+            if vault:
+                target = (f"../{vault.parent.name}/{vault.name}/10-people/"
+                          f"{obsidian_name(name)}")
+                g_edges.append({"a": nid, "b": target, "type": "correlated",
+                                "w": 1.0, "src": ent})
+    for key, v in cross_orgs:
+        name = v["appear"][0][3]
+        nid = f"orgs/{obsidian_name(name)}"
+        g_nodes.append({"id": nid, "path": nid + ".md", "title": obsidian_name(name),
+                        "layer": "correlations", "type": "correlation-org",
+                        "referenced_by": sorted({a[0] for a in v["appear"]})})
+    for a, pred, b, detail in sorted(set(edges)):
+        g_edges.append({"a": a, "b": b, "type": pred, "w": 1.0,
+                        **({"src": detail} if detail else {})})
+    graph = {"schema": "sbl-graph/1", "subject": "correlations",
+             "entity": "_correlations", "generated": "",
+             "layers": [{"key": "correlations", "folder": "", "label": "Correlations",
+                         "count": len(g_nodes), "sources": {}}],
+             "nodes": sorted(g_nodes, key=lambda n: n["id"]),
+             "edges": sorted(g_edges, key=lambda e: (e["a"], e["b"], e["type"])),
+             "stats": {"nodes": len(g_nodes), "edges": len(g_edges),
+                       "cross_source_edges": len(g_edges)}}
+    _write(out / "graph.json", _json.dumps(graph, ensure_ascii=False, indent=1))
+
     # ---- Home + guide ------------------------------------------------------
     guides = {"claude": "CLAUDE.md", "openai": "AGENTS.md"}
     home = [_fm({"type": "moc", "title": "Correlations", "tags": ["moc", "correlation"],
