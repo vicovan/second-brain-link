@@ -18,3 +18,20 @@ jobs:
           test -f providers/openai/SKILL.md
       - name: Skill packages cleanly for both providers
         run: python3 packaging/build_skill.py all
+      - name: Plugins are present and self-describing
+        run: |
+          test -f plugins/README.md
+          test -f plugins/job-search/.claude-plugin/plugin.json
+          test -f plugins/job-search/providers/openai/SKILL.md
+          test -f plugins/job-search/studio.json
+          test -f plugins/job-search/studio/grounding.md
+      - name: Plugins package cleanly for both providers
+        run: python3 packaging/build_plugin.py all --provider all
+      - name: Engine skill must not bundle plugins (zero-network promise)
+        run: |
+          python3 - <<'EOF'
+          import sys, zipfile
+          bad = [n for n in zipfile.ZipFile("dist/claude/second-brain-link.skill").namelist()
+                 if "plugins/" in n]
+          sys.exit("engine skill bundles plugins: %s" % bad[:3] if bad else 0)
+          EOF

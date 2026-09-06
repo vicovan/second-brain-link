@@ -1,0 +1,23 @@
+# OpenAI Codex Agent Skill metadata (optional, alongside SKILL.md).
+# Codex discovers skills from .agents/skills/ (repo) and ~/.agents/skills/ (user).
+interface:
+  display_name: Job Search
+  # Codex may pick this skill implicitly when a task matches SKILL.md's description.
+  allow_implicit_invocation: true
+policy:
+  # NOT "none", unlike the second-brain-link engine skill. Job discovery reads public,
+  # unauthenticated job-board APIs (Greenhouse, Lever, Ashby) and fetches individual
+  # postings. Saying otherwise here would be a false claim about what this runs.
+  network: outbound
+  network_hosts:
+    - boards-api.greenhouse.io
+    - api.lever.co
+    - api.ashbyhq.com
+    - www.ycombinator.com
+dependencies:
+  runtime: python3
+  python: ">=3.9"
+  # Optional: without reportlab the CV is produced as Markdown and the PDF step is
+  # skipped with a notice, rather than failing.
+  pip_optional:
+    - reportlab

@@ -1,0 +1,30 @@
+# A plugin's CODE is tracked. A user's DATA never is.
+#
+# The state root normally lives outside this tree entirely (see job-search/README.md),
+# but a user who runs the plugin from inside this repository would otherwise produce
+# untracked-but-stageable output right here. Belt and braces.
+
+# ledgers and rendered layers
+45-jobs/
+_state/
+JobData/
+seen.json
+brain-path.txt
+companies.txt
+ats_pool.json
+last-run.txt
+snooze.txt
+nudged.txt
+lessons.md
+*.jsonl
+
+# generated CVs and reports
+*.pdf
+*.docx
+reports/
+applications/
+
+# python + os noise
+__pycache__/
+*.pyc
+.DS_Store

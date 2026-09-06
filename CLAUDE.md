@@ -62,6 +62,21 @@ intelligence for founders raising and for sales/BD.
 5. **Engine canonical & in sync.** The one source of truth is `engine/`. After
    editing it, repackage + install (§11). Never fork the engine per provider —
    providers are just `providers/<p>/SKILL.md`.
+   **`plugins/` is a separate distribution surface, not engine payload.** The engine
+   BUILDS a brain (deterministic, stdlib-only, zero network); a plugin USES one to do
+   work and may reach the network if it declares that in its own
+   `.claude-plugin/plugin.json`. `build_skill.py` deliberately does not copy `plugins/`,
+   so principle #1 above stays literally true of everything the skill ships;
+   `packaging/build_plugin.py` zips each plugin separately, and — like the engine —
+   in **two packagings from one source**: `claude` (the plugin as authored, loaded with
+   `--plugin-dir`) and `openai` (FLATTENED into one self-contained Codex skill, because
+   Codex discovers skills from `~/.agents/skills/` and has no plugin concept; scripts
+   collapse into one `scripts/`, each skill's SKILL.md becomes `references/<skill>.md`,
+   and `${CLAUDE_PLUGIN_ROOT}/skills/<s>/scripts/` is rewritten to `scripts/`). The
+   flatten is only safe while no two skills share a script/reference basename — the
+   builder refuses the build on a collision and `tests/run.py` checks the built archive. Note the word collision:
+   "plugin" in the README/SKILL prose still means an **Obsidian community plugin** (the
+   vault needs none) — see `plugins/README.md`.
 6. **Obsidian-native output, plug-and-play.** See §7. Filenames == note titles,
    quoted wikilinks in properties, ISO dates, Properties/tags, a Home MOC, a real
    graph. No plugins required.
@@ -268,12 +283,22 @@ second-brain-link/
 ├── providers/                    # thin per-provider manifests (Agent Skills standard)
 │   ├── claude/SKILL.md
 │   └── openai/SKILL.md + agents/openai.yaml   # Codex metadata
+├── plugins/                      # capability packs that USE a brain (see plugins/README.md)
+│   ├── README.md                 #   the contract; why plugins are not engine payload
+│   ├── .gitignore                #   a user's ledger can never be staged from here
+│   └── job-search/               #   first plugin: sweep ATS boards → tailor CV → apply → 45-jobs/
+│       ├── .claude-plugin/plugin.json   #   identity + the network declaration
+│       ├── providers/openai/     #   the Codex packaging's manifest (+ agents/openai.yaml)
+│       ├── studio.json + studio/grounding.md   #   makes it the Jobs Agent in Studio
+│       ├── commands/  skills/{job-onboarding,job-scout,cv-tailor,job-apply,job-pipeline}/
+│       └── docs/scheduling.md
 ├── packaging/build_skill.py      # assembles engine + a manifest → dist/<provider>/…
+├── packaging/build_plugin.py     # a plugin → dist/plugins/{claude/<n>.zip, openai/<n>.skill}
 ├── dist/
 │   ├── claude/second-brain-link.skill     # committed installable (unpacked folder git-ignored)
 │   └── openai/second-brain-link.skill
 ├── tests/
-│   ├── run.py                    # stdlib test harness (currently 609 checks)
+│   ├── run.py                    # stdlib test harness (currently 667 checks)
 │   └── fixtures/{personal,company}/<entity>/<source>/   # synthetic exports
 └── .github/                      # CI + issue/PR templates
 ```
@@ -292,7 +317,10 @@ languages) · `10-people/` (one merged note per person) · `15-organizations/` �
 (inferences, ad-profile) · `60-learning/` · `70-services/` · `80-search/` ·
 **`85-places/`** (saved/reviewed/checked-in locations) · `90-synthesis/` (network-map,
 target-companies, positions-i-hold [draft], positioning-gaps [draft]) ·
-`_notes/` (YOURS — never regenerated) · `99-uncategorized/` · `_quarantine/`. **Company brains use company-named folders** for the middle layers (20-brand, 30-content, 35-procurement, 40-pipeline w/ one note per deal, 50-market-view, 60-knowledge w/ meetings.md, 70-support, 80-signals, 85-locations) — driven by `mappings/brain/layout.json` `variants` via `VaultWriter.L(key)` (never hardcode a layer folder). Full field reference: `docs/ENTITY-MAP.md`.
+`_notes/` (YOURS — never regenerated) · `99-uncategorized/` · `_quarantine/`.
+**`45-jobs/` (person) / `45-hiring/` (company)** is registered as the `jobs` layer key but is
+**written by the `job-search` plugin, not the builder** — the engine only knows the name so the
+tree, graph and dashboard render it when present (the same arrangement as analyze's `95-goals`). **Company brains use company-named folders** for the middle layers (20-brand, 30-content, 35-procurement, 40-pipeline w/ one note per deal, 50-market-view, 60-knowledge w/ meetings.md, 70-support, 80-signals, 85-locations) — driven by `mappings/brain/layout.json` `variants` via `VaultWriter.L(key)` (never hardcode a layer folder). Full field reference: `docs/ENTITY-MAP.md`.
 
 **`graph.json` (schema `sbl-graph/1`)** is ALWAYS written at each brain root (+
 `_correlations/graph.json`): the machine-readable typed graph — `nodes` (id = note path
@@ -446,7 +474,7 @@ structure tags adapters emit).
 Real-world validation build (IG + Google Maps + LinkedIn + **Facebook**, `--full`): cross-source
 merge verified, `source/*` tags on every note, `_STRUCTURE.md`/`_DATA_POINTS.md`/`_GRAPH.md`
 present, default-mode PII sweep clean. Both providers package + install + run end-to-end.
-`tests/run.py` → **609 checks, 0 failed** (selector mini-language, mapping-wins,
+`tests/run.py` → **667 checks, 0 failed** (selector mini-language, mapping-wins,
 IG/Google fixture build, places + review note, harvester rescue, multi-entity 3-brain
 build, cross-person note, `works_at` edge, negative no-merge, multi-vault PII sweep, Codex
 `agents/openai.yaml` + `--install`, two-sibling-vault split, **Facebook full mapping +
@@ -500,7 +528,7 @@ S=engine/scripts
 
 # build: every entity under data/ → one brain each + _correlations/
 python3 $S/build_vault.py data -o vault
-python3 $S/build_vault.py data -o vault --refresh   # UPDATE in place (v1.5): keeps your notes/edits
+python3 $S/build_vault.py data -o vault --refresh   # UPDATE in place (v1): keeps your notes/edits
 python3 $S/build_vault.py data/personal/<id>/linkedin -o vault/my-brain   # one source
 python3 $S/build_vault.py data --dry-run                                  # detect only
 python3 $S/build_vault.py data -o vault --provider openai --emit both --full
@@ -513,8 +541,15 @@ python3 $S/profile_export.py data --out vault/_profile
 python3 packaging/build_skill.py all --install
 #   claude → ~/.claude/skills/   openai → ~/.agents/skills/
 
+# package a plugin (separate surface — NOT bundled into the engine skill)
+python3 packaging/build_plugin.py all                    # both providers
+#   claude → dist/plugins/claude/<name>.zip   (load with --plugin-dir)
+#   openai → dist/plugins/openai/<name>.skill (flattened Codex skill)
+python3 packaging/build_plugin.py job-search --provider openai --install   # → ~/.agents/skills/
+claude --plugin-dir plugins/job-search                   # or load straight from source
+
 # test (stdlib only; must stay green)
-python3 tests/run.py            # → 609 passed, 0 failed
+python3 tests/run.py            # → 667 passed, 0 failed
 ```
 **Testing approach:** synthetic exports under
 `tests/fixtures/{personal,company}/<entity>/<source>/`; assert valid YAML on every
@@ -527,8 +562,14 @@ rescue. Never commit a real export or vault.
 ## 12. Roadmap / open questions
 **Roadmap:**
 - ✓ v1 sources shipped: X, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok + Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email(mbox), Microsoft 365, Teams. Next: Pinterest/Goodreads/Letterboxd/Netflix + Contacts(.vcf)/Calendar(.ics) light seeds (see docs-sources catalog).
-- Sharper entity resolution + stable IDs (below).
-- ✓ v1.5 SHIPPED: `--refresh` idempotent re-import (manifest + stable note IDs + collector dedupe); Studio reseed offers Update vs Rebuild.
+- **v1.2 — sharper entity resolution + stable IDs: NOT shipped, still roadmap** (below). This
+  line was correct all along; `deck/YC/SBL-Deck-FACTS.md` briefly claimed the opposite and was
+  corrected 2026-08-20. Resolution today is **name-only** (`nk()` exact match; orgs merge on bare
+  `nk(name)` with no guard). Tracked as workstream **W-E1**.
+- ✓ **SHIPPED — local `--refresh` idempotent re-import** (manifest + stable note IDs + collector
+  dedupe); Studio reseed offers Update vs Rebuild. **Label corrected 2026-08-20: this is v1, not
+  v1.5.** The workspace adopts the root `CLAUDE.md` numbering, which reserves **v1.5 for the
+  hosted/scheduled managed sync** — still roadmap, and the paid cloud product.
 - v2: agentic twin (meeting prep, drafting in voice, relationship-revival nudges).
 - Live `gbrain import` validation once a `gbrain` runtime is available.
 
@@ -540,5 +581,5 @@ rescue. Never commit a real export or vault.
   (we don't store it). This is the pending **entity-resolution upgrade**.
 - **FB/IG/Google/company formats drift** across versions/regions; prefer widening
   detection + a mapping/harvester catch-all over brittle exact-path assumptions.
-- ✓ SOLVED (v1.5): `--refresh` updates an existing vault in place — manifest (`_GENERATED.json`) three-way sync; user notes/edits preserved (conflicts → `*.new.md` + `_UPDATE_REPORT.md`), stale unedited notes pruned, `_notes/` never touched.
+- ✓ SOLVED (v1): `--refresh` updates an existing vault in place — manifest (`_GENERATED.json`) three-way sync; user notes/edits preserved (conflicts → `*.new.md` + `_UPDATE_REPORT.md`), stale unedited notes pruned, `_notes/` never touched.
 - Distribution: GitHub Releases for the `.skill` files? A marketplace listing?

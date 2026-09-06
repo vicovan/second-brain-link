@@ -1,0 +1,7 @@
+# Required for PDF output (cv-tailor/scripts/build_cv.py).
+# Without it the CV is still produced as Markdown; only the PDF step is skipped.
+reportlab>=4.0
+
+# Optional.
+# pypdf        - fallback PDF text extraction when poppler's pdftotext is not on PATH
+# python-docx  - only for `build_cv.py --docx`

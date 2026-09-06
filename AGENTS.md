@@ -79,3 +79,15 @@ The engine is the source of truth. After editing `engine/`, rebuild the installa
 with `python3 packaging/build_skill.py all` (or `… all --install` to copy into the
 provider discovery dirs), and keep `tests/run.py` green (`python3 tests/run.py`).
 Never fork the engine per provider.
+
+## Plugins
+
+`plugins/` is a separate surface from `engine/`. The engine BUILDS a brain (deterministic,
+stdlib-only, zero network); a plugin USES one to do work and may reach the network if its
+`.claude-plugin/plugin.json` declares it. `packaging/build_skill.py` never bundles
+`plugins/` — that is what keeps the engine's zero-network claim true of everything the
+skill ships. Build plugins with `packaging/build_plugin.py` (`--provider claude|openai|all`);
+the Codex packaging is a FLATTENED single skill installed to `~/.agents/skills/`.
+
+A plugin must never write user data inside the plugin folder or this repository, never
+hardcode a vault layer folder, and never ship anything personal. See `plugins/README.md`.

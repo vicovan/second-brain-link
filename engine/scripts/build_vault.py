@@ -253,7 +253,7 @@ def keywords(text, n=20):
 _LAYERS_PERSON = {
     "root": "00-me", "people": "10-people", "orgs": "15-organizations",
     "reputation": "20-reputation", "voice": "30-voice", "shopping": "35-shopping",
-    "career": "40-career",
+    "career": "40-career", "jobs": "45-jobs",
     "mirror": "50-mirror", "learning": "60-learning", "services": "70-services",
     "search": "80-search", "places": "85-places", "synthesis": "90-synthesis",
     "uncategorized": "99-uncategorized", "quarantine": "_quarantine",
@@ -262,7 +262,7 @@ _LAYERS_PERSON = {
 _LAYERS_COMPANY = {
     "root": "00-org", "people": "10-people", "orgs": "15-organizations",
     "reputation": "20-brand", "voice": "30-content", "shopping": "35-procurement",
-    "career": "40-pipeline",
+    "career": "40-pipeline", "jobs": "45-hiring",
     "mirror": "50-market-view", "learning": "60-knowledge", "services": "70-support",
     "search": "80-signals", "places": "85-locations", "synthesis": "90-synthesis",
     "uncategorized": "99-uncategorized", "quarantine": "_quarantine",
@@ -284,6 +284,8 @@ _LAYER_ROLE_TEXT = {
                  "PROCUREMENT — vendor spend: purchases and subscriptions (one note each)."),
     "career": ("Applications log, job-seeker preferences, saved jobs, reusable answers.",
                "PIPELINE — deals and campaigns from the CRM (one note per deal)."),
+    "jobs": ("JOB SEARCH — written by the job-search plugin, not the builder: shortlists, one folder per application, tailored CVs.",
+             "HIRING — written by the job-search plugin, not the builder: open roles, candidates and application records."),
     "mirror": ("HOW THE ALGORITHMS SEE YOU — inferences + ad-targeting segments (fed by the mirror/ad_segment emits).",
                "MARKET VIEW — how platforms/audiences model the org: follower/visitor demographics, segments."),
     "learning": ("Courses/coaching + events.",

@@ -1,0 +1,71 @@
+{
+  "id": "job-search",
+  "label": "Jobs Agent",
+  "blurb": "Sweeps open ATS boards against your criteria, tailors a CV per role, and fills the application.",
+  "icon": "briefcase",
+  "grounding": "studio/grounding.md",
+  "entrySkill": "job-pipeline",
+  "layer": "45-jobs",
+  "homeNote": "45-jobs/reports/Shortlist {date}.md",
+  "homeNoteFallback": "45-jobs/Job Dashboard.md",
+  "watchGlob": "45-jobs/**",
+  "tools": [
+    "Skill",
+    "Agent",
+    "mcp__claude-in-chrome__*"
+  ],
+  "chrome": true,
+  "requires": {
+    "profile": "45-jobs/profile/profile.md",
+    "onboardSkill": "job-onboarding"
+  },
+  "providers": [
+    "claudecode"
+  ],
+  "color": "#3e6ae1",
+  "suggestions": [
+    {
+      "t": "Set me up",
+      "q": "Set up my job-search profile. Ask me the onboarding questions — target roles, geography, compensation floor, hard exclusions and my settled application answers — pulling whatever you can from this brain and my CV first, so you only ask what you genuinely cannot find."
+    },
+    {
+      "t": "Launch a job search",
+      "q": "Launch a job search: sweep the open ATS boards against my criteria, score everything against my rubric, drop what I can't actually apply to, and give me today's ranked shortlist with comp and the apply route for each."
+    },
+    {
+      "t": "Tailor my CV for a job",
+      "q": "Tailor my CV for a specific job description and build the PDF. I'll paste the job description or the posting URL next — mirror the title, lead with the keywords that matter, and keep every claim true to my profile."
+    },
+    {
+      "t": "Apply and fill the form",
+      "q": "Apply to a role from the shortlist: resolve it to the employer's own ATS form, open it in my browser, fill every field from my profile and answers, verify each one in the DOM, then finish the way my autonomy setting says — submit it, or show me a short review and wait."
+    },
+    {
+      "t": "How is the pipeline doing?",
+      "q": "Show me the KPI: applications actually submitted, shortlist conversion, what got blocked and why, and what the outcomes so far say I should change."
+    }
+  ],
+  "settings": {
+    "title": "Jobs Agent settings",
+    "blurb": "Files the agent reads when it builds and tailors your CV. They live in your brain, in the job-search profile — nothing is uploaded anywhere.",
+    "files": [
+      {
+        "id": "cv",
+        "label": "Your current CV",
+        "hint": "PDF, DOCX, Markdown or plain text. Onboarding reads this to fill your profile, and the tailorer uses it as the source of truth for your history.",
+        "dest": "45-jobs/profile/cv",
+        "accept": [
+          ".pdf",
+          ".docx",
+          ".doc",
+          ".md",
+          ".markdown",
+          ".txt",
+          ".rtf",
+          ".odt"
+        ],
+        "multiple": true
+      }
+    ]
+  }
+}

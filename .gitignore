@@ -37,6 +37,11 @@ dist/**
 !dist/
 !dist/*/
 !dist/**/*.skill
+# plugins are a separate distribution surface — track their installable archives too
+# (one per provider: dist/plugins/claude/<name>.zip, dist/plugins/openai/<name>.skill;
+# the unpacked dist/plugins/openai/<name>/ build tree stays ignored, like the engine's)
+!dist/plugins/**/*.zip
+!dist/plugins/**/*.skill
 
 # Stray exports / per-build artifacts anywhere else
 *.zip

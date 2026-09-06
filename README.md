@@ -550,6 +550,29 @@ Every network you own is just one more link.
 
 ---
 
+## Plugins — make the brain do work
+
+The engine **builds** a brain. A **plugin** uses one to do something.
+
+`plugins/` holds capability packs that read your vault, act, and write the results back
+as a normal vault layer. They are a separate distribution surface: the engine skill never
+bundles them, so its zero-network guarantee stays true of everything it ships, and each
+plugin declares its own network use in its manifest.
+
+| Plugin | What it does |
+|---|---|
+| [`job-search`](plugins/job-search/) | Sweeps open ATS boards against criteria you set, scores and shortlists, tailors an ATS-first CV per role, and keeps the whole pipeline in a `45-jobs/` layer of your vault |
+
+```bash
+python3 packaging/build_plugin.py job-search              # both providers
+claude --plugin-dir plugins/job-search                    # Claude Code
+python3 packaging/build_plugin.py job-search --provider openai --install   # Codex
+```
+
+Nothing personal ships in a plugin: everything it knows about you comes from files its
+own onboarding writes into your vault. See [`plugins/README.md`](plugins/README.md) for
+the contract.
+
 ## Contributing
 
 The most valuable contribution right now: run it on **your real export** and open an issue if any file or column didn't map cleanly (the `schema_map.md` it generates is exactly what we need to see). Parser robustness across the long tail of real accounts is how this gets great. See `CONTRIBUTING.md`.

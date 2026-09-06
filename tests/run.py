@@ -865,6 +865,233 @@ def test_layout_v2():
     check("layout2: no hardcoded layer folders in builder", not hard, str(hard))
 
 
+def test_plugins():
+    """plugins/ — the capability-pack surface. Structural guards only.
+
+    A test that grepped for the author's real name, employer or salary would have to
+    CONTAIN them, which is exactly what must not be in this repo. So the personal-needle
+    sweep is a local pre-commit step; what CI enforces is the structure that makes a
+    leak unlikely and a plugin portable.
+    """
+    plugins = REPO / "plugins"
+    if not plugins.is_dir():
+        return
+    names = sorted(d.name for d in plugins.iterdir()
+                   if d.is_dir() and (d / ".claude-plugin" / "plugin.json").is_file())
+    check("plugins: at least one plugin present", bool(names), str(names))
+    check("plugins: job-search is present", "job-search" in names, str(names))
+
+    # --- job-search specifics -------------------------------------------------
+    js = plugins / "job-search"
+    if js.is_dir():
+        learn = (js / "skills/job-scout/scripts/learn.py").read_text(encoding="utf-8")
+        render = (js / "skills/job-scout/scripts/render_brain.py").read_text(encoding="utf-8")
+        import re as _re0
+        statuses = set(_re0.findall(r"\"([a-z_]+)\"",
+                                    _re0.search(r"STATUSES = \[(.*?)\]", learn, _re0.S).group(1)))
+        glyphs = set(_re0.findall(r"\"([a-z_]+)\":",
+                                  _re0.search(r"STATUS_GLYPH = \{(.*?)\}", render, _re0.S).group(1)))
+        # An application can only be RENDERED in a state the writer can RECORD. When
+        # "filled" existed as a glyph but not as a status, an application that was built
+        # and filled but not yet sent could not be logged, so it never reached the vault.
+        results = set(_re0.findall(r"\"([a-z_]+)\"",
+                                   _re0.search(r"RESULTS = \[(.*?)\]", learn, _re0.S).group(1)))
+        vocab = statuses | results
+        missing = sorted(g for g in glyphs if g not in vocab and not g.startswith("skipped"))
+        check("job-search: every rendered status can be logged", not missing, str(missing))
+
+        # Auto-submit is opt-in. The shipped template must not arrive set to autonomous:
+        # a stranger installing this from the repo would find it applying in their name.
+        tmpl = (js / "skills/job-onboarding/references/answers-template.md").read_text(encoding="utf-8")
+        check("job-search: answers template defaults to supervised",
+              "level: supervised" in tmpl and "level: autonomous" not in tmpl.split("```")[1])
+
+    import json as _json
+    for name in names:
+        root = plugins / name
+        meta = _json.loads((root / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        for key in ("name", "version", "description", "license"):
+            check(f"{name}: plugin.json has {key}", bool(meta.get(key)))
+        check(f"{name}: plugin.json name matches folder", meta.get("name") == name,
+              f"{meta.get('name')} != {name}")
+        check(f"{name}: README.md present", (root / "README.md").is_file())
+
+        # A plugin that reaches the network declares it — the engine's zero-network
+        # promise stays true because plugins are a separate surface that says so.
+        py = " ".join(f.read_text(encoding="utf-8", errors="replace")
+                      for f in root.rglob("*.py"))
+        if "urllib.request" in py or "http.client" in py:
+            net = meta.get("network") or {}
+            check(f"{name}: network use is declared in plugin.json", bool(net.get("required")))
+            check(f"{name}: network declaration lists endpoints", bool(net.get("endpoints")))
+
+        # Every SKILL.md obeys the repo's frontmatter rules (§8).
+        skills = sorted((root / "skills").glob("*/SKILL.md")) if (root / "skills").is_dir() else []
+        check(f"{name}: has skills", bool(skills), str(len(skills)))
+        for sk in skills:
+            txt = sk.read_text(encoding="utf-8")
+            check(f"{name}/{sk.parent.name}: frontmatter present", txt.startswith("---\n"))
+            fm = txt[4:txt.index("\n---\n", 4)] if "\n---\n" in txt else ""
+            desc = [l for l in fm.split("\n") if l.startswith("description:")]
+            check(f"{name}/{sk.parent.name}: has description", bool(desc))
+            if desc:
+                val = desc[0].split("description:", 1)[1].strip()
+                check(f"{name}/{sk.parent.name}: description < 1024", len(val) < 1024, str(len(val)))
+                check(f"{name}/{sk.parent.name}: no bare colon in description", ": " not in val)
+            check(f"{name}/{sk.parent.name}: declares allowed-tools",
+                  any(l.startswith("allowed-tools:") for l in fm.split("\n")))
+
+        # Portability + privacy guards across every text file in the plugin.
+        import re as _re, ast as _ast
+        bad_path, bad_state, bad_pronoun, bad_date = [], [], [], []
+        for f in root.rglob("*"):
+            if not f.is_file() or f.suffix not in (".md", ".py", ".sh", ".json", ".txt"):
+                continue
+            body = f.read_text(encoding="utf-8", errors="replace")
+            rel = f.relative_to(root)
+            # A home-relative install path is a leftover when it is baked into CODE, and
+            # documentation when the README names where `--install` puts things — which it
+            # has to, since Studio reads that same location and ships no copy of its own.
+            # An ABSOLUTE path is one machine's, and is never right anywhere.
+            install_doc = str(rel) == "README.md"
+            if "/Users/" in body or (
+                not install_doc
+                and ("~/.claude/skills/" in body or "~/.agents/skills/" in body)
+            ):
+                bad_path.append(str(rel))
+            # "<state root>" is fine as prose in a docstring or comment. As a real
+            # string literal it is a find-replace artifact that silently resolves to
+            # a nonexistent directory — the exact bug this guard exists to catch.
+            if f.suffix == ".py":
+                try:
+                    tree = _ast.parse(body)
+                    docs = {id(_ast.get_docstring(n, clean=False))
+                            for n in _ast.walk(tree)
+                            if isinstance(n, (_ast.Module, _ast.FunctionDef,
+                                              _ast.AsyncFunctionDef, _ast.ClassDef))}
+                    for node in _ast.walk(tree):
+                        if (isinstance(node, _ast.Constant) and isinstance(node.value, str)
+                                and "<state root>" in node.value
+                                and id(node.value) not in docs):
+                            bad_state.append(f"{rel}:{node.lineno}")
+                except SyntaxError:
+                    pass
+            if _re.search(r"\b(he|his|him|himself)\b", body, _re.I):
+                bad_pronoun.append(str(rel))
+            for m in _re.findall(r"20\d\d-\d\d-\d\d", body):
+                if m != "2026-01-15":          # the one neutral example date
+                    bad_date.append(f"{rel}:{m}")
+        check(f"{name}: no absolute or install-specific paths", not bad_path, str(bad_path))
+
+        # The application layout is DATED. A doc still describing the flat
+        # applications/<job_key>/ shape sends the model to a folder the renderer no
+        # longer writes, which is how an application became invisible in the vault.
+        flat = [f"{f.relative_to(root)}:{i + 1}"
+                for f in root.rglob("*.md") if f.is_file()
+                for i, line in enumerate(f.read_text(encoding="utf-8", errors="replace").split("\n"))
+                if "applications/<job_key>" in line]
+        check(f"{name}: applications paths are dated, not flat", not flat, str(flat))
+        check(f"{name}: no placeholder tokens left in code", not bad_state, str(bad_state))
+        check(f"{name}: no gendered pronouns", not bad_pronoun, str(bad_pronoun))
+        check(f"{name}: no run-history datestamps", not bad_date, str(bad_date[:5]))
+
+        # Two SHAPES that a real de-personalisation leak took, caught structurally so
+        # this file never has to contain the words it is guarding against.
+        #
+        # 1. A named attribution in prose — `- Pipedrive: "…"`. A reference file's
+        #    examples come from the shipped fictional persona; a real company credited
+        #    by name beside a quote means the example came from someone's actual run.
+        # 2. A bold placeholder — `**<current employer>**`. Replacing the NAME while
+        #    leaving the description beside it does not redact anything, and the
+        #    emphasis is the tell: a table cell that had to be filled in from a life.
+        attrib, boldph = [], []
+        for f in sorted((root / "skills").rglob("references/*.md")) if (root / "skills").is_dir() else []:
+            for i, line in enumerate(f.read_text(encoding="utf-8", errors="replace").split("\n")):
+                if _re.match(r"\s*-\s+[A-Z][A-Za-z]+:\s*\*?\"", line):
+                    attrib.append(f"{f.relative_to(root)}:{i + 1}")
+                if _re.search(r"\*\*<[a-z][a-z0-9 -]*>\*\*", line):
+                    boldph.append(f"{f.relative_to(root)}:{i + 1}")
+        check(f"{name}: no named attributions in reference examples", not attrib, str(attrib))
+        check(f"{name}: no bold placeholders in reference tables", not boldph, str(boldph))
+
+        # A user's ledger must never be committed. __pycache__ is excluded here on
+        # purpose: simply RUNNING the plugin creates it, and both plugins/.gitignore
+        # and build_plugin.py already drop it — failing the suite for a local run
+        # would train people to ignore this check, which is the opposite of the point.
+        leaks = [str(f.relative_to(root)) for f in root.rglob("*")
+                 if f.is_file()
+                 and "__pycache__" not in f.parts
+                 and (f.suffix in (".pdf", ".jsonl", ".docx")
+                      or f.name in ("seen.json", "brain-path.txt", ".DS_Store"))]
+        check(f"{name}: no user state committed", not leaks, str(leaks))
+
+        # Never hardcode a layer folder — resolve it, as the engine does.
+        hard = []
+        for f in root.rglob("*.py"):
+            # paths.py is the plugin's own resolver: the folder names are DEFINED there,
+            # exactly as the engine defines them in layout_for()'s fallback block, which
+            # that guard exempts too. Everywhere else must go through layer(brain, key).
+            if f.name == "paths.py":
+                continue
+            for m in _re.findall(r'"(\d\d-[a-z]+)"', f.read_text(encoding="utf-8", errors="replace")):
+                hard.append(f"{f.relative_to(root)}:{m}")
+        check(f"{name}: no stray layer-folder literals", not hard, str(hard))
+
+        # A Studio agent needs its grounding file to actually exist.
+        sj = root / "studio.json"
+        if sj.is_file():
+            s = _json.loads(sj.read_text(encoding="utf-8"))
+            for key in ("id", "label", "grounding", "entrySkill", "layer"):
+                check(f"{name}: studio.json has {key}", bool(s.get(key)))
+            check(f"{name}: studio grounding file exists", (root / s["grounding"]).is_file(),
+                  s.get("grounding", ""))
+            check(f"{name}: studio entrySkill exists",
+                  (root / "skills" / s["entrySkill"] / "SKILL.md").is_file(), s.get("entrySkill", ""))
+
+    # Both packagings of every plugin must build, and must not carry each other's
+    # manifest. The openai one is FLATTENED (Codex has no plugin concept), so it is
+    # also where a script- or reference-name collision would first show up.
+    for name in names:
+        root = plugins / name
+        if not (root / "providers" / "openai" / "SKILL.md").is_file():
+            continue
+        oz = REPO / "dist" / "plugins" / "openai" / (name + ".skill")
+        cz = REPO / "dist" / "plugins" / "claude" / (name + ".zip")
+        import zipfile as _zf2
+        if oz.is_file():
+            n = _zf2.ZipFile(oz).namelist()
+            check(f"{name}: openai packaging has a flat scripts/",
+                  any(x.startswith(name + "/scripts/") for x in n))
+            check(f"{name}: openai packaging has a SKILL.md",
+                  (name + "/SKILL.md") in n)
+            check(f"{name}: openai packaging routes to workflow references",
+                  any(x.startswith(name + "/references/job-") for x in n))
+            check(f"{name}: openai packaging drops the plugin-root variable",
+                  not any("CLAUDE_PLUGIN_ROOT" in
+                          _zf2.ZipFile(oz).read(x).decode("utf-8", "replace")
+                          for x in n if x.endswith((".md", ".sh"))))
+            check(f"{name}: openai packaging carries no claude manifest",
+                  not any(".claude-plugin" in x for x in n))
+        if cz.is_file():
+            n = _zf2.ZipFile(cz).namelist()
+            check(f"{name}: claude packaging carries no openai manifest",
+                  not any("/providers/" in x for x in n))
+
+    # The engine skill must NOT carry plugins — that is what keeps its zero-network
+    # promise true and verifiable.
+    skill_zip = REPO / "dist" / "claude" / "second-brain-link.skill"
+    if skill_zip.is_file():
+        import zipfile as _zf
+        with _zf.ZipFile(skill_zip) as z:
+            inside = [n for n in z.namelist() if "plugins/" in n]
+        check("plugins: engine .skill does not bundle plugins", not inside, str(inside[:3]))
+
+    # The layer key resolves per subject and is never hardcoded by a plugin.
+    import build_vault as _bv
+    check("plugins: jobs layer key resolves (person)", _bv.layout_for("person")["jobs"] == "45-jobs")
+    check("plugins: jobs layer key resolves (company)", _bv.layout_for("company")["jobs"] == "45-hiring")
+
+
 def test_refresh_v2():
     """M3 incremental updates: --refresh preserves user notes and edits, updates
     unedited engine notes, adds new data, removes stale unedited notes, and a
@@ -1276,7 +1503,7 @@ def test_google_takeout_subsources():
     place-list CSV, YouTube subscriptions + search-history HTML — across a Takeout
     tree — landing in the right layers with PII clean in default mode."""
     with tempfile.TemporaryDirectory() as d:
-        g = Path(d) / "personal" / "adi" / "google" / "Takeout"
+        g = Path(d) / "personal" / "john" / "google" / "Takeout"
         (g / "Contacts").mkdir(parents=True)
         (g / "Calendar").mkdir()
         (g / "Maps" / "My labeled places").mkdir(parents=True)
@@ -1295,7 +1522,7 @@ def test_google_takeout_subsources():
         (g / "Maps" / "My labeled places" / "Labeled places.json").write_text(json.dumps({
             "features": [{"type": "Feature",
                           "geometry": {"type": "Point", "coordinates": [27.58, 47.14]},
-                          "properties": {"name": "Home", "address": "Carpati 7, Iasi"}}]}))
+                          "properties": {"name": "Home", "address": "12 Sycamore Row, Springfield"}}]}))
         (g / "Saved" / "Want to go.csv").write_text(
             "Title,Note,URL,Tags,Comment\nTokyo Tower,,https://maps.google.com/?cid=9,,must visit\n")
         (yt / "subscriptions" / "subscriptions.csv").write_text(
@@ -1307,7 +1534,7 @@ def test_google_takeout_subsources():
         r = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"),
                             str(Path(d)), "-o", str(out)], capture_output=True, text=True)
         check("google: build runs", r.returncode == 0, r.stderr[-300:])
-        brain = out / "personal" / "adi-brain"
+        brain = out / "personal" / "john-brain"
         brain = brain if brain.is_dir() else out
         allmd = "\n".join(p.read_text() for p in brain.rglob("*.md"))
         check("google: vCard contact → person", "Grace Hopper" in allmd)
@@ -1675,6 +1902,7 @@ def main():
     test_facebook_mapping()
     test_data_catalog()
     test_final_sweep()
+    test_plugins()
     # Per-source fixtures live at tests/fixtures/<personal|company>/<entity>/<source>/.
     # Build each single source export on its own (exercises every adapter + the
     # vault invariants), independent of the multi-entity orchestration above.

@@ -40,7 +40,7 @@ SCHEMA = "sbl-graph/1"
 # plus the analyze-written 95-goals pseudo-layer. Folders resolve per subject
 # through build_vault.layout_for() (never hardcode a layer folder).
 LAYER_ORDER = ["root", "people", "orgs", "reputation", "voice", "shopping",
-               "career", "mirror", "learning", "services", "search", "places",
+               "career", "jobs", "mirror", "learning", "services", "search", "places",
                "synthesis", "goals", "uncategorized"]
 
 # (person label, company label) per layer key — honest short names for HUD cards.
@@ -49,6 +49,7 @@ LAYER_LABELS = {
     "orgs": ("Organizations", "Organizations"),
     "reputation": ("Reputation", "Brand"), "voice": ("Voice", "Content"),
     "shopping": ("Shopping", "Procurement"), "career": ("Career", "Pipeline"),
+    "jobs": ("Jobs", "Hiring"),
     "mirror": ("Mirror", "Market view"), "learning": ("Learning", "Knowledge"),
     "services": ("Services", "Support"), "search": ("Search", "Signals"),
     "places": ("Places", "Locations"), "synthesis": ("Synthesis", "Synthesis"),
