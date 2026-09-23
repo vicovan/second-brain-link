@@ -30,9 +30,11 @@ wrong, fix the tailor. This file only orchestrates.
 This skill runs on two surfaces and they ask differently. **Check which one you are on
 before a gate**, and never let a gate silently do nothing:
 
-- **A terminal / interactive session:** use `AskUserQuestion`.
-- **Second Brain Studio (or any non-interactive stream):** `AskUserQuestion` does not exist
-  — emit ONE fenced `gate` block and end your turn. The surface renders it as buttons and
+- **A terminal / interactive session, or Second Brain Studio:** use `AskUserQuestion`.
+  Studio shows the options as buttons and your call waits for the answer, just as in a
+  terminal.
+- **Any other non-interactive stream, where `AskUserQuestion` is unavailable or fails:**
+  emit ONE fenced `gate` block and end your turn. The surface renders it as buttons and
   the answer arrives as the next message.
 
 ````

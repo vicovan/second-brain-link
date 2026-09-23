@@ -50,9 +50,11 @@ When the level or one of the rules above genuinely requires a question, this ski
 surfaces and they ask differently. **Check which one you are on before a gate**, and never let
 a gate silently do nothing:
 
-- **A terminal / interactive session:** use `AskUserQuestion`.
-- **Second Brain Studio (or any non-interactive stream):** `AskUserQuestion` does not exist
-  — emit ONE fenced `gate` block and end your turn. The surface renders it as buttons and
+- **A terminal / interactive session, or Second Brain Studio:** use `AskUserQuestion`.
+  Studio shows the options as buttons and your call waits for the answer, just as in a
+  terminal.
+- **Any other non-interactive stream, where `AskUserQuestion` is unavailable or fails:**
+  emit ONE fenced `gate` block and end your turn. The surface renders it as buttons and
   the answer arrives as the next message.
 
 ````
@@ -230,9 +232,9 @@ dispatching:
 list_connected_browsers          -> the deviceId(s)
 ask which one                    -> EVERY time, even for a single browser: the extension's
                                     contract requires the user to choose and forbids you
-                                    picking for them. AskUserQuestion in a terminal; a
-                                    `gate` block in Studio, which ends the turn but NOT the
-                                    session, so you carry on from here.
+                                    picking for them. AskUserQuestion (terminal and
+                                    Studio); a `gate` block only where that tool is
+                                    unavailable — it ends the turn but NOT the session.
 select_browser <deviceId>        -> connect
 tabs_context_mcp createIfEmpty   -> a tabId to hand the subagent
 ```

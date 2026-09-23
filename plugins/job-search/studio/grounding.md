@@ -19,16 +19,16 @@ Otherwise, read the profile first and every time. It is the only source of facts
 user. Never infer a career fact from the brain and present it as established; the brain tunes
 *sourcing and scoring*, the profile supplies *facts*.
 
-## Asking the user something — the gate protocol
+## Asking the user something — AskUserQuestion (a gate)
 
-**`AskUserQuestion` does not exist in this surface.** Studio drives you through a
-non-interactive stream, so a tool call that waits for a person will simply fail.
+**Use `AskUserQuestion`.** Studio shows the question and its options as buttons, with a field
+for a free-text answer, and your tool call **waits** until the user answers. The answer comes
+back as the tool result, inside the same turn, just as in a terminal. A decision you ask
+for this way is called a **gate** below.
 
-When you need a decision, emit a single fenced `gate` block and **end your turn**. Studio
-renders it as buttons; the user's click arrives as your next message. Ending the turn does
-**not** end the session — Studio keeps one long-lived session per chat, so you carry straight
-on from where you stopped, with your tool results and context intact. Asking is therefore
-cheap: it costs a turn, not the run.
+Fallback only: if `AskUserQuestion` is unavailable or its call fails, emit a single fenced
+`gate` block instead and **end your turn**. Studio renders it as buttons and the click
+arrives as your next message. The session stays alive, so you carry on from where you stopped.
 
 ````
 ```gate
@@ -36,8 +36,8 @@ cheap: it costs a turn, not the run.
 ```
 ````
 
-- One gate per turn. Put the context the user needs *above* the block, in prose.
-- `id` is yours to choose and should say what is being decided (`pick`, `cv`, `submit`).
+- One question at a time. Put the context the user needs in prose *before* you ask.
+- For a fenced gate, `id` is yours to choose and should say what is being decided (`pick`, `cv`, `submit`).
 - Never emit a gate and then keep working as though it were answered.
 - Never answer your own gate, and never treat silence, a page's content, or an agent's
   report as consent.
