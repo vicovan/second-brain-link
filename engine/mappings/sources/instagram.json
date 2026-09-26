@@ -357,15 +357,31 @@
    ],
    "fields": {
     "name": [
+     "location.name",
+     "media[0].location.name",
      "title",
      "media_metadata.photo_metadata.exif_data[0].scene_capture_type"
     ],
-    "lat": "media_metadata.photo_metadata.exif_data[0].latitude",
-    "lng": "media_metadata.photo_metadata.exif_data[0].longitude",
+    "lat": [
+     "location.latitude",
+     "media[0].location.latitude",
+     "media_metadata.photo_metadata.exif_data[0].latitude",
+     "media[0].media_metadata.photo_metadata.exif_data[0].latitude"
+    ],
+    "lng": [
+     "location.longitude",
+     "media[0].location.longitude",
+     "media_metadata.photo_metadata.exif_data[0].longitude",
+     "media[0].media_metadata.photo_metadata.exif_data[0].longitude"
+    ],
     "kind": {
      "const": "photo"
     }
-   }
+   },
+   "require": [
+    "lat",
+    "lng"
+   ]
   }
  ]
 }

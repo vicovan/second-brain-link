@@ -24,6 +24,9 @@ target precisely, never invent, verify the PDF the way a machine will read it.
 | `<profile>/profile.md` (in the user's data, resolved at step 0) | ALWAYS. The only allowed source of facts, titles, numbers, contacts. |
 | `references/tailoring-playbook.md` | ALWAYS. Intake, location decision, title mirroring, keyword strategy, human-gate rules, variants by company type. |
 | `references/ats-checklist.md` | Before delivering. QA gates. |
+| `<app dir>/fit.md` | ALWAYS when it exists (job-apply writes it). The two-pass requirement table, keywords, reviewer doubts, gaps. Build the CV from its `existing`/`supported` rows only. |
+| `<profile>/archetypes.md` | ALWAYS. The lane this job belongs to decides the headline, summary skeleton, lead proof points and bullet priority. |
+| `scripts/lint_cv.py` | Before building and after every edit. The deterministic gate — chronology, fact gate, de-tell, self-disqualifiers. Its result goes into `gates.json`. |
 | `assets/example-cv.md` | Once, to see the content-JSON shape and the tone that worked. |
 | `scripts/build_cv.py` | To render JSON → PDF (`--docx` for Word too). Pure Python + reportlab. |
 | `scripts/check_pdf.py` | To verify keyword coverage, page count, extraction order, fonts. |
@@ -50,6 +53,12 @@ If `job-scout` is installed, `lessons.md` records which CV choices actually drew
 which headline variants, which lead bullets, which title labels. Apply anything tagged `[cv]`.
 Skip this step silently if the file or the scout is not present.
 
+### 0c. Know the archetype
+Read `profile/archetypes.md` and pick the lane this job belongs to (the scout already recorded it
+if the job came from a sweep). The archetype supplies the headline pattern, the summary skeleton,
+the proof points to lead with, and the framing policy for concurrent roles. **A job that fits no
+archetype is not tailored** — say so and stop; that is a targeting problem, not a writing one.
+
 ### 1. Get the target
 - If the user gave a URL, fetch it (web_fetch / browser). If it is a company page or
   programme page rather than a JD, read it for what they screen for.
@@ -60,6 +69,8 @@ Skip this step silently if the file or the scout is not present.
   location/work mode, must-have keywords, nice-to-haves, domain, culture
   signals, the three silent questions). Write it in your reasoning; do not
   dump it on the user.
+- **Write `<outdir>/fit.md`** (playbook §1b) unless job-apply already did: pass 1 from the JD
+  alone, pass 2 against the profile, then `## Keywords`, `## Reviewer doubts`, `## Gaps`.
 
 ### 2. Decide the contact set
 Apply playbook §2. Output exactly one phone + one primary location (dual city
@@ -100,16 +111,18 @@ final message.
   projects are framed (playbook §6); if unclear, ask the user the one framing
   question and use the default (current venture as the current role) meanwhile.
 
-### 3b. Write the summary and the closing section — playbook §3c and §3d
-- **Professional Summary, rewritten from scratch every time.** Four sentences: target title verbatim
-  and bolded + strongest proof · their #1 requirement answered with a specific fact · their #2–#3
-  compressed · scale credential or the honest calibration. 90–120 words. Quote a distinctive line
-  from the JD back at them where one exists.
-- **Include an honest calibration clause wherever there is a real gap** — name the seniority,
-  domain or depth the profile genuinely does not have, in the profile's own words. Told plainly it makes the rest credible; found
-  by the reader it discounts everything.
-- **Close with a 3-bullet "Why This Role"** named for the target: strongest match, second match,
-  then logistics or the gap.
+### 3b. Write the summary — playbook §3c
+- **Professional Summary, rewritten from scratch every time.** Four sentences, implied subject (no
+  "I"): target title verbatim and bolded + strongest proof · the JD's riskiest `critical`
+  requirement answered with a specific fact · their #2–#3 compressed · a scale credential (team,
+  org, budget, users) from the profile. 90–120 words, the top five `fit.md` keywords inside it.
+  Quote a distinctive line from the JD back at them where one exists.
+- **Never name a gap on the CV** (playbook §3c, "Gaps never go on the CV"). Gaps live in
+  `fit.md` for interview prep.
+- **No "Why This Role" section** (playbook §3d). That material goes to the cover letter and the
+  why-answers, which job-apply writes from `company.md`.
+- **Roles in strict reverse-chronological order.** Relevance comes from bullet count and depth,
+  never from moving a role up.
 
 ### 4. Write the CV as Markdown
 
@@ -130,9 +143,18 @@ Everything the reader sees lives in this one file; the builder only lays it out.
 Markdown, not JSON, for three reasons: the user can read and correct it, it diffs cleanly between
 versions, and it is indexable as a note if their job data lives in a Second Brain vault.
 
-### 4b. The de-tell pass — playbook §3e
-Before building, read the JSON back and fix the eight tells that make a CV look generated. The
-short version, in order of how loudly each one shouts:
+### 4b. The gate, then the de-tell pass — playbook §3e
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/cv-tailor/scripts/lint_cv.py cv <outdir>/<cv>.md \
+   --profile <profile>/profile.md --fit <outdir>/fit.md
+```
+**Every FAIL is fixed before building** — chronology, a "Why" section, first person, a named gap,
+banned phrases, negative parallelism, em-dash and bold-lead-in counts, and any number, employer or
+title that is not in the profile. Re-run until it prints `RESULT: PASS`; the result is recorded in
+`<outdir>/gates.json`, and an application whose CV gate is red cannot be logged as applied.
+
+Then read the Markdown back for the tells the linter cannot count. The short version, in order of
+how loudly each one shouts:
 
 1. **Bold lead-ins on every bullet** — at most half per role, never three in a row. Rewrite the
    surplus to open with a verb or with the number.
@@ -253,13 +275,6 @@ An optional italic scope-equivalence line goes here, after a blank line.
 
 #### Earlier ventures and roles
 
-## Why This Role
-<!-- blocks: mixed -->
-
-- **Strongest match.** …
-- Second match. …
-- **On fit and logistics:** the honest calibration.
-
 ## Education
 <!-- blocks: entries -->
 
@@ -306,5 +321,7 @@ Section order for ATS: Professional Summary → Core Competencies → Work Exper
   coloured. Bright web-blue everywhere is what makes a CV look generated; no colour at all reads as
   a plain-text dump.
 - Target title verbatim in headline and summary.
-- ≤ 2 pages; PDF always; verified with `check_pdf.py` before delivery.
-- Reverse-chronological, continuous timeline, consistent date format.
+- ≤ 2 pages; PDF always; verified with `lint_cv.py` (gate green) and `check_pdf.py` before delivery.
+- Strictly reverse-chronological, consistent date format; overlaps framed per the profile's
+  framing policy.
+- No "Why …" section, no first person, no named gap — on any employment CV.

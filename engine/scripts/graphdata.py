@@ -4,7 +4,8 @@ graphdata.py — machine-readable graph sidecar (`graph.json`, schema sbl-graph/
 
 Scans a BUILT brain (the rendered Obsidian vault) and emits one compact JSON
 describing the knowledge graph: nodes (one per note, with layer/type/sources/
-strength/geo/avatar), typed+weighted edges (derived from the same structures the
+strength/lat/lng/avatar, plus address/country/city/kind/rating/lists/place_tags on
+place notes), typed+weighted edges (derived from the same structures the
 vault renders — a person's `company:` property, event attendee links, an org's
 "People here" list, purchase merchants, plain wikilinks), ordered layers with
 per-layer counts + dominant sources, and summary stats.
@@ -40,7 +41,7 @@ SCHEMA = "sbl-graph/1"
 # plus the analyze-written 95-goals pseudo-layer. Folders resolve per subject
 # through build_vault.layout_for() (never hardcode a layer folder).
 LAYER_ORDER = ["root", "people", "orgs", "reputation", "voice", "shopping",
-               "career", "jobs", "mirror", "learning", "services", "search", "places",
+               "career", "jobs", "fundraising", "travel", "mirror", "learning", "services", "search", "places",
                "synthesis", "goals", "uncategorized"]
 
 # (person label, company label) per layer key — honest short names for HUD cards.
@@ -50,6 +51,8 @@ LAYER_LABELS = {
     "reputation": ("Reputation", "Brand"), "voice": ("Voice", "Content"),
     "shopping": ("Shopping", "Procurement"), "career": ("Career", "Pipeline"),
     "jobs": ("Jobs", "Hiring"),
+    "fundraising": ("Fundraising", "Fundraising"),
+    "travel": ("Travel", "Travel"),
     "mirror": ("Mirror", "Market view"), "learning": ("Learning", "Knowledge"),
     "services": ("Services", "Support"), "search": ("Search", "Signals"),
     "places": ("Places", "Locations"), "synthesis": ("Synthesis", "Synthesis"),
@@ -179,6 +182,26 @@ def build_graph_json(brain_root, subject=None, entity=""):
             v = fmd.get(f_str)
             if isinstance(v, str) and v:
                 node[f_str] = v
+        if node["type"] == "place":
+            # place facts, so a reader (the travel-planner plugin, a map) gets a full
+            # record from graph.json alone without re-walking the places layer
+            for f_str in ("address", "country", "city", "kind"):
+                v = fmd.get(f_str)
+                if isinstance(v, (str, int, float)) and str(v).strip():
+                    node[f_str] = str(v).strip()
+            v = fmd.get("rating")
+            if v not in ("", None, []):
+                try:
+                    node["rating"] = float(v)
+                except (TypeError, ValueError):
+                    pass
+            for f_list, keep in (("lists", None), ("tags", "place/")):
+                v = fmd.get(f_list)
+                vals = v if isinstance(v, list) else ([v] if isinstance(v, str) and v else [])
+                vals = [str(x) for x in vals if str(x).strip()
+                        and (keep is None or str(x).lower().startswith(keep))]
+                if vals:
+                    node["place_tags" if f_list == "tags" else f_list] = vals
         notes[nid] = node
         raw[nid] = (fmd, body)
         by_title.setdefault(p.stem.lower(), nid)

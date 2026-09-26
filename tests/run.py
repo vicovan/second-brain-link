@@ -478,6 +478,19 @@ def test_google_expansion():
         check("p1a: mail/fit skipped honestly",
               cov.count("skipped (low-signal, by design") >= 3, cov[-800:])
         check("p1a: takeout mail never leaks", "secret-body-do-not-leak" not in allmd)
+        # new on-device Timeline format → visited pins (home skipped, raw signals ignored)
+        vis = list((out / "85-places").glob("Visited spot*.md"))
+        vtxt = vis[0].read_text() if vis else ""
+        check("travel: timeline (new format) visit → place", len(vis) == 1, str([v.name for v in vis]))
+        check("travel: timeline visits aggregated by placeId", "2 visit(s)" in vtxt, vtxt[:300])
+        check("travel: timeline HOME segment never becomes a pin", "48.85," not in allmd)
+        check("travel: timeline no longer reported skipped",
+              "`timeline` — skipped" not in cov, cov[-600:])
+        # T-E5: country/city/kind are fields on place notes
+        eif = out / "85-places" / "Eiffel Tower.md"
+        etxt = eif.read_text() if eif.exists() else ""
+        check("travel: place note carries country/city/kind fields",
+              "country: FR" in etxt and "city: Paris" in etxt and "kind: saved" in etxt, etxt[:400])
 
 
 def test_new_sources():
@@ -865,6 +878,290 @@ def test_layout_v2():
     check("layout2: no hardcoded layer folders in builder", not hard, str(hard))
 
 
+
+def _job_search_gates(js):
+    """The gates that stop an application being sent: knock-out screen, CV lint, answers lint,
+    and learn.py refusing `applied` without them. All synthetic — a fictional candidate."""
+    import subprocess as _sp, tempfile as _tf, json as _js, os as _os, pathlib, sys
+    ko = js / "skills/job-apply/scripts/knockout.py"
+    lint = js / "skills/cv-tailor/scripts/lint_cv.py"
+    learn = js / "skills/job-scout/scripts/learn.py"
+    for f in (ko, lint):
+        check(f"job-search: {f.name} present", f.is_file())
+    if not (ko.is_file() and lint.is_file()):
+        return
+    tmp = pathlib.Path(_tf.mkdtemp(prefix="sbl-js-"))
+    run = lambda *a, **kw: _sp.run([sys.executable, *map(str, a)], capture_output=True, text=True, **kw)
+
+    # --- knock-out screen ---------------------------------------------------------------
+    ans = tmp / "application-answers.md"
+    ans.write_text("# a\n## Knock-outs\n- right_to_work: EU, EEA\n- sponsorship_acceptable: GB\n"
+                   "- based_in: PT\n- relocate_to: EU\n- nationalities: PT\n"
+                   "- languages: English, Portuguese\n- degrees: BSc Mathematics\n"
+                   "- years_experience: 15\n- salary_floor: EUR 100000\n## Next\n", encoding="utf-8")
+    def jd(name, text):
+        (tmp / name).write_text(text, encoding="utf-8")
+        return tmp / name
+    uk = jd("uk.txt", "Director of Engineering, London. You must have the right to work in the UK. "
+                      "We are unable to offer visa sponsorship.")
+    eu = jd("eu.txt", "Engineering Director. Remote across the EU. German is a plus.")
+    lang = jd("lang.txt", "Head of Engineering, Helsinki. Fluent Finnish required.")
+    low = jd("low.txt", "VP Engineering, Berlin. Salary €70,000 - €85,000.")
+    nat = jd("nat.txt", "CTO, Riyadh. Saudi nationals only.")
+    r = run(ko, "--jd", uk, "--answers", ans)
+    check("knockout: UK right-to-work without sponsorship STOPs", r.returncode == 1 and "STOP" in r.stdout, r.stdout)
+    r = run(ko, "--jd", eu, "--answers", ans)
+    check("knockout: remote-EU role passes (flag only)", r.returncode == 0 and "STOP" not in r.stdout, r.stdout)
+    for name, f in (("required language", lang), ("band below floor", low), ("nationality gate", nat)):
+        r = run(ko, "--jd", f, "--answers", ans)
+        check(f"knockout: {name} STOPs", r.returncode == 1, r.stdout)
+    form = jd("form.txt", "Are you currently located in the United Kingdom?")
+    r = run(ko, "--jd", eu, "--form", form, "--answers", ans)
+    check("knockout: form location question STOPs", r.returncode == 1, r.stdout)
+    r = run(ko, "--jd", eu, "--answers", tmp / "missing.md")
+    check("knockout: no profile block exits 2", r.returncode == 2)
+
+    # --- CV lint ------------------------------------------------------------------------
+    prof = tmp / "profile.md"
+    prof.write_text("# Profile\n### Tidewater Labs — VP Engineering\n- grew the team to 42 engineers\n"
+                    "### Harbor Freight Data — Engineering Manager\n- cut build time by 37%\n", encoding="utf-8")
+    good = """---
+type: cv
+name: Ada Example
+headline: "VP Engineering · platform teams"
+email: ada@example.com
+phone: "+00 000 000 000"
+---
+
+## Professional Summary
+<!-- blocks: prose -->
+
+**VP Engineering** who grew a platform organisation to 42 engineers. Short proof here.
+
+## Work Experience
+<!-- blocks: mixed -->
+
+### VP Engineering | Tidewater Labs
+*01/2021 – Present*
+Lisbon, Portugal
+
+- Grew the platform team to 42 engineers across two sites.
+- Rebuilt the release process.
+
+### Engineering Manager | Harbor Freight Data
+*01/2016 – 12/2020*
+Porto, Portugal
+
+- Cut build time by 37% for the data platform.
+"""
+    cv = tmp / "app1" / "Ada_Example_CV_Acme.md"
+    cv.parent.mkdir()
+    cv.write_text(good, encoding="utf-8")
+    r = run(lint, "cv", cv, "--profile", prof)
+    check("lint_cv: clean CV passes", r.returncode == 0, r.stdout)
+    check("lint_cv: writes gates.json", (cv.parent / "gates.json").is_file())
+    bad_cases = {
+        "roles out of date order": good.replace("*01/2016 – 12/2020*", "*01/2023 – 12/2024*"),
+        "Why section": good + "\n## Why Acme\n<!-- blocks: mixed -->\n\n- Because.\n",
+        "self-disqualifier": good.replace("Short proof here.", "I have not run a public company."),
+        "banned phrase": good.replace("Rebuilt the release process.", "Spearheaded a seamless release process."),
+        "number not in profile": good.replace("37%", "61%"),
+        "negative parallelism": good.replace("Rebuilt the release process.", "Not just shipped features but rebuilt the release process."),
+    }
+    for label, text in bad_cases.items():
+        cv.write_text(text, encoding="utf-8")
+        r = run(lint, "cv", cv, "--profile", prof)
+        check(f"lint_cv: {label} FAILs", r.returncode == 1, r.stdout[-300:])
+    cv.write_text(good, encoding="utf-8")
+    run(lint, "cv", cv, "--profile", prof)
+
+    # --- answers lint + learn.py refusal ------------------------------------------------
+    env = dict(_os.environ, JOB_SEARCH_HOME=str(tmp / "state"))
+    r = run(learn, "log-outcome", "--company", "Acme", "--role", "VP", "--job-key", "acme-vp",
+            "--status", "filled", env=env)
+    check("learn: filled logs", r.returncode == 0, r.stderr)
+    appdir = next((tmp / "state" / "applications").glob("*/acme-vp"))
+    r = run(learn, "log-outcome", "--company", "Acme", "--role", "VP", "--job-key", "acme-vp",
+            "--status", "applied", env=env)
+    check("learn: applied refused without answers.json and gates", r.returncode != 0 and "REFUSING" in (r.stderr + r.stdout))
+    (appdir / "answers.json").write_text(_js.dumps({"Expected salary": "DEFLECT: ask first"}), encoding="utf-8")
+    r = run(lint, "answers", appdir / "answers.json")
+    check("lint_cv: placeholder in an answer FAILs", r.returncode == 1, r.stdout)
+    (appdir / "answers.json").write_text(_js.dumps({"Expected salary": "EUR 120000",
+        "Why this role": "Acme's move to self-serve onboarding is the problem I spent the last four years on "
+                         "at Tidewater Labs, where the platform team grew to 42 engineers."}), encoding="utf-8")
+    r = run(lint, "answers", appdir / "answers.json", "--profile", prof)
+    check("lint_cv: a specific, clean answer passes", r.returncode == 0, r.stdout)
+    (appdir / "gates.json").write_text((cv.parent / "gates.json").read_text(encoding="utf-8"), encoding="utf-8")
+    run(lint, "answers", appdir / "answers.json", "--profile", prof)
+    r = run(learn, "log-outcome", "--company", "Acme", "--role", "VP", "--job-key", "acme-vp",
+            "--status", "applied", env=env)
+    check("learn: applied refused without a recruiter review", r.returncode != 0)
+    run(lint, "review", appdir, "--verdict", "shortlist")
+    r = run(learn, "log-outcome", "--company", "Acme", "--role", "VP", "--job-key", "acme-vp",
+            "--status", "applied", env=env)
+    check("learn: applied accepted once every gate is green", r.returncode == 0, r.stderr + r.stdout)
+    r = run(learn, "set-result", "--all-open", "--result", "rejected", "--note", "generic", env=env)
+    check("learn: set-result --all-open records a result", r.returncode == 0 and "rejected" in r.stdout)
+    r = run(learn, "kpi", env=env)
+    check("learn: kpi leads with interviews", "INTERVIEWS" in r.stdout, r.stdout[:200])
+
+def _fundraising_checks(fr):
+    """The fundraising plugin's own invariants: the ledger's state machine, list import,
+    the filter chain, the claims linter, form detection, the never-send rule, and the
+    shipped defaults. Every run happens in a scratch state root, never the user's."""
+    import subprocess as _sp, tempfile as _tf, json as _js, os as _os
+    S = fr / "skills/raise-research/scripts"
+    A = fr / "skills/raise-apply/scripts"
+    with _tf.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        env = dict(_os.environ, FUNDRAISE_HOME=str(tmp / "state"), CLAUDE_PROJECT_DIR=str(tmp))
+        prof_dir = tmp / "46-fundraising" / "profile"
+        prof_dir.mkdir(parents=True)
+        (prof_dir / "round.md").write_text(
+            "---\ntype: fundraising-profile\nmin_net_cash: 100000\ngeography_ok: [global, europe]\n"
+            "relocation: ok\nexclusions: [crypto]\nthesis_keywords: [ai, developer, data]\n"
+            "off_thesis: [consumer]\n---\n", encoding="utf-8")
+        (prof_dir / "company.md").write_text(
+            "# Co\n- 25 sources, 609 tests.\n## Do not claim\n- users — none published\n",
+            encoding="utf-8")
+
+        def run(script, *args, stdin=None):
+            r = _sp.run([sys.executable, str(script), *args], cwd=tmp, env=env,
+                        capture_output=True, text=True, input=stdin)
+            return r
+
+        csvf = tmp / "list.csv"
+        csvf.write_text(
+            "Name,About,Website,Location\n"
+            "Alpha Seed,Invests $25k - $50k in anything,alpha.example,Global\n"
+            "Beta Ventures,Pre-seed AI and developer tools; checks $250K-$1M,beta.example,Europe\n"
+            "Gamma Chain,Web3 and token infrastructure; $500K checks,gamma.example,Global\n"
+            "Delta Local,Consumer brands only; $200K checks,delta.example,North America\n",
+            encoding="utf-8")
+        r = run(S / "ledger.py", "import-csv", str(csvf), "--origin", "fixture")
+        check("fundraising: import-csv runs", r.returncode == 0, r.stderr[-300:])
+        r2 = run(S / "ledger.py", "import-csv", str(csvf), "--origin", "fixture")
+        check("fundraising: import-csv is idempotent",
+              r2.returncode == 0 and '"created": 0' in r2.stdout, r2.stdout[-200:])
+        txt = tmp / "list.txt"
+        txt.write_text("500 Global Flagship Accelerator\n1) Epsilon Labs | by Epsilon\n"
+                       "- Zeta Fund\nJane Roe - Eta Capital\n", encoding="utf-8")
+        r = run(S / "ledger.py", "import-text", str(txt), "--origin", "fixture-text", "--kind", "program")
+        names = {_js.loads(l)["name"] for l in (tmp / "state" / "targets.jsonl").read_text(encoding="utf-8").split("\n") if l.strip()}
+        check("fundraising: import-text keeps a leading number that is part of the name",
+              "500 Global Flagship Accelerator" in names and "Global Flagship Accelerator" not in names, str(sorted(names)))
+        check("fundraising: import-text strips list numbers and bullets",
+              "Epsilon Labs" in names and "Zeta Fund" in names and "Eta Capital" in names, str(sorted(names)))
+        r = run(S / "ledger.py", "remove", "zeta-fund", "--why", "fixture")
+        check("fundraising: remove archives instead of deleting",
+              r.returncode == 0 and "zeta-fund" in (tmp / "state" / "removed.jsonl").read_text(encoding="utf-8"))
+        recs = {}
+        for line in (tmp / "state" / "targets.jsonl").read_text(encoding="utf-8").split("\n"):
+            if line.strip():
+                o = _js.loads(line)
+                recs[o["key"]] = o
+        check("fundraising: imports are desk-screened, never verified",
+              all(r["status"] in ("screened", "out") and not r["claims"] for r in recs.values()))
+        why = lambda k: (recs[k].get("out_reason") or "")  # noqa: E731
+        check("fundraising: floor removes a sub-floor cheque", why("alpha-seed").startswith("floor"), why("alpha-seed"))
+        check("fundraising: exclusions remove crypto", why("gamma-chain").startswith("exclusions"), why("gamma-chain"))
+        check("fundraising: off-thesis removed", why("delta-local").startswith("thesis"), why("delta-local"))
+        check("fundraising: an on-thesis fund survives", recs["beta-ventures"]["status"] == "screened")
+
+        # the never-send rule: only the founder can mark a target contacted
+        run(S / "ledger.py", "log-draft", "beta-ventures", "--path", "outreach/x/B.md")
+        r = run(S / "ledger.py", "set-status", "beta-ventures", "contacted", "--by", "agent")
+        check("fundraising: agent cannot mark an email sent", r.returncode != 0 and "only the founder" in (r.stderr + r.stdout))
+        r = run(S / "ledger.py", "sent", "beta-ventures")
+        check("fundraising: founder 'sent' starts the follow-up clock", r.returncode == 0 and '"follow-up"' in r.stdout, r.stdout + r.stderr)
+        run(S / "ledger.py", "log-outcome", "beta-ventures", "passed")
+        r = run(S / "ledger.py", "set-status", "beta-ventures", "queued", "--by", "founder")
+        check("fundraising: re-queue after a no needs --different", r.returncode != 0)
+        r = run(S / "ledger.py", "set-status", "beta-ventures", "queued", "--by", "founder",
+                "--different", "a cofounder joined")
+        check("fundraising: re-queue with a stated difference is allowed", r.returncode == 0, r.stderr[-200:])
+
+        r = run(S / "render_brain.py", "--quiet")
+        dash = tmp / "46-fundraising" / "Fundraising Dashboard.md"
+        check("fundraising: render writes the dashboard", r.returncode == 0 and dash.is_file(), r.stderr[-300:])
+        check("fundraising: manifest kept beside the ledger, not in the layer",
+              (tmp / "state" / "_FUNDRAISE_GENERATED.json").is_file()
+              and not (tmp / "46-fundraising" / "_FUNDRAISE_GENERATED.json").exists())
+        check("fundraising: target note titled '(target)' so it never shadows an org note",
+              (tmp / "46-fundraising" / "targets" / "Beta Ventures (target).md").is_file())
+
+        draft = tmp / "answers.json"
+        draft.write_text(_js.dumps({"fields": [
+            {"label": "Traction", "answer": "5,000 users and 609 tests. [CONFIRM: date]",
+             "required": True, "limit": {"n": 20, "unit": "chars"}},
+            {"label": "Why now", "answer": "GDPR Art. 20 made 25 sources possible.",
+             "limit": {"n": 100, "unit": "words"}}]}), encoding="utf-8")
+        r = run(S / "lint_claims.py", str(draft))
+        red = r.stdout
+        check("fundraising: lint stops on [CONFIRM]", r.returncode == 1 and "CONFIRM" in red)
+        check("fundraising: lint stops on a do-not-claim term", "users" in red)
+        check("fundraising: lint stops on a number not in the profile", "5,000" in red)
+        check("fundraising: lint stops on an over-limit answer", "> limit 20" in red)
+        check("fundraising: lint ignores legal references and known numbers",
+              "«20»" not in red and "«25»" not in red, red[-400:])
+        check("fundraising: gates.json written", (tmp / "gates.json").is_file())
+        d2 = tmp / "small.json"
+        d2.write_text(_js.dumps({"fields": [{"label": "Why you",
+                                              "answer": "I founded five startups."}]}), encoding="utf-8")
+        r = run(S / "lint_claims.py", str(d2), "--out", str(tmp / "g2.json"))
+        d3 = tmp / "neg.json"
+        d3.write_text(_js.dumps({"fields": [{"label": "Traction", "answer": "Pre-users, 609 tests."}]}), encoding="utf-8")
+        r3 = run(S / "lint_claims.py", str(d3), "--out", str(tmp / "g3.json"))
+        check("fundraising: a hyphenated negation ('pre-users') is not a do-not-claim hit",
+              r3.returncode == 0, r3.stdout[-300:])
+        check("fundraising: lint stops on a spelled-out count the profile does not state",
+              r.returncode == 1 and "five startups" in r.stdout, r.stdout[-300:])
+
+        r = run(A / "detect_form.py", "https://tally.so/r/abc")
+        check("fundraising: detect_form classifies tally", '"tally"' in r.stdout)
+        page = tmp / "p.html"
+        page.write_text('<input type="password"> Application fee: $50. Record a 1 minute video.', encoding="utf-8")
+        r = run(A / "detect_form.py", "https://example.org/apply", "--html", str(page))
+        o = _js.loads(r.stdout)
+        check("fundraising: detect_form flags login, fee and video",
+              o["needs_login"] and o["fee_signal"] and o["video_signal"], r.stdout)
+
+    # shipped defaults and rails
+    tmpl = (fr / "skills/raise-onboarding/references/answers-template.md").read_text(encoding="utf-8")
+    check("fundraising: answers template defaults to supervised",
+          "level: supervised" in tmpl and "level: autonomous" not in tmpl)
+    sj = _json_load(fr / "studio.json")
+    check("fundraising: studio tools never include a send-capable wildcard",
+          not any("gmail" in t.lower() and t.endswith("*") for t in sj.get("tools", [])))
+    # Personal needles are NOT listed here — this file is public, and a list of words to
+    # guard against would itself publish them (see the test_plugins docstring). The local
+    # sweep reads them from $SBL_PERSONAL_NEEDLES (a path outside the repo, one term per
+    # line) and is skipped in CI. What CI enforces is structural: no founder-shaped example
+    # is the shipped default, and the templates' worked example is fictional.
+    import os as _os2
+    nf = _os2.environ.get("SBL_PERSONAL_NEEDLES")
+    if nf and Path(nf).is_file():
+        needles = [l.strip().lower() for l in Path(nf).read_text(encoding="utf-8").split("\n")
+                   if l.strip() and not l.startswith("#")]
+        hits = []
+        for f in fr.rglob("*"):
+            if f.is_file() and f.suffix in (".md", ".py", ".json", ".sh", ".yaml", ".txt") \
+                    and "__pycache__" not in f.parts:
+                low = f.read_text(encoding="utf-8", errors="replace").lower()
+                hits += [f"{f.relative_to(fr)}:{n}" for n in needles if n in low]
+        check("fundraising: no personal needles in the shipped plugin (local sweep)", not hits,
+              str(hits[:6]))
+    rt = (fr / "skills/raise-onboarding/references/round-template.md").read_text(encoding="utf-8")
+    check("fundraising: round template's worked example is not a shipped floor of 100K",
+          "min_net_cash: 100000" not in rt)
+
+
+def _json_load(p):
+    import json as _j
+    return _j.loads(Path(p).read_text(encoding="utf-8"))
+
+
 def test_plugins():
     """plugins/ — the capability-pack surface. Structural guards only.
 
@@ -905,6 +1202,13 @@ def test_plugins():
         tmpl = (js / "skills/job-onboarding/references/answers-template.md").read_text(encoding="utf-8")
         check("job-search: answers template defaults to supervised",
               "level: supervised" in tmpl and "level: autonomous" not in tmpl.split("```")[1])
+
+        _job_search_gates(js)
+
+    # --- fundraising specifics ------------------------------------------------
+    fr = plugins / "fundraising"
+    if fr.is_dir():
+        _fundraising_checks(fr)
 
     import json as _json
     for name in names:
@@ -1065,7 +1369,9 @@ def test_plugins():
             check(f"{name}: openai packaging has a SKILL.md",
                   (name + "/SKILL.md") in n)
             check(f"{name}: openai packaging routes to workflow references",
-                  any(x.startswith(name + "/references/job-") for x in n))
+                  any(x.startswith(name + "/references/") and
+                      x[len(name) + 12:-3] in {d.name for d in (root / "skills").iterdir()}
+                      for x in n))
             check(f"{name}: openai packaging drops the plugin-root variable",
                   not any("CLAUDE_PLUGIN_ROOT" in
                           _zf2.ZipFile(oz).read(x).decode("utf-8", "replace")
@@ -1088,9 +1394,218 @@ def test_plugins():
 
     # The layer key resolves per subject and is never hardcoded by a plugin.
     import build_vault as _bv
+    check("plugins: travel layer key resolves (person+company)",
+          _bv.layout_for("person")["travel"] == _bv.layout_for("company")["travel"] == "47-travel")
     check("plugins: jobs layer key resolves (person)", _bv.layout_for("person")["jobs"] == "45-jobs")
     check("plugins: jobs layer key resolves (company)", _bv.layout_for("company")["jobs"] == "45-hiring")
+    check("plugins: fundraising layer key resolves (person)", _bv.layout_for("person")["fundraising"] == "46-fundraising")
+    check("plugins: fundraising layer key resolves (company)", _bv.layout_for("company")["fundraising"] == "46-fundraising")
 
+
+
+def test_travel_plugin():
+    """travel-planner: the itinerary invariants, virtual-interlining refusal + stopover
+    promotion, the map projection, render idempotence, and that an engine --refresh leaves
+    the plugin's layer alone. Runs the plugin's own scripts inside a freshly built brain."""
+    tp = REPO / "plugins" / "travel-planner"
+    if not tp.is_dir():
+        return
+    S = tp / "skills" / "trip-planner" / "scripts"
+    owner = FIXTURES / "personal" / "owner"
+    with tempfile.TemporaryDirectory() as d:
+        out = Path(d) / "v"
+        r = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"), str(owner), "-o", str(out)],
+                           capture_output=True, text=True)
+        brain = out / "personal" / "owner-brain"
+        brain = brain if brain.is_dir() else out
+        env = {k: v for k, v in __import__("os").environ.items()
+               if k not in ("TRAVEL_HOME", "CLAUDE_PROJECT_DIR", "SECOND_BRAIN_HOME")}
+
+        def run(*args):
+            return subprocess.run([sys.executable, str(S / args[0])] + list(args[1:]),
+                                  capture_output=True, text=True, cwd=str(brain), env=env)
+
+        pl = run("places.py", "--json")
+        recs = json.loads(pl.stdout or "[]")
+        check("travel: places.py reads the places layer with coordinates",
+              any(x["name"] == "Eiffel Tower" and x["lat"] and x["country"] == "FR" for x in recs), pl.stderr[-300:])
+        r1 = run("itinerary.py", "new", "--id", "paris-test", "--title", "Paris test")
+        r2 = run("itinerary.py", "add-stop", "paris-test", "--place", "Paris", "--arrive", "2030-05-01", "--nights", "2")
+        r3 = run("itinerary.py", "brain-pois", "paris-test", "--stop", "s1")
+        r4 = run("itinerary.py", "plan-days", "paris-test")
+        check("travel: itinerary new/add-stop/brain-pois/plan-days run",
+              all(x.returncode == 0 for x in (r1, r2, r3, r4)), (r1.stderr + r2.stderr + r3.stderr + r4.stderr)[-400:])
+        tdir = brain / "47-travel" / "trips" / "paris-test"
+        it = json.loads((tdir / "itinerary.json").read_text()) if (tdir / "itinerary.json").exists() else {}
+        pois = it.get("pois") or []
+        check("travel: brain places become from_brain POIs linked to real notes",
+              pois and all(p["from_brain"] and (brain / p["brain_note"]).is_file() for p in pois), str(pois)[:300])
+        check("travel: plan-days allocates every POI to a day",
+              sorted(i for s in it.get("stops", []) for dd in s.get("days", []) for i in dd["items"])
+              == sorted(p["id"] for p in pois))
+        gj = json.loads((tdir / "map.geojson").read_text()) if (tdir / "map.geojson").exists() else {}
+        feats = gj.get("features") or []
+        check("travel: map.geojson is a FeatureCollection with day-numbered POIs",
+              gj.get("type") == "FeatureCollection" and any(f["properties"].get("feature") == "poi"
+                                                            and f["properties"].get("day") for f in feats))
+        check("travel: from_brain POIs carry a note_id Studio can resolve",
+              all((brain / (f["properties"]["note_id"] + ".md")).is_file() for f in feats
+                  if f["properties"].get("note_id")))
+        bad = run("set-stay" if False else "itinerary.py", "set-stay", "paris-test", "--stop", "s1",
+                  "--name", "Hotel", "--price", "100")
+        check("travel: a price without quoted_at is refused", bad.returncode != 0 and "quoted-at" in bad.stderr)
+        web = run("itinerary.py", "add-poi", "paris-test", "--stop", "s1", "--name", "Nowhere Cafe")
+        check("travel: a place not in the brain needs coordinates (never invented)", web.returncode != 0)
+        sys.path.insert(0, str(S))
+        try:
+            import itinerary as _it  # noqa
+            bad_it = json.loads(json.dumps(it))
+            bad_it["stops"][0]["role"] = "stopover"; bad_it["stops"][0]["nights"] = 0
+            bad_it["pois"].append({"id": "px", "stop": "s1", "name": "Fake", "lat": 48.8, "lng": 2.3,
+                                   "from_brain": True, "brain_note": "85-places/Not A Place.md"})
+            errs = _it.validate(bad_it, brain)
+            check("travel: a zero-night stopover is invalid", any("stopover" in e for e in errs), str(errs))
+            check("travel: from_brain with no such note is invalid", any("from_brain" in e for e in errs), str(errs))
+        finally:
+            sys.path.remove(str(S))
+            for m in ("itinerary", "geo", "paths", "places", "taste"):
+                sys.modules.pop(m, None)
+        # interline: a sub-floor connection is refused; an overnight 14h+ one becomes a stop
+        fares = [
+            {"id": "a", "provider": "x", "price": 300, "currency": "EUR", "quoted_at": "2030-01-01T10:00",
+             "segments": [{"carrier": "EK", "number": "EK1", "from": "DXB", "to": "ICN",
+                           "dep": "2030-05-01T03:00", "arr": "2030-05-01T16:00"}]},
+            {"id": "b", "provider": "x", "price": 90, "currency": "EUR", "quoted_at": "2030-01-01T10:05",
+             "segments": [{"carrier": "KE", "number": "KE2", "from": "ICN", "to": "HND",
+                           "dep": "2030-05-02T09:00", "arr": "2030-05-02T11:30"}]},
+            {"id": "c", "provider": "x", "price": 60, "currency": "EUR", "quoted_at": "2030-01-01T10:06",
+             "segments": [{"carrier": "OZ", "number": "OZ3", "from": "ICN", "to": "HND",
+                           "dep": "2030-05-01T17:00", "arr": "2030-05-01T19:20"}]}]
+        fpath = Path(d) / "fares.json"
+        fpath.write_text(json.dumps(fares))
+        js = run("interline.py", "--fares", str(fpath), "--from", "DXB", "--to", "TYO", "--json")
+        jl = json.loads(js.stdout or "[]")
+        check("travel: interline refuses a sub-floor self-transfer",
+              jl and not any(any(f["id"] == "c" for f in j["fares"]) for j in jl), js.stderr[-300:])
+        check("travel: interline promotes an overnight layover to a stopover",
+              any(j["stopovers"] == ["Seoul"] for j in jl), str(jl)[:300])
+        run("itinerary.py", "new", "--id", "japan-test", "--title", "Japan test")
+        pk = run("interline.py", "--fares", str(fpath), "--from", "DXB", "--to", "HND", "--pick", "1",
+                 "--trip", "japan-test")
+        jt = json.loads((brain / "47-travel" / "trips" / "japan-test" / "itinerary.json").read_text()) \
+            if pk.returncode == 0 else {}
+        so = [s for s in jt.get("stops", []) if s.get("role") == "stopover"]
+        st_legs = [l for l in jt.get("legs", []) if l.get("self_transfer")]
+        check("travel: the stopover is a real stop with a night",
+              len(so) == 1 and so[0]["nights"] >= 1, pk.stderr[-300:])
+        check("travel: the self-transfer leg carries risk and points at the stopover",
+              st_legs and st_legs[0].get("stopover_stop") == so[0]["id"] and st_legs[0]["risk"]["why"]
+              if so else False)
+        # render: layer written, twice is a no-op, machinery hidden, no place shadowed
+        run("itinerary.py", "activate", "paris-test")
+        run("scout.py")
+        a1 = run("render_brain.py")
+        a2 = run("render_brain.py")
+        layer = brain / "47-travel"
+        check("travel: render writes the dashboard, ideas, love and the current trip map",
+              all((layer / f).is_file() for f in ("Travel Dashboard.md", "Trip Ideas.md",
+                                                   "Places I Love.md", "Current Trip.geojson")), a1.stderr[-300:])
+        check("travel: a second render writes nothing", " 0 written" in a2.stdout, a2.stdout)
+        check("travel: manifest lives in the hidden ledger, not the layer",
+              (brain / ".plugins" / "travel-planner" / "_TRAVEL_GENERATED.json").is_file()
+              and not (layer / "_TRAVEL_GENERATED.json").exists())
+        places_titles = {p.stem.lower() for p in (brain / "85-places").glob("*.md")}
+        shadow = [p.name for p in layer.rglob("*.md") if p.stem.lower() in places_titles]
+        check("travel: no travel note shadows a place note", not shadow, str(shadow))
+        jn = next(layer.rglob("Japan test — Flights.md"), None)
+        check("travel: self-transfer risk is printed where the user reads",
+              jn is not None and "Self-transfer" in jn.read_text() and "seen " in jn.read_text())
+        # suggestion sets: a brain name is linked, a far coordinate refused, the Map layers written
+        s1 = run("suggest.py", "new", "--id", "paris-coffee", "--title", "Coffee in Paris", "--near", "Paris")
+        s2 = run("suggest.py", "add", "paris-coffee", "--name", "Eiffel Tower")
+        s3 = run("suggest.py", "add", "paris-coffee", "--name", "Web Cafe", "--lat", "48.86", "--lng", "2.35",
+                 "--kind", "cafe", "--why", "third-wave")
+        far = run("suggest.py", "add", "paris-coffee", "--name", "Lyon Cafe", "--lat", "45.76", "--lng", "4.83")
+        check("travel: suggest new/add run", all(x.returncode == 0 for x in (s1, s2, s3)),
+              (s1.stderr + s2.stderr + s3.stderr)[-400:])
+        check("travel: a suggestion far from its city is refused (never drawn in the wrong place)",
+              far.returncode != 0 and "km from" in far.stderr, far.stderr[-200:])
+        sset = json.loads((layer / "suggestions" / "paris-coffee.json").read_text()) \
+            if (layer / "suggestions" / "paris-coffee.json").exists() else {}
+        sp = {p["name"]: p for p in sset.get("picks") or []}
+        check("travel: a brain place in a suggestion set is linked, a web pick is marked web only",
+              sp.get("Eiffel Tower", {}).get("from_brain") and (brain / sp["Eiffel Tower"]["brain_note"]).is_file()
+              and sp.get("Web Cafe", {}).get("why", "").startswith("no brain signal — web only")
+              and not sp.get("Web Cafe", {}).get("from_brain"), str(sp)[:300])
+        sg = json.loads((layer / "Suggestions.geojson").read_text()) if (layer / "Suggestions.geojson").exists() else {}
+        sf = [f["properties"] for f in sg.get("features") or []]
+        check("travel: Suggestions.geojson carries the active set and the trip ideas",
+              (sg.get("properties") or {}).get("layer") == "suggestions"
+              and sum(1 for f in sf if f["feature"] == "suggestion") == 2
+              and any(f["feature"] == "idea" for f in sf), str(sf)[:300])
+        ag = json.loads((layer / "All Trips.geojson").read_text()) if (layer / "All Trips.geojson").exists() else {}
+        check("travel: All Trips.geojson has every trip, the current one flagged",
+              (ag.get("properties") or {}).get("layer") == "trips"
+              and {f["properties"]["trip_id"] for f in ag.get("features") or []} >= {"paris-test", "japan-test"}
+              and all(f["properties"]["current"] == (f["properties"]["trip_id"] == "paris-test")
+                      for f in ag.get("features") or []), str(ag.get("properties")))
+        check("travel: the current trip's map is tagged as the trip layer",
+              json.loads((layer / "Current Trip.geojson").read_text())["properties"].get("layer") == "trip")
+        # quote sets: real prices only with when/where; tags; pick → trip; rendered as a list
+        seg = lambda n, f, t, d, a: {"carrier": "TK", "carrier_name": "Turkish Airlines", "number": n,
+                                     "from": f, "to": t, "dep": d, "arr": a}
+        fl = [{"provider": "Google Flights", "url": "https://www.google.com/travel/flights", "price": 412,
+               "currency": "EUR", "quoted_at": "2030-01-01T10:00", "total_min": 545,
+               "segments": [seg("TK 873", "DXB", "IST", "2030-05-01T07:40", "2030-05-01T11:35"),
+                            seg("TK 1827", "IST", "CDG", "2030-05-01T13:20", "2030-05-01T16:05")]},
+              {"provider": "Emirates", "url": "https://www.emirates.com", "price": 620, "currency": "EUR",
+               "quoted_at": "2030-01-01T10:04", "total_min": 445,
+               "segments": [dict(seg("EK 73", "DXB", "CDG", "2030-05-01T08:30", "2030-05-01T13:55"), carrier="EK")]}]
+        q1 = run("quotes.py", "new", "flights", "--id", "dxb-cdg", "--title", "Dubai to Paris",
+                 "--from", "DXB", "--to", "CDG", "--date", "2030-05-01", "--trip", "paris-test")
+        q2 = run("quotes.py", "add", "dxb-cdg", "--json", json.dumps(fl))
+        noq = run("quotes.py", "add", "dxb-cdg", "--json", json.dumps(dict(fl[0], quoted_at="")))
+        check("travel: quotes new/add run", q1.returncode == 0 and q2.returncode == 0, (q1.stderr + q2.stderr)[-300:])
+        check("travel: a quoted price without quoted_at is refused", noq.returncode != 0 and "quoted_at" in noq.stderr)
+        qs = json.loads((layer / "quotes" / "dxb-cdg.json").read_text()) if (layer / "quotes" / "dxb-cdg.json").exists() else {}
+        tg = {o["id"]: o.get("tags", []) for o in qs.get("options") or []}
+        check("travel: quote options are tagged Cheapest / Fastest",
+              "Cheapest" in tg.get("f1", []) and "Fastest" in tg.get("f2", []), str(tg))
+        check("travel: layovers computed at the same airport",
+              (qs.get("options") or [{}])[0].get("layovers") == [{"at": "IST", "min": 105}], str(qs.get("options", [{}])[0].get("layovers")))
+        fz = run("quotes.py", "fence", "dxb-cdg")
+        check("travel: quotes fence prints the Studio card fence",
+              fz.stdout.startswith("```flights") and '"quotes": "dxb-cdg"' in fz.stdout, fz.stdout)
+        pk2 = run("quotes.py", "pick", "dxb-cdg", "f2")
+        pt = json.loads((brain / "47-travel" / "trips" / "paris-test" / "itinerary.json").read_text())
+        check("travel: picking a flight writes a priced, timestamped leg into the trip",
+              pk2.returncode == 0 and any(l.get("quote") == "dxb-cdg:f2" and l["tickets"][0]["quoted_at"]
+                                          for l in pt.get("legs", [])), pk2.stderr[-300:])
+        run("quotes.py", "new", "stays", "--id", "paris-stay", "--title", "Paris stays", "--city", "Paris",
+            "--checkin", "2030-05-01", "--checkout", "2030-05-03", "--trip", "paris-test", "--stop", "s1")
+        st1 = run("quotes.py", "add", "paris-stay", "--json", json.dumps(
+            {"provider": "Booking.com", "url": "https://www.booking.com/x", "name": "Hotel Test",
+             "price_night": 150, "currency": "EUR", "quoted_at": "2030-01-01T10:10", "rating": 8.9, "reviews": 900}))
+        sq = json.loads((layer / "quotes" / "paris-stay.json").read_text()) if (layer / "quotes" / "paris-stay.json").exists() else {}
+        check("travel: a stay priced per night gets its total over the stay's nights",
+              st1.returncode == 0 and (sq.get("options") or [{}])[0].get("price_total") == 300, st1.stderr[-200:])
+        run("render_brain.py")
+        a3 = run("render_brain.py")
+        check("travel: each quote set renders a list note",
+              (layer / "quotes" / "Dubai to Paris.md").is_file()
+              and "| f2 ✔ picked |" in (layer / "quotes" / "Dubai to Paris.md").read_text()
+              if (layer / "quotes" / "Dubai to Paris.md").is_file() else False)
+        check("travel: a suggestion set renders a note, and a second render writes nothing",
+              (layer / "suggestions" / "Coffee in Paris.md").is_file() and " 0 written" in a3.stdout, a3.stdout)
+        # an engine --refresh leaves the plugin's layer byte-identical
+        before = {p.relative_to(layer).as_posix(): p.read_bytes() for p in layer.rglob("*") if p.is_file()}
+        rr = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"), str(owner), "-o", str(out),
+                             "--refresh"], capture_output=True, text=True)
+        after = {p.relative_to(layer).as_posix(): p.read_bytes() for p in layer.rglob("*") if p.is_file()}
+        check("travel: build_vault --refresh leaves 47-travel byte-identical",
+              rr.returncode == 0 and before == after, rr.stderr[-300:])
+        check("travel: --refresh leaves the plugin manifest intact",
+              (brain / ".plugins" / "travel-planner" / "_TRAVEL_GENERATED.json").is_file())
 
 def test_refresh_v2():
     """M3 incremental updates: --refresh preserves user notes and edits, updates
@@ -1474,6 +1989,10 @@ def test_places_and_mappings_build():
         ptext = "\n".join(p.read_text() for p in places.glob("*.md")) if places.is_dir() else ""
         check("mappings: saved place rendered (Eiffel Tower)", "Eiffel Tower" in ptext)
         check("mappings: review note captured", "Best coffee in the Marais" in ptext)
+        check("travel: IG post venue → named place with coordinates",
+              "title: Le Petit Zinc" in ptext and "lat: 48.854" in ptext, ptext[:0])
+        check("travel: IG caption without coordinates is never a place",
+              "shipping a new feature today" not in ptext and "sunrise over the city" not in ptext)
         # IG followers → people, posts → voice
         ppl = "\n".join(p.read_text() for p in (brain / "10-people").glob("*.md")) if (brain / "10-people").is_dir() else ""
         check("mappings: IG follower → person", "ada_dev" in ppl or "Ada Dev" in ppl)
@@ -1711,6 +2230,10 @@ def test_facebook_mapping():
         ev = (brain / "60-learning" / "events.md")
         check("facebook: event invitation → event",
               ev.exists() and "Founders Dinner" in ev.read_text(encoding="utf-8"))
+        check("travel: FB event location on events.md",
+              ev.exists() and "📍 Harbor Loft" in ev.read_text(encoding="utf-8"))
+        check("travel: FB event places → 85-places",
+              "title: Harbor Loft" in plc and "title: Springfield Expo Hall" in plc, plc[:0])
         ints = (brain / "30-voice" / "interests.md")
         check("facebook: liked page → interest",
               ints.exists() and "SpaceX" in ints.read_text(encoding="utf-8"))
@@ -1903,6 +2426,7 @@ def main():
     test_data_catalog()
     test_final_sweep()
     test_plugins()
+    test_travel_plugin()
     # Per-source fixtures live at tests/fixtures/<personal|company>/<entity>/<source>/.
     # Build each single source export on its own (exercises every adapter + the
     # vault invariants), independent of the multi-entity orchestration above.

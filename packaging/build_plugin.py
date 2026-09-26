@@ -63,11 +63,18 @@ SKIP_NAMES = {"__pycache__", ".DS_Store", ".git"}
 SKIP_SUFFIX = {".pyc", ".pyo"}
 # A user's ledger must never reach a distributed archive, even if they ran the plugin
 # from inside the repo. Mirrors plugins/.gitignore — belt and braces.
-SKIP_DIRS = {"45-jobs", "_state", "JobData", "reports", "applications"}
+SKIP_DIRS = {"45-jobs", "_state", "JobData", "reports", "applications",
+             # fundraising: the rendered layer and its working folders
+             "46-fundraising", ".plugins", "outreach", "targets", "plans",
+             # travel-planner: the rendered layer and the ledger's working folders
+             "47-travel", "trips", "quotes", "bookings"}
 # providers/ holds OTHER packagings' manifests — each build takes only its own.
 CLAUDE_SKIP_DIRS = SKIP_DIRS | {"providers"}
 SKIP_FILES = {"seen.json", "brain-path.txt", "companies.txt", "ats_pool.json",
-              "last-run.txt", "snooze.txt", "nudged.txt", "lessons.md"}
+              "last-run.txt", "snooze.txt", "nudged.txt", "lessons.md",
+              "_FUNDRAISE_GENERATED.json", "gates.json", ".ledger.lock",
+              "_TRAVEL_GENERATED.json", "_TRAVEL_BUILD_REPORT.md", "current.json", "ideas.json",
+              "outcomes.jsonl.lock", "lessons.md.lock"}
 SKIP_DATA_SUFFIX = {".jsonl", ".pdf", ".docx"}
 
 

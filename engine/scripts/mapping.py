@@ -198,7 +198,7 @@ def _locate(data, mode, field_keys):
 # emit — call the matching col.add_* (privacy enforced inside Collector)
 # ---------------------------------------------------------------------------
 
-def _emit(col, source, kind, fields, rec, tags=None):
+def _emit(col, source, kind, fields, rec, tags=None, require=None):
     """fields: {logical_name: spec}. We fan out on the PRIMARY field's list so a
     record with N handles emits N people, etc. `tags` are rule-declared semantic
     tags (e.g. ["person/friend"]) attached to every entity note this rule emits —
@@ -311,12 +311,19 @@ def _emit(col, source, kind, fields, rec, tags=None):
         return len(names)
     if kind == "place":
         names = resolved.get("name") or []
+        n_out = 0
         for i, _ in enumerate(names):
+            # rule-level `require`: fields that must resolve for THIS record, or it
+            # emits nothing — e.g. a post place rule requires lat/lng, so a caption
+            # with no coordinates never becomes a coordinate-less "place" orphan.
+            if require and any(str(g(k, i)).strip() == "" for k in require):
+                continue
+            n_out += 1
             col.add_place(source, name=str(g("name", i)), address=str(g("address", i)),
                           lat=str(g("lat", i)), lng=str(g("lng", i)),
                           url=str(g("url", i)), kind=str(g("kind", i) or "place"),
                           note=str(g("note", i)), date=str(g("date", i)), tags=tags)
-        return len(names)
+        return n_out
     if kind == "purchase":
         items = resolved.get("item") or resolved.get("name") or []
         for i, _ in enumerate(items):
@@ -426,7 +433,7 @@ class JsonMapping:
                 k for spec in fields.values()
                 for k in ([spec] if isinstance(spec, str) else
                           spec if isinstance(spec, list) else [])
-                if isinstance(k, str) for k in [k.split(".")[0].rstrip("[]")])
+                if isinstance(k, str) for k in [re.sub(r"\[.*$", "", k.split(".")[0])])
             for p in all_paths:
                 if p.suffix.lower() not in (".json", ".csv"):
                     continue
@@ -439,7 +446,8 @@ class JsonMapping:
                         records = _locate(read_json(p), mode, field_keys)
                     n = 0
                     for rec in records:
-                        n += _emit(col, self.NAME, emit, fields, rec, rule_tags)
+                        n += _emit(col, self.NAME, emit, fields, rec, rule_tags,
+                                   rule.get("require"))
                     if n:
                         col.note(f"[{self.NAME}] {emit}: {n} from {p.name}")
                     consumed.add(norm_file(p.name))   # match the engine's file_index keys

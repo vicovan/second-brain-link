@@ -6,7 +6,7 @@ shortlists, fills the employer's application form, and keeps everything as an in
 of your vault.
 
 **Nothing about any particular person is in this plugin.** Your career facts, criteria and
-settled application answers live in five Markdown files that `/onboard` writes into your own
+settled application answers live in seven Markdown files that `/onboard` writes into your own
 vault or working folder, and every skill reads them from there.
 
 ## Install
@@ -69,7 +69,8 @@ Then:
 ```
 /onboard      # builds your profile from a CV, a Second Brain vault, a LinkedIn export, or a chat
 /jobs         # the daily run: sweep -> score -> tailor -> apply
-/kpi          # the only number that matters: applications actually submitted
+/kpi          # the number that matters: interviews won, and the interview rate
+/outcome      # paste a reply or rejection — it is logged against the right application
 /report       # re-render the dashboard
 ```
 
@@ -82,6 +83,25 @@ Then:
 | `cv-tailor` | Builds a tailored, ATS-first CV as Markdown and PDF, from your profile only |
 | `job-apply` | Classifies the portal, fills the form, logs every answer given |
 | `job-pipeline` | Sequences the other four and holds whatever gates your autonomy setting calls for |
+
+## How it tries to win interviews, not just send applications
+
+Fast, generic rejections usually come from an automatic rule, not a person: a "No" to *right to
+work in <country>*, a location outside the posting's, a required language, a salary figure off
+the band. After those, the causes are a job the candidate was never going to be shortlisted for,
+and a CV or answer that reads as generated. Each has a gate:
+
+| Gate | Where | Stops |
+|---|---|---|
+| **Knock-out screen** | `job-apply/scripts/knockout.py`, run by the scout and again on the form's own questions | jobs the truthful answer disqualifies — before a CV is written |
+| **Archetypes + shortlist likelihood + apply floor** | `profile/archetypes.md`, `job-scout/references/scoring-rubric.md` | roles outside your lanes, and roles a recruiter would not shortlist you for |
+| **Fit file** | `<application>/fit.md` | a CV built from anything but evidence for the JD's actual requirements |
+| **CV and answers lint** | `cv-tailor/scripts/lint_cv.py` | dates out of order, a named gap, first person, banned phrases, "not just X but Y", numbers or titles not in your profile, placeholders in a form answer |
+| **Independent recruiter review** | job-apply step 4b — one small model, no tools | anything a hiring manager would not shortlist; only `shortlist` is submitted autonomously |
+
+`learn.py log-outcome --status applied` refuses to record a submission unless all three
+recorded gates in `gates.json` are green. And the loop only learns if results come back —
+`/outcome` records them, `learn.py calibrate` shows whether the score predicts replies.
 
 ## Where your data lives
 

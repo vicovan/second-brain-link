@@ -1,0 +1,586 @@
+{
+ "_comment": "Airports the travel-planner knows by IATA code: city, country, coordinates, whether it has more than one terminal, and mct_self — the MINIMUM self-transfer connection in minutes (bags collected and re-checked, landside re-security, a separate ticket). These are conservative planning floors chosen by hand, NOT published airline minimum-connection-times, which assume a single ticket and are far shorter. interline.py refuses any separate-ticket connection below mct_self. An unknown airport falls back to _default.",
+ "_default": {
+  "mct_self": 180,
+  "multi_terminal": true
+ },
+ "DXB": {
+  "city": "Dubai",
+  "country": "AE",
+  "lat": 25.2532,
+  "lng": 55.3657,
+  "multi_terminal": true,
+  "mct_self": 180
+ },
+ "AUH": {
+  "city": "Abu Dhabi",
+  "country": "AE",
+  "lat": 24.433,
+  "lng": 54.6511,
+  "multi_terminal": true,
+  "mct_self": 150
+ },
+ "DOH": {
+  "city": "Doha",
+  "country": "QA",
+  "lat": 25.2731,
+  "lng": 51.6081,
+  "multi_terminal": false,
+  "mct_self": 150
+ },
+ "IST": {
+  "city": "Istanbul",
+  "country": "TR",
+  "lat": 41.2753,
+  "lng": 28.7519,
+  "multi_terminal": false,
+  "mct_self": 180
+ },
+ "LHR": {
+  "city": "London",
+  "country": "GB",
+  "lat": 51.47,
+  "lng": -0.4543,
+  "multi_terminal": true,
+  "mct_self": 210
+ },
+ "LGW": {
+  "city": "London",
+  "country": "GB",
+  "lat": 51.1537,
+  "lng": -0.1821,
+  "multi_terminal": true,
+  "mct_self": 180
+ },
+ "STN": {
+  "city": "London",
+  "country": "GB",
+  "lat": 51.886,
+  "lng": 0.2389,
+  "multi_terminal": false,
+  "mct_self": 150
+ },
+ "CDG": {
+  "city": "Paris",
+  "country": "FR",
+  "lat": 49.0097,
+  "lng": 2.5479,
+  "multi_terminal": true,
+  "mct_self": 210
+ },
+ "ORY": {
+  "city": "Paris",
+  "country": "FR",
+  "lat": 48.7262,
+  "lng": 2.3652,
+  "multi_terminal": true,
+  "mct_self": 150
+ },
+ "AMS": {
+  "city": "Amsterdam",
+  "country": "NL",
+  "lat": 52.3105,
+  "lng": 4.7683,
+  "multi_terminal": false,
+  "mct_self": 150
+ },
+ "FRA": {
+  "city": "Frankfurt",
+  "country": "DE",
+  "lat": 50.0379,
+  "lng": 8.5622,
+  "multi_terminal": true,
+  "mct_self": 180
+ },
+ "MUC": {
+  "city": "Munich",
+  "country": "DE",
+  "lat": 48.3538,
+  "lng": 11.7861,
+  "multi_terminal": true,
+  "mct_self": 150
+ },
+ "BER": {
+  "city": "Berlin",
+  "country": "DE",
+  "lat": 52.3667,
+  "lng": 13.5033,
+  "multi_terminal": true,
+  "mct_self": 150
+ },
+ "MAD": {
+  "city": "Madrid",
+  "country": "ES",
+  "lat": 40.4983,
+  "lng": -3.5676,
+  "multi_terminal": true,
+  "mct_self": 180
+ },
+ "BCN": {
+  "city": "Barcelona",
+  "country": "ES",
+  "lat": 41.2974,
+  "lng": 2.0833,
+  "multi_terminal": true,
+  "mct_self": 150
+ },
+ "LIS": {
+  "city": "Lisbon",
+  "country": "PT",
+  "lat": 38.7742,
+  "lng": -9.1342,
+  "multi_terminal": true,
+  "mct_self": 150
+ },
+ "OPO": {
+  "city": "Porto",
+  "country": "PT",
+  "lat": 41.2481,
+  "lng": -8.6814,
+  "multi_terminal": false,
+  "mct_self": 120
+ },
+ "FCO": {
+  "city": "Rome",
+  "country": "IT",
+  "lat": 41.8003,
+  "lng": 12.2389,
+  "multi_terminal": true,
+  "mct_self": 180
+ },
+ "MXP": {
+  "city": "Milan",
+  "country": "IT",
+  "lat": 45.6306,
+  "lng": 8.7281,
+  "multi_terminal": true,
+  "mct_self": 150
+ },
+ "ZRH": {
+  "city": "Zurich",
+  "country": "CH",
+  "lat": 47.4582,
+  "lng": 8.5555,
+  "multi_terminal": false,
+  "mct_self": 150
+ },
+ "VIE": {
+  "city": "Vienna",
+  "country": "AT",
+  "lat": 48.1103,
+  "lng": 16.5697,
+  "multi_terminal": false,
+  "mct_self": 150
+ },
+ "CPH": {
+  "city": "Copenhagen",
+  "country": "DK",
+  "lat": 55.618,
+  "lng": 12.656,
+  "multi_terminal": false,
+  "mct_self": 120
+ },
+ "ARN": {
+  "city": "Stockholm",
+  "country": "SE",
+  "lat": 59.6519,
+  "lng": 17.9186,
+  "multi_terminal": true,
+  "mct_self": 150
+ },
+ "OSL": {
+  "city": "Oslo",
+  "country": "NO",
+  "lat": 60.1976,
+  "lng": 11.1004,
+  "multi_terminal": false,
+  "mct_self": 120
+ },
+ "HEL": {
+  "city": "Helsinki",
+  "country": "FI",
+  "lat": 60.3172,
+  "lng": 24.9633,
+  "multi_terminal": false,
+  "mct_self": 120
+ },
+ "DUB": {
+  "city": "Dublin",
+  "country": "IE",
+  "lat": 53.4264,
+  "lng": -6.2499,
+  "multi_terminal": true,
+  "mct_self": 150
+ },
+ "WAW": {
+  "city": "Warsaw",
+  "country": "PL",
+  "lat": 52.1657,
+  "lng": 20.9671,
+  "multi_terminal": false,
+  "mct_self": 120
+ },
+ "PRG": {
+  "city": "Prague",
+  "country": "CZ",
+  "lat": 50.1008,
+  "lng": 14.26,
+  "multi_terminal": true,
+  "mct_self": 120
+ },
+ "BUD": {
+  "city": "Budapest",
+  "country": "HU",
+  "lat": 47.4369,
+  "lng": 19.2556,
+  "multi_terminal": true,
+  "mct_self": 120
+ },
+ "OTP": {
+  "city": "Bucharest",
+  "country": "RO",
+  "lat": 44.5711,
+  "lng": 26.085,
+  "multi_terminal": false,
+  "mct_self": 120
+ },
+ "ATH": {
+  "city": "Athens",
+  "country": "GR",
+  "lat": 37.9364,
+  "lng": 23.9445,
+  "multi_terminal": false,
+  "mct_self": 150
+ },
+ "TLL": {
+  "city": "Tallinn",
+  "country": "EE",
+  "lat": 59.4133,
+  "lng": 24.8328,
+  "multi_terminal": false,
+  "mct_self": 90
+ },
+ "JFK": {
+  "city": "New York City",
+  "country": "US",
+  "lat": 40.6413,
+  "lng": -73.7781,
+  "multi_terminal": true,
+  "mct_self": 240
+ },
+ "EWR": {
+  "city": "Newark",
+  "country": "US",
+  "lat": 40.6895,
+  "lng": -74.1745,
+  "multi_terminal": true,
+  "mct_self": 210
+ },
+ "BOS": {
+  "city": "Boston",
+  "country": "US",
+  "lat": 42.3656,
+  "lng": -71.0096,
+  "multi_terminal": true,
+  "mct_self": 180
+ },
+ "ORD": {
+  "city": "Chicago",
+  "country": "US",
+  "lat": 41.9742,
+  "lng": -87.9073,
+  "multi_terminal": true,
+  "mct_self": 210
+ },
+ "SFO": {
+  "city": "San Francisco",
+  "country": "US",
+  "lat": 37.6213,
+  "lng": -122.379,
+  "multi_terminal": true,
+  "mct_self": 210
+ },
+ "LAX": {
+  "city": "Los Angeles",
+  "country": "US",
+  "lat": 33.9416,
+  "lng": -118.4085,
+  "multi_terminal": true,
+  "mct_self": 240
+ },
+ "SEA": {
+  "city": "Seattle",
+  "country": "US",
+  "lat": 47.4502,
+  "lng": -122.3088,
+  "multi_terminal": false,
+  "mct_self": 180
+ },
+ "AUS": {
+  "city": "Austin",
+  "country": "US",
+  "lat": 30.1975,
+  "lng": -97.6664,
+  "multi_terminal": false,
+  "mct_self": 150
+ },
+ "PIT": {
+  "city": "Pittsburgh",
+  "country": "US",
+  "lat": 40.4915,
+  "lng": -80.2329,
+  "multi_terminal": false,
+  "mct_self": 120
+ },
+ "YYZ": {
+  "city": "Toronto",
+  "country": "CA",
+  "lat": 43.6777,
+  "lng": -79.6248,
+  "multi_terminal": true,
+  "mct_self": 210
+ },
+ "YVR": {
+  "city": "Vancouver",
+  "country": "CA",
+  "lat": 49.1967,
+  "lng": -123.1815,
+  "multi_terminal": false,
+  "mct_self": 180
+ },
+ "MEX": {
+  "city": "Mexico City",
+  "country": "MX",
+  "lat": 19.4361,
+  "lng": -99.0719,
+  "multi_terminal": true,
+  "mct_self": 210
+ },
+ "GRU": {
+  "city": "São Paulo",
+  "country": "BR",
+  "lat": -23.4356,
+  "lng": -46.4731,
+  "multi_terminal": true,
+  "mct_self": 240
+ },
+ "HND": {
+  "city": "Tokyo",
+  "country": "JP",
+  "lat": 35.5494,
+  "lng": 139.7798,
+  "multi_terminal": true,
+  "mct_self": 180
+ },
+ "NRT": {
+  "city": "Tokyo",
+  "country": "JP",
+  "lat": 35.772,
+  "lng": 140.3929,
+  "multi_terminal": true,
+  "mct_self": 210
+ },
+ "KIX": {
+  "city": "Osaka",
+  "country": "JP",
+  "lat": 34.432,
+  "lng": 135.2304,
+  "multi_terminal": true,
+  "mct_self": 180
+ },
+ "ICN": {
+  "city": "Seoul",
+  "country": "KR",
+  "lat": 37.4602,
+  "lng": 126.4407,
+  "multi_terminal": true,
+  "mct_self": 180
+ },
+ "GMP": {
+  "city": "Seoul",
+  "country": "KR",
+  "lat": 37.5583,
+  "lng": 126.7906,
+  "multi_terminal": true,
+  "mct_self": 150
+ },
+ "PEK": {
+  "city": "Beijing",
+  "country": "CN",
+  "lat": 40.0799,
+  "lng": 116.6031,
+  "multi_terminal": true,
+  "mct_self": 210
+ },
+ "PVG": {
+  "city": "Shanghai",
+  "country": "CN",
+  "lat": 31.1443,
+  "lng": 121.8083,
+  "multi_terminal": true,
+  "mct_self": 210
+ },
+ "HKG": {
+  "city": "Hong Kong",
+  "country": "HK",
+  "lat": 22.308,
+  "lng": 113.9185,
+  "multi_terminal": true,
+  "mct_self": 180
+ },
+ "TPE": {
+  "city": "Taipei",
+  "country": "TW",
+  "lat": 25.0797,
+  "lng": 121.2342,
+  "multi_terminal": true,
+  "mct_self": 180
+ },
+ "SIN": {
+  "city": "Singapore",
+  "country": "SG",
+  "lat": 1.3644,
+  "lng": 103.9915,
+  "multi_terminal": true,
+  "mct_self": 150
+ },
+ "KUL": {
+  "city": "Kuala Lumpur",
+  "country": "MY",
+  "lat": 2.7456,
+  "lng": 101.7072,
+  "multi_terminal": true,
+  "mct_self": 180
+ },
+ "BKK": {
+  "city": "Bangkok",
+  "country": "TH",
+  "lat": 13.69,
+  "lng": 100.7501,
+  "multi_terminal": false,
+  "mct_self": 180
+ },
+ "DEL": {
+  "city": "New Delhi",
+  "country": "IN",
+  "lat": 28.5562,
+  "lng": 77.1,
+  "multi_terminal": true,
+  "mct_self": 210
+ },
+ "BOM": {
+  "city": "Mumbai",
+  "country": "IN",
+  "lat": 19.0896,
+  "lng": 72.8656,
+  "multi_terminal": true,
+  "mct_self": 210
+ },
+ "SYD": {
+  "city": "Sydney",
+  "country": "AU",
+  "lat": -33.9399,
+  "lng": 151.1753,
+  "multi_terminal": true,
+  "mct_self": 240
+ },
+ "MEL": {
+  "city": "Melbourne",
+  "country": "AU",
+  "lat": -37.669,
+  "lng": 144.841,
+  "multi_terminal": true,
+  "mct_self": 180
+ },
+ "AKL": {
+  "city": "Auckland",
+  "country": "NZ",
+  "lat": -37.0082,
+  "lng": 174.785,
+  "multi_terminal": true,
+  "mct_self": 180
+ },
+ "JNB": {
+  "city": "Johannesburg",
+  "country": "ZA",
+  "lat": -26.1392,
+  "lng": 28.246,
+  "multi_terminal": true,
+  "mct_self": 180
+ },
+ "CAI": {
+  "city": "Cairo",
+  "country": "EG",
+  "lat": 30.1219,
+  "lng": 31.4056,
+  "multi_terminal": true,
+  "mct_self": 180
+ },
+ "NBO": {
+  "city": "Nairobi",
+  "country": "KE",
+  "lat": -1.3192,
+  "lng": 36.9278,
+  "multi_terminal": true,
+  "mct_self": 150
+ },
+ "CMN": {
+  "city": "Casablanca",
+  "country": "MA",
+  "lat": 33.3675,
+  "lng": -7.5898,
+  "multi_terminal": true,
+  "mct_self": 150
+ },
+ "_metro": {
+  "_comment": "IATA metropolitan-area codes: a journey to TYO may end at HND or NRT.",
+  "TYO": [
+   "Tokyo",
+   "JP"
+  ],
+  "LON": [
+   "London",
+   "GB"
+  ],
+  "PAR": [
+   "Paris",
+   "FR"
+  ],
+  "NYC": [
+   "New York City",
+   "US"
+  ],
+  "SEL": [
+   "Seoul",
+   "KR"
+  ],
+  "MIL": [
+   "Milan",
+   "IT"
+  ],
+  "ROM": [
+   "Rome",
+   "IT"
+  ],
+  "OSA": [
+   "Osaka",
+   "JP"
+  ],
+  "BJS": [
+   "Beijing",
+   "CN"
+  ],
+  "SHA": [
+   "Shanghai",
+   "CN"
+  ],
+  "STO": [
+   "Stockholm",
+   "SE"
+  ],
+  "CHI": [
+   "Chicago",
+   "US"
+  ]
+ }
+}

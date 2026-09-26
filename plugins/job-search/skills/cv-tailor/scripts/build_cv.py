@@ -413,6 +413,40 @@ def rename_source(path, base):
     return dst
 
 
+def mirror_into_brain(out_dir):
+    """Refresh the brain's job layer when this CV was written into a brain's hidden ledger.
+
+    The ledger (`<brain>/.plugins/job-search/applications/...`) is never shown in the vault;
+    render_brain.py mirrors it into `45-jobs/` as `CV <Company>.md`. Until that runs, a CV
+    that was just built is invisible in Studio ("isn't rendered into this brain's notes
+    yet"). Best effort: a failed render never fails the build."""
+    full = os.path.abspath(out_dir).replace(os.sep, "/")
+    marker = "/.plugins/job-search/"
+    if marker not in full:
+        return
+    brain = full.split(marker, 1)[0]
+    here = os.path.dirname(os.path.abspath(__file__))
+    # Claude plugin: skills/cv-tailor/scripts/ → skills/job-scout/scripts/render_brain.py;
+    # the flattened Codex skill keeps every script side by side in one scripts/ folder.
+    renderer = next((c for c in (
+        os.path.join(os.path.dirname(os.path.dirname(here)), "job-scout", "scripts", "render_brain.py"),
+        os.path.join(here, "render_brain.py"),
+    ) if os.path.isfile(c)), None)
+    if not renderer:
+        return
+    try:
+        import subprocess
+        r = subprocess.run([sys.executable, renderer, "--quiet"], cwd=brain,
+                           capture_output=True, text=True, timeout=120)
+        if r.returncode == 0:
+            print("brain: job layer re-rendered — the CV opens in Studio")
+        else:
+            print(f"note: could not re-render the job layer ({(r.stderr or '').strip()[-200:]}); "
+                  "run render_brain.py --quiet", file=sys.stderr)
+    except Exception as e:  # noqa: BLE001 - never fail a finished CV over the mirror
+        print(f"note: could not re-render the job layer ({e}); run render_brain.py --quiet", file=sys.stderr)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("content", help="the CV content file — .md (preferred) or .json")
@@ -440,6 +474,7 @@ def main():
         print(f"  interpreter: {sys.executable}", file=sys.stderr)
         print(f"  the CV IS complete as Markdown: {a.content}", file=sys.stderr)
         print(f"  fix: {sys.executable} -m pip install reportlab", file=sys.stderr)
+        mirror_into_brain(a.out)
         return 3
 
     reg, bold, fname = register_fonts()
@@ -459,6 +494,7 @@ def main():
         out_docx = os.path.join(a.out, base + ".docx")
         if build_docx(content, out_docx):
             print(f"DOCX: {out_docx}")
+    mirror_into_brain(a.out)
     return 0
 
 if __name__ == "__main__":

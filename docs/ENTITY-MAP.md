@@ -85,15 +85,19 @@ fields: item, merchant, amount, currency, category, created. Filled by: amazon
 Canonical record via `add_event`: name, date, kind (event/meeting/deal/campaign/
 activity), location, description, attendees (wikilinks, cap 15), RSVP tags
 (`event/going|interested`), url, value. Filled by: google(ics), google_workspace
-(calendars→meetings), linkedin(events), facebook(invitations+RSVPs), strava
+(calendars→meetings), linkedin(events), facebook(invitations+RSVPs, with the event's
+place as `location`), strava
 (activities), salesforce/hubspot (deals→pipeline).
 
 ### place (`<places>/<Name>.md`) — one note per place, numeric suffix on collisions
 fields: address, lat, lng, `location: "lat,lng"` (Obsidian Map View), url, kind
-(saved/reviewed/labeled/check-in/visited/photo/activity), lists, note (your
-review), created, sources. Filled by: google (Maps saved/reviews/labeled,
-Semantic Location History visits, Photos EXIF spots), facebook (check-ins),
-instagram (locations/media EXIF), strava (GPX start points).
+(saved/reviewed/labeled/check-in/visited/photo/activity/event), country (ISO-2, from the
+export or the offline gazetteer), city (nearest gazetteer city; bare when none within
+range), rating (your own stars), lists, note (your review), created, sources. Filled by:
+google (Maps saved/reviews/labeled, Semantic Location History visits, new-format Timeline
+visits, Photos EXIF spots), facebook (check-ins, event places), instagram (locations, post
+venues/media EXIF — only with coordinates), strava (GPX start points). `graph.json` copies
+address/country/city/kind/rating/lists/place tags onto place nodes.
 
 ### aggregates (all carry frontmatter: type/tags/sources/totals)
 - `interests.md` — grouped BY SOURCE, counts, cap 500 (+ "and N more"); interest_meta keeps sources+first date. Filled by: every source.

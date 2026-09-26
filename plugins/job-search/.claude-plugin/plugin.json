@@ -1,6 +1,6 @@
 {
   "name": "job-search",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Run a whole job hunt from Claude Code or from inside Second Brain Studio: sweep the market against your own criteria, tailor a CV per role, fill the application, and keep the results as an indexed layer of your Second Brain.",
   "author": {"name": "Second Brain Link", "url": "https://secondbrainlink.com"},
   "homepage": "https://secondbrainlink.com",

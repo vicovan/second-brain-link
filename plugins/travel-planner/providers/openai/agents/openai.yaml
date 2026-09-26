@@ -1,0 +1,13 @@
+# OpenAI Codex Agent Skill metadata (optional, alongside SKILL.md).
+# Codex discovers skills from .agents/skills/ (repo) and ~/.agents/skills/ (user).
+interface:
+  display_name: Travel Planner
+  allow_implicit_invocation: true
+policy:
+  # Planning reads only the local brain. The Codex packaging has no browser, so it makes no
+  # shopping requests itself; "outbound" covers optional web search for places when asked.
+  network: outbound
+  network_hosts: []
+dependencies:
+  runtime: python3
+  python: ">=3.9"

@@ -2,7 +2,15 @@
   "events_invited_v2": [
     {
       "name": "Founders Dinner",
-      "start_timestamp": 1650000000
+      "start_timestamp": 1650000000,
+      "place": {
+        "name": "Harbor Loft",
+        "address": "Pier 17, Springfield",
+        "coordinate": {
+          "latitude": 40.706,
+          "longitude": -74.003
+        }
+      }
     }
   ]
 }

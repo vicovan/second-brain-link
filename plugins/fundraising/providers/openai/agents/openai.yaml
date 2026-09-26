@@ -1,0 +1,12 @@
+# OpenAI Codex Agent Skill metadata (optional, alongside SKILL.md).
+interface:
+  display_name: Fundraising
+  allow_implicit_invocation: true
+policy:
+  # NOT "none": research reads public fund and program pages. Nothing is ever sent.
+  network: outbound
+  network_hosts:
+    - "fund and program websites reached by web search / fetch"
+dependencies:
+  runtime: python3
+  python: ">=3.9"

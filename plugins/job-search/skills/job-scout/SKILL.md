@@ -6,9 +6,14 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch, TodoWri
 
 # Job Scout
 
-A daily sweep of the market for the roles the user actually wants, scored against their real
-profile, deduped against everything they have already been shown, and delivered as a
-ranked top 10 with a saved report.
+A daily sweep of the market for the roles the user actually wants **and can win**, scored against
+their real profile, deduped against everything they have already been shown, and delivered as a
+ranked shortlist of up to 10 — only jobs that clear the apply floor — with a saved report.
+
+**Fewer, better applications win more interviews than many average ones.** A recruiter who sees
+the same person apply as CTO, ML scientist and product director in one week reads none of them
+seriously, and every application that is auto-rejected teaches the system nothing. The shortlist
+is judged by the interviews it produces, not by its length.
 
 **This skill finds jobs. It does not write CVs.** If the user pastes *one* job description
 and wants a document, that is **`cv-tailor`** — hand off and stop. This skill's
@@ -20,7 +25,9 @@ output is the shortlist; the CV skill turns one item on it into a PDF.
 |---|---|
 | `profile/search-criteria.md` | ALWAYS. What they are looking for — lanes, geography, comp, red flags. |
 | `references/sources.md` | ALWAYS. Which sources work, the exact commands, and what not to retry. |
-| `references/scoring-rubric.md` | Before ranking. The 100-point scale and the disqualifiers. |
+| `references/scoring-rubric.md` | Before ranking. The 100-point scale, shortlist likelihood, the apply floor, the disqualifiers. |
+| `profile/archetypes.md` | Before scoring. The lanes the user targets and each lane's trigger keywords — a job matching no lane is dropped. |
+| `${CLAUDE_PLUGIN_ROOT}/skills/job-apply/scripts/knockout.py` | Step 5 — every fetched posting is knock-out screened before it is scored. |
 | `<brain>/45-jobs/profile/profile.md` | ALWAYS. The **only** source of facts about the user. Never copy it here. |
 | `scripts/ats_pool.py` | Tier-0 bulk probe of many companies' open ATS boards → JSON. |
 | `scripts/ats_fetch.py` | Tier-1 drill-down into one company's Greenhouse/Lever/Ashby board. |
@@ -48,19 +55,26 @@ and an offer to copy it here → **run `job-search:job-onboarding` (the **Skill*
 location or a target title: a run built on invented criteria costs the user a whole day and
 produces a shortlist they would never act on.
 
-### 0a. THE NORTH STAR — successful applications
+### 0a. THE NORTH STAR — interviews
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/learn.py kpi
 ```
-**The single measure of whether this system works is how many applications actually get submitted.**
-Two derived numbers matter as much:
-- **Shortlist conversion** — of the jobs shortlisted, what share reached submit. Low conversion
-  means the *shortlist* is bad, not the applying.
-- **Wasted shortlist** — jobs shortlisted then blocked (account wall, wrong geo, requirement they
-  cannot meet). **Every one of these is a scouting bug to fix**, not bad luck.
+**The single measure of whether this system works is how many applications turn into a screen or
+an interview.** Submissions are the means, not the result: eighteen fast rejections are worse than
+three considered applications, because they burn the employer's first impression and teach
+nothing.
 
-Every daily report opens with the KPI block. Every blocked job gets a one-line reason so the cause
-is fixable next run. If a portal keeps converting 0/N, stop sourcing from it.
+Read the KPI's tables before sweeping:
+- **By archetype** — a lane with several answered applications and no reply is the first to
+  narrow. Say so in the report; the lanes themselves are the user's call.
+- **By score band** — once `learn.py calibrate` has ≥ 5 results, it says whether the score
+  predicts replies. A flat or inverted score is a scoring bug to raise, not noise.
+- **Stopped before sending** — knock-out and review skips are the gates working; a *scouting* bug
+  is a job that reached the shortlist and was then stopped for something visible in the posting.
+
+If applications are open with no result, remind the user once to record them
+(`learn.py set-result --job-key K --result rejected`, or `--all-open`) — the loop learns nothing
+until they do.
 
 ### 0b. Load what past runs learned  (never skip)
 ```bash
@@ -198,12 +212,22 @@ nothing identifying in either field, and only reading the posting reveals it. An
 whose sector is unclear must be read before it is ranked. Report the count of exclusions in one line; do not list them all.
 
 ### 5. Shortlist, then read the real postings
-Score everything cheaply from title + company + location first. Take the **top ~15**
-and `WebFetch` each posting for what only the full text reveals: comp, work-authorization
-wording, whether "CTO" means CTO, team size, funding. Do not fetch all of them — that is
-the expensive step and most candidates die on the title alone.
+Map each candidate to an **archetype** from `profile/archetypes.md` by its title and trigger
+keywords; one that matches no lane is dropped here (count it, do not list it). Then score
+cheaply from title + company + location. Take the **top ~15** and `WebFetch` each posting for
+what only the full text reveals: comp, work-authorization wording, whether "CTO" means CTO,
+team size, funding. Do not fetch all of them — that is the expensive step and most candidates
+die on the title alone.
 
-### 5b. Applyability check — BEFORE anything reaches the top 10
+**Knock-out screen every fetched posting** (save the text, then):
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-apply/scripts/knockout.py --jd /tmp/posting-<n>.txt
+```
+`STOP` → out of the ranking, into an "excluded — knock-out" line with the quoted sentence. `FLAG`
+→ keep, and show the flag in the job's Flag line. This is where UK-only, citizenship-gated,
+language-gated and below-floor roles leave the list, *before* anyone tailors a CV for them.
+
+### 5b. Applyability check — BEFORE anything reaches the shortlist
 **A job the user cannot actually apply to does not belong on the shortlist.** For every candidate that
 survives scoring, establish how the application is submitted *before* ranking it:
 
@@ -229,9 +253,18 @@ This costs a few fetches per run and saves the user discovering the wall themsel
 they liked. It is not optional.
 
 ### 6. Score and rank
-Apply `references/scoring-rubric.md` — six components out of 100, hard disqualifiers
-dropped outright. Rank, break ties on the work-mode order in `profile/scoring.md`, cut at 10.
-If fewer than 10 clear 60, deliver fewer and say so.
+Apply `references/scoring-rubric.md` — six components out of 100 including **shortlist
+likelihood** (would a recruiter put *this* person on a call?), hard disqualifiers dropped
+outright. Rank, break ties on the work-mode order in `profile/scoring.md`.
+
+**Only jobs that clear the apply floor are shortlisted** (the floor is in `profile/scoring.md`;
+the rubric's default is total ≥ 75 and shortlist likelihood ≥ 20/30). Cut at 10. On a thin day
+deliver fewer and say so plainly — **never widen the search to pad the list**, and never lower
+the floor to reach a number. At most one role per company, and none at a company applied to in
+the last 30 days (`learn.py pending` / the ledger).
+
+Record each shortlisted job's archetype and likelihood in the report; job-apply logs them to the
+ledger so `learn.py calibrate` can check the score against what comes back.
 
 ### 7. Drill down (when it pays)
 If a company looks strong, pull its whole board — the best-fitting role is often not the
@@ -307,7 +340,7 @@ it is a no-op when nothing moved, and silent when no brain is reachable.
 (`publish_report.py` is the separate command that copies a report into `<brain>/_notes/`.)
 
 ### 9. Deliver
-In chat: the top 10, **three lines each** in the rubric's format (rank, title, company,
+In chat: the shortlist, **three lines each** in the rubric's format (rank, title, company,
 location/mode, score · why it fits · flag → link). Then one closing line on what the day
 looked like. No essays, no restating their CV back at them.
 

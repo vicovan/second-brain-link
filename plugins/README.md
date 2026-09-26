@@ -103,11 +103,27 @@ Three rules a plugin must not break:
 | Plugin | Does |
 |---|---|
 | [`job-search`](job-search/) | Runs a whole job hunt: sweeps open ATS boards against your criteria, tailors a CV per role, fills the application, and writes it all into `45-jobs/` |
+| [`fundraising`](fundraising/) | Runs a raise: screens funds and programs against your own filter chain, verifies them on their own sites, writes a dated Funding Plan, drafts applications and investor emails (never sends them), and tracks it all in `46-fundraising/` |
+| [`travel-planner`](travel-planner/) | Plans a trip from the places already in your brain — trip ideas from cities you saved and never visited, a day-by-day itinerary on Studio's Map, then flights (with self-transfer stopover nights), stays, ground and food read from public sites in your own browser — into `47-travel/`. Developer preview; books nothing |
+
+## Install one
+
+From a checkout of this repo (`git clone https://github.com/vicovan/second-brain-link && cd second-brain-link`):
+
+```bash
+python3 packaging/build_plugin.py <name> --provider claude --install   # → ~/.claude/skills/<name>
+python3 packaging/build_plugin.py <name> --provider openai --install   # → ~/.agents/skills/<name>
+```
+
+`<name>` is `job-search`, `fundraising` or `travel-planner`. The Claude install is what the
+CLI **and both Studios** (desktop and browser) read — one install, and the agent appears in
+Studio's Agents tab. `claude --plugin-dir plugins/<name>` loads a plugin for one CLI session
+only; Studio never sees it.
 
 ## Build one
 
 ```bash
-python3 packaging/build_plugin.py <name>                          # both providers
-python3 packaging/build_plugin.py <name> --provider openai --install
-claude --plugin-dir plugins/<name>                                # or load from source
+python3 packaging/build_plugin.py <name>                          # both providers → dist/plugins/
+python3 packaging/build_plugin.py all                             # every plugin
+claude --plugin-dir plugins/<name>                                # try it from source, no install
 ```

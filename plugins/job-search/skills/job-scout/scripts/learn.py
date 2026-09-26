@@ -15,10 +15,16 @@ State (shared root, outside any skill folder):
         applications/YYYY-MM-DD/<job_key>/   tailored CV + answers, filed by the day it went out
 
 Subcommands:
-    kpi           **THE NORTH STAR** — successful applications, shortlist conversion,
-                  why shortlisted jobs failed, and which portals actually convert
-    log-outcome   record an application, draft or skip
-    set-result    record what came back (none|rejected|screen|interview|offer)
+    kpi           **THE NORTH STAR** — interview rate: applied → reply → screen → interview,
+                  by archetype, score band, portal and market; submissions are secondary
+    log-outcome   record an application, draft or skip. `--status applied` REFUSES unless
+                  the application folder holds a non-empty answers.json and gates.json
+                  shows the cv, answers and review gates passed (lint_cv.py)
+    set-result    record what came back (none|rejected|screen|interview|offer); one job,
+                  a list (--keys), or every open application (--all-open)
+    calibrate     does the score predict interviews? rate by score band, archetype, portal;
+                  suggests a floor — never changes one
+    import-legacy COPY an older state root's ledger and applications into this one
     add-lesson    append a candidate observation
     consolidate   promote observations seen >=3x into rules; recompute stats
     show          print lessons.md (what skills read at step 0)
@@ -57,8 +63,12 @@ RESULTS = ["none", "rejected", "screen", "interview", "offer"]
 # too: a state the vault can DISPLAY but this file cannot RECORD is a state an application
 # can get stuck in invisibly. (`replied` and `interview` are results, not statuses — they are
 # recorded with `set-result` and live in RESULTS below.)
+# skipped_knockout = knockout.py said STOP (right to work, location, language, pay floor…).
+# skipped_review   = the independent recruiter review said reject.
 STATUSES = ["applied", "filled", "not_started", "drafted_linkedin", "skipped_walled",
-            "skipped_policy", "disqualified", "excluded", "abandoned", "prior_external"]
+            "skipped_policy", "skipped_knockout", "skipped_review", "disqualified", "excluded",
+            "abandoned", "prior_external"]
+POSITIVE = {"screen", "interview", "offer"}
 
 HEADER = """# Lessons — what the job search has actually learned
 
@@ -136,6 +146,33 @@ def _app_dir(key, day=TODAY):
     return APPS / day / key
 
 
+def _gates_ok(d):
+    """The submit gate. Lives in cv-tailor's lint_cv.py; imported lazily so the ledger still
+    works for every other status when that skill is absent."""
+    here = pathlib.Path(__file__).resolve().parent
+    for p in (here, here.parent.parent / "cv-tailor" / "scripts"):
+        sys.path.insert(0, str(p))
+    try:
+        from lint_cv import gates_ok
+    except ImportError:
+        return False, "lint_cv.py not found — cannot verify the gates"
+    return gates_ok(d)
+
+
+def _answers_ok(d):
+    f = d / "answers.json"
+    if not f.exists():
+        return False, "no answers.json in the application folder"
+    try:
+        data = json.loads(f.read_text(encoding="utf-8"))
+    except ValueError:
+        return False, "answers.json is not valid JSON"
+    real = {k: v for k, v in data.items() if not str(k).startswith("_")} if isinstance(data, dict) else data
+    if not real:
+        return False, "answers.json is empty"
+    return True, "ok"
+
+
 def cmd_log(a):
     """Record — or update — one application.
 
@@ -149,10 +186,20 @@ def cmd_log(a):
     prior = next((r for r in recs if r.get("job_key") == key), None)
     if prior and prior.get("status") == "applied" and a.status == "applied":
         sys.exit(f"REFUSING: already applied to '{key}'. Never apply twice.")
+    if a.status == "applied":
+        d0 = _app_dir(key, (prior or {}).get("date") or TODAY)
+        problems = [why for ok, why in (_answers_ok(d0), _gates_ok(d0)) if not ok]
+        if problems and not a.force_gates:
+            sys.exit(f"REFUSING to log '{key}' as applied: " + "; ".join(problems) +
+                     f".\n  folder: {d0}\n  Run lint_cv.py cv / answers / review there first. "
+                     "A human who submitted by hand may pass --force-gates \"<reason>\".")
+        if problems:
+            a.note = (a.note + " " if a.note else "") + f"[gates overridden: {a.force_gates}]"
     rec = {"date": TODAY, "job_key": key, "company": a.company, "role": a.role,
            "url": a.url, "source": a.source, "score": a.score, "portal": a.portal,
            "status": a.status, "cv_variant": a.cv_variant, "contact_set": a.contact_set,
            "keywords": [k.strip() for k in (a.keywords or "").split(";") if k.strip()],
+           "archetype": a.archetype, "likelihood": a.likelihood, "market": a.market,
            "result": None, "result_date": None, "note": a.note}
     if prior:
         # Keep what the earlier row knew and the caller left blank — a `--status applied`
@@ -208,23 +255,30 @@ def cmd_log(a):
 
 def cmd_set_result(a):
     recs = rows(OUT)
-    hit = [r for r in recs if r.get("job_key") == a.job_key]
-    if not hit:
-        sys.exit(f"no outcome with job_key '{a.job_key}'. Try: learn.py pending")
+    if a.all_open:
+        keys = {r["job_key"] for r in recs if r.get("status") == "applied" and not r.get("result")}
+    else:
+        keys = {k.strip() for k in (a.keys or a.job_key or "").split(",") if k.strip()}
+    if not keys:
+        sys.exit("nothing to update — give --job-key, --keys a,b or --all-open. Try: learn.py pending")
+    unknown = keys - {r.get("job_key") for r in recs}
+    if unknown:
+        sys.exit(f"no outcome with job_key {', '.join(sorted(unknown))}. Try: learn.py pending")
     for r in recs:
-        if r.get("job_key") == a.job_key:
+        if r.get("job_key") in keys:
             r["result"] = a.result
             r["result_date"] = TODAY
             if a.note:
                 r["note"] = a.note
+            if a.feedback:
+                r["feedback"] = a.feedback
             try:
                 d0 = datetime.date.fromisoformat(r["date"])
                 r["days_to_response"] = (datetime.date.today() - d0).days
             except (ValueError, KeyError, TypeError):
                 pass
-    OUT.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in recs),
-                   encoding="utf-8")
-    print(f"{a.job_key} -> {a.result}")
+            print(f"{r['job_key']} -> {a.result}")
+    rewrite(OUT, recs)
 
 
 def cmd_add_lesson(a):
@@ -329,45 +383,135 @@ def cmd_pending(a):
         print(f"{r['date']}  ({age:3}d)  {r['company'][:28]:30} {r['role'][:34]:36} {r['job_key']}")
 
 
-def cmd_kpi(a):
-    """THE NORTH STAR: successful applications, and what stops there being more."""
-    recs = rows(OUT)
-    # prior_external = the user applied themselves, outside the system. It belongs in neither the
-    # numerator nor the denominator: this KPI measures what THIS system sent.
-    recs = [r for r in recs if r.get("status") != "prior_external"]
-    applied = [r for r in recs if r.get("status") == "applied"]
-    blocked = [r for r in recs if str(r.get("status","")).startswith("skipped")]
-    drafted = [r for r in recs if r.get("status") == "drafted_linkedin"]
-    total = len(recs)
-    print("# KPI — north star: successful applications\n")
-    print(f"## ✅ SUCCESSFUL APPLICATIONS: {len(applied)}\n")
-    if total:
-        print(f"- Shortlisted and attempted : {total}")
-        print(f"- **Submitted**             : {len(applied)}   ({100*len(applied)//total}% conversion)")
-        print(f"- Blocked before submitting : {len(blocked)}   ({100*len(blocked)//total}% wasted shortlist)")
-        if drafted:
-            print(f"- Handed to the user to submit   : {len(drafted)}")
-    by = collections.Counter(r.get("status","?") for r in recs)
-    print("\n## Outcome breakdown")
-    for k,v in by.most_common(): print(f"- {k}: {v}")
-    if blocked:
-        print("\n## Why shortlisted jobs failed — fixing these raises the KPI")
-        for r in blocked:
-            why = (r.get("note") or "").split(".")[0][:110]
-            print(f"- **{r.get('company')}** ({r.get('portal') or '?'}): {why}")
-    pf = collections.defaultdict(lambda: [0,0])
+def _rate_table(recs, field, label):
+    agg = collections.defaultdict(lambda: [0, 0, 0])      # answered, positive, interview+
     for r in recs:
-        k = r.get("portal") or "unknown"; pf[k][1]+=1
-        if r.get("status")=="applied": pf[k][0]+=1
-    print("\n## Applications landed, by portal — aim the search here")
-    for k,v in sorted(pf.items(), key=lambda x:-x[1][0]): print(f"- {k}: {v[0]}/{v[1]}")
-    done=[r for r in applied if r.get("result")]; pos={"screen","interview","offer"}
-    print("\n## Replies")
-    if done:
-        g=sum(1 for r in done if r["result"] in pos)
-        print(f"- {g}/{len(done)} answered applications got a positive reply")
+        k = (band(r.get("score")) if field == "score" else r.get(field)) or "unknown"
+        if r.get("result"):
+            agg[k][0] += 1
+            if r["result"] in POSITIVE:
+                agg[k][1] += 1
+            if r["result"] in ("interview", "offer"):
+                agg[k][2] += 1
+    rows_ = [(k, v) for k, v in agg.items() if v[0]]
+    if not rows_:
+        return []
+    out = [f"\n### By {label}", "| | answered | reply→screen+ | interview+ |", "|---|---|---|---|"]
+    for k, v in sorted(rows_, key=lambda x: (-x[1][1] / x[1][0], -x[1][0])):
+        out.append(f"| {k} | {v[0]} | {v[1]} ({100 * v[1] // v[0]}%) | {v[2]} |")
+    return out
+
+
+def cmd_kpi(a):
+    """THE NORTH STAR: interviews won. Submissions are only the means."""
+    recs = [r for r in rows(OUT) if r.get("status") != "prior_external"]
+    applied = [r for r in recs if r.get("status") == "applied"]
+    answered = [r for r in applied if r.get("result")]
+    pos = [r for r in answered if r["result"] in POSITIVE]
+    inter = [r for r in answered if r["result"] in ("interview", "offer")]
+    print("# KPI — north star: interviews\n")
+    print(f"## 🎯 INTERVIEWS: {len(inter)}   ·   screens or better: {len(pos)}\n")
+    if applied:
+        print(f"- Applications sent        : {len(applied)}")
+        print(f"- With a result            : {len(answered)}   ({len(applied) - len(answered)} still open)")
+        if answered:
+            print(f"- **Interview rate**       : {100 * len(pos) // len(answered)}% of answered "
+                  f"applications reached a screen or better")
     else:
-        print(f"- 0 of {len(applied)} answered yet — feed results back with `set-result`")
+        print("- nothing sent yet")
+    blocked = [r for r in recs if str(r.get("status", "")).startswith("skipped")]
+    by = collections.Counter(r.get("status", "?") for r in recs)
+    print("\n## Pipeline")
+    for k, v in by.most_common():
+        print(f"- {k}: {v}")
+    if blocked:
+        print("\n## Stopped before sending — the gates doing their job, or a scouting bug")
+        for r in blocked[-15:]:
+            why = (r.get("note") or "").split(".")[0][:110]
+            print(f"- **{r.get('company')}** [{r.get('status')}]: {why}")
+    for field, label in (("archetype", "archetype"), ("score", "score band"),
+                         ("portal", "portal"), ("market", "market")):
+        for line in _rate_table(applied, field, label):
+            print(line)
+    if applied and not answered:
+        print("\n_No results recorded — the loop learns nothing until they are: "
+              "`learn.py set-result --job-key K --result rejected` (or `--all-open`)._")
+
+
+def cmd_calibrate(a):
+    """Does the score predict interviews? Suggests a floor; never changes one."""
+    applied = [r for r in rows(OUT) if r.get("status") == "applied" and r.get("result")]
+    if len(applied) < 5:
+        print(f"Only {len(applied)} applications have a result — calibration needs at least 5. "
+              "Record results with `set-result` first.")
+        return
+    print("# Calibration — score vs outcome\n")
+    for line in _rate_table(applied, "score", "score band") + _rate_table(applied, "archetype", "archetype") \
+            + _rate_table(applied, "likelihood", "shortlist likelihood"):
+        print(line)
+    pos = [r for r in applied if r["result"] in POSITIVE]
+    neg = [r for r in applied if r["result"] not in POSITIVE]
+    num = lambda rs, k: [float(r[k]) for r in rs if str(r.get(k) or "").replace(".", "", 1).isdigit()]
+    for k in ("score", "likelihood"):
+        p, n = num(pos, k), num(neg, k)
+        if p and n:
+            mp, mn = sum(p) / len(p), sum(n) / len(n)
+            verdict = ("predicts outcomes" if mp - mn >= 5 else
+                       "is FLAT — it does not separate wins from losses" if abs(mp - mn) < 5 else
+                       "is INVERTED — higher scores did worse")
+            print(f"\n- **{k}**: mean {mp:.0f} for replies vs {mn:.0f} for rejections → the {k} {verdict}.")
+            if mp - mn >= 5:
+                print(f"  Suggested floor: {min(p):.0f} (lowest {k} that drew a reply). "
+                      "Change it in profile/scoring.md yourself if you agree.")
+        elif not p:
+            print(f"\n- **{k}**: no positive replies yet — nothing to calibrate a floor against. "
+                  "Look at the archetype table: the lane with 0 replies is the first to narrow.")
+    fb = [r for r in applied if r.get("feedback")]
+    if fb:
+        print("\n## Verbatim feedback")
+        for r in fb[-10:]:
+            print(f"- **{r.get('company')}** ({r.get('result')}): {r['feedback'][:200]}")
+
+
+def cmd_import_legacy(a):
+    """COPY (never move, never overwrite) an older state root into this one."""
+    import shutil
+    src = pathlib.Path(os.path.expanduser(a.src)).resolve()
+    if not src.is_dir():
+        sys.exit(f"no such folder: {src}")
+    if src == ROOT.resolve():
+        sys.exit("source is already the state root — nothing to import")
+    ROOT.mkdir(parents=True, exist_ok=True)
+    have = {r.get("job_key") for r in rows(OUT)}
+    added = [r for r in rows(src / "outcomes.jsonl") if r.get("job_key") not in have]
+    for r in added:
+        append(OUT, r)
+    print(f"ledger: {len(added)} row(s) copied")
+    for name in ("observations.jsonl",):
+        s_, d_ = src / name, ROOT / name
+        if s_.exists():
+            seen = {json.dumps(o, sort_keys=True) for o in rows(d_)}
+            new = [o for o in rows(s_) if json.dumps(o, sort_keys=True) not in seen]
+            for o in new:
+                append(d_, o)
+            print(f"{name}: {len(new)} line(s) copied")
+    for name in ("companies.txt", "ats_pool.json", "lessons.md"):
+        s_, d_ = src / name, ROOT / name
+        if s_.exists() and not d_.exists():
+            shutil.copy2(s_, d_)
+            print(f"{name}: copied")
+        elif s_.exists():
+            print(f"{name}: kept the existing copy here (not overwritten)")
+    n = 0
+    if (src / "applications").is_dir():
+        for f in (src / "applications").rglob("*"):
+            if f.is_file():
+                d_ = APPS / f.relative_to(src / "applications")
+                if not d_.exists():
+                    d_.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(f, d_)
+                    n += 1
+    print(f"applications: {n} file(s) copied. The source folder is untouched.")
 
 
 def main():
@@ -382,11 +526,19 @@ def main():
     g.add_argument("--cv-variant", default=""); g.add_argument("--contact-set", default="")
     g.add_argument("--keywords", default=""); g.add_argument("--note", default="")
     g.add_argument("--job-key", default="")
+    g.add_argument("--archetype", default="", help="the profile lane this job was scored as")
+    g.add_argument("--likelihood", default=None, help="shortlist-likelihood component (0-30)")
+    g.add_argument("--market", default="", help="country/region code of the role")
+    g.add_argument("--force-gates", default="",
+                   help="log as applied without passing gates — a reason is required")
 
     g = sub.add_parser("set-result"); g.set_defaults(f=cmd_set_result)
-    g.add_argument("--job-key", required=True)
+    g.add_argument("--job-key", default="")
+    g.add_argument("--keys", default="", help="comma-separated job keys")
+    g.add_argument("--all-open", action="store_true", help="every applied job with no result")
     g.add_argument("--result", required=True, choices=RESULTS)
     g.add_argument("--note", default="")
+    g.add_argument("--feedback", default="", help="the employer's words, verbatim")
 
     g = sub.add_parser("add-lesson"); g.set_defaults(f=cmd_add_lesson)
     g.add_argument("text")
@@ -397,6 +549,9 @@ def main():
     g.add_argument("--threshold", type=int, default=3)
 
     sub.add_parser("kpi").set_defaults(f=cmd_kpi)
+    sub.add_parser("calibrate").set_defaults(f=cmd_calibrate)
+    g = sub.add_parser("import-legacy"); g.set_defaults(f=cmd_import_legacy)
+    g.add_argument("src", help="the older state folder to copy from")
     for name, fn in (("show", cmd_show), ("stats", cmd_stats), ("pending", cmd_pending)):
         sub.add_parser(name).set_defaults(f=fn)
 

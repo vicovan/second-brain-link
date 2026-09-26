@@ -11,8 +11,10 @@ location or a target title — a shortlist built on invented criteria wastes the
 ## 1. Freshness and volume
 
 Sweep the last **4–5 days** by default, widening from whatever `scout_state.py window` reports since
-the last run. **Always deliver the full target count** (ten by default) — if fewer clear the bar,
-widen the search before you shorten the list, then say plainly how thin the day was.
+the last run. **Deliver only what clears the apply floor** (`scoring-rubric.md`), up to ten. Widening
+the *sources* on a thin day is fine — another ATS board, a remote-flagged pass — but never widen the
+*lanes* or lower the floor to reach a number: a padded list is how a week of applications goes out
+to roles the candidate was never going to be shortlisted for. Say plainly how thin the day was.
 
 ## 2. Source order — open boards before aggregators
 

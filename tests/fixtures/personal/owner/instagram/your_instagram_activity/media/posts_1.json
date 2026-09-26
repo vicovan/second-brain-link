@@ -1,4 +1,29 @@
 [
-  { "media": [ { "title": "sunrise over the city", "creation_timestamp": 1700001000 } ] },
-  { "title": "shipping a new feature today", "creation_timestamp": 1700002000 }
+  {
+    "media": [
+      {
+        "title": "sunrise over the city",
+        "creation_timestamp": 1700001000
+      }
+    ]
+  },
+  {
+    "title": "shipping a new feature today",
+    "creation_timestamp": 1700002000
+  },
+  {
+    "media": [
+      {
+        "title": "",
+        "creation_timestamp": 1700003000
+      }
+    ],
+    "title": "dinner with the team",
+    "creation_timestamp": 1700003000,
+    "location": {
+      "name": "Le Petit Zinc",
+      "latitude": 48.854,
+      "longitude": 2.3333
+    }
+  }
 ]

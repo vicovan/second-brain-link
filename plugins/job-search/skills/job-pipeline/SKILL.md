@@ -213,21 +213,35 @@ rejection worth recording as `--result none` so the statistics stay honest.
 Invoke the **Skill** tool with `job-search:job-scout` and let it run its own workflow. Do not duplicate its sweep here.
 
 ### 3. Choose which jobs
-Present the top 10 in the scout's format.
+Present the scout's shortlist (up to 10, every one above the apply floor) in its format. A thin
+day is a correct result — do not ask the scout to widen to fill slots.
 
 - **`supervised` — Gate 1, they pick.** *"Apply to one of these today?"* → *"#N — <company>,
   <role>"* for the top 3 · *"A different number"* · *"None today"*. On **None today**: log
   nothing, say one line, stop. Do not push.
 - **`autonomous`** — take the top N by score, where N is what the user asked for (default 1)
   capped by `max-submits-per-run`, and say which ones you are taking in one line. Skip
-  anything the scout marked walled, excluded or disqualified.
+  anything the scout marked walled, excluded, disqualified or knock-out, and never two roles at
+  the same company.
+
+Each chosen job then passes three more gates on its way to submit, whatever the level: the
+knock-out screen (job-apply 2b), the CV and answers lint, and the independent recruiter review
+(job-apply 4b). Only `shortlist` verdicts are submitted autonomously; the report lists the others
+with the reviewer's reasons.
 
 ### 4. Phase A — build every application, in parallel
 
 For each chosen job, dispatch one **`Agent`** subagent, **at most four at a time**. Each does
-job-apply steps 1–4 for its own job and nothing else: classify the portal, create the folder
-via `learn.py log-outcome --status filled`, invoke `job-search:cv-tailor` with that folder as
-the output directory, and write `answers.json`.
+job-apply steps 1–4 for its own job and nothing else: classify the portal, run the knock-out
+screen (2b — on `STOP` it returns the quoted sentence and builds nothing), create the folder via
+`learn.py log-outcome --status filled`, write `posting.md`, `fit.md` and `company.md` (three
+searches, no more), invoke `job-search:cv-tailor` with that folder as the output directory,
+write `answers.json`, and run both `lint_cv.py` gates until they pass.
+
+**Then you, not the subagents, run job-apply step 4b** — one Haiku recruiter review per built
+application, sequentially, and record each verdict with `lint_cv.py review`. A subagent cannot
+dispatch its own reviewer, and a reviewer briefed by the agent that wrote the CV is not
+independent. Log `skipped_knockout` / `skipped_review` rows yourself from what the agents return.
 
 **The ledger has exactly one writer: you.** A subagent writes only inside its own
 `<state root>/applications/<YYYY-MM-DD>/<job_key>/`. It must never call `learn.py`, never

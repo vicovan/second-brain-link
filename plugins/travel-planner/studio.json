@@ -1,0 +1,70 @@
+{
+  "id": "travel-planner",
+  "label": "Travel Agent",
+  "blurb": "Plans a trip from the places already in your brain, draws it on the Map, and shops it on public sites — stopover nights included.",
+  "icon": "plane",
+  "grounding": "studio/grounding.md",
+  "entrySkill": "trip-pipeline",
+  "layer": "47-travel",
+  "homeNote": "47-travel/Travel Dashboard.md",
+  "watchGlob": "47-travel/**",
+  "canvas": "map",
+  "canvasData": "47-travel/Current Trip.geojson",
+  "canvasLayers": [
+    "47-travel/Suggestions.geojson",
+    "47-travel/All Trips.geojson"
+  ],
+  "tools": [
+    "Skill",
+    "Agent",
+    "mcp__claude-in-chrome__*"
+  ],
+  "chrome": true,
+  "requires": {
+    "profile": "47-travel/profile/traveler.md",
+    "onboardSkill": "travel-onboarding"
+  },
+  "providers": [
+    "claudecode"
+  ],
+  "color": "#0f9d8a",
+  "suggestions": [
+    {
+      "t": "Set me up",
+      "q": "Set up my travel profile. Read my places first — what I saved, rated and visited — propose my taste from them, and only ask me what the brain cannot tell you: home airports, citizenships, who I travel with, pace and budget."
+    },
+    {
+      "t": "Where should I go?",
+      "q": "Where should I go next? Use only my brain — cities where I saved places and never went, places I rated highly, people I know — and give me three ideas, each with the notes that justify it and the months I usually travel."
+    },
+    {
+      "t": "Plan a trip from my places",
+      "q": "Plan five days in the city at the top of my trip ideas, built from my own saved places first. Put it on the map with one walking route per day, and tell me which suggestions came from my brain and which are web only."
+    },
+    {
+      "t": "Find flights with a stopover",
+      "q": "Find real flight prices for the current trip from my home airport — Google Flights first, then the carriers' own sites — and show them as a flights list. If two separate tickets with a long layover are cheaper, turn the layover into a night in that city, with the self-transfer risk spelled out."
+    },
+    {
+      "t": "Find a place to stay",
+      "q": "Find stays for each stop of the current trip with real prices and availability — Google Hotels, then Booking.com and Agoda — in the neighbourhood where that stop's places cluster, matched to my hotel style. Show them as a hotels list, with what recent reviews say about what I care about."
+    },
+    {
+      "t": "Where should I eat?",
+      "q": "For the current trip, find cafés and restaurants that match my taste — the kinds of places I rated highly — near each day's route. Keep my own saved places first and mark anything that is web only."
+    },
+    {
+      "t": "Best-reviewed near a place",
+      "q": "Find the best-reviewed places of the kind I love in a city I name — search Google Maps, read the reviews against my own taste, and give me the ones reviewers describe the way I would, with their words as evidence. Put them on the map."
+    }
+  ],
+  "settings": {
+    "title": "Travel Agent settings",
+    "blurb": "The Travel Agent draws your trips on Studio's Map. The Map needs your own Google Maps key — it stays in this browser or app and goes only to Google to load map tiles, never your notes. Planning and every trip note work without it.",
+    "keys": [
+      {
+        "id": "mapsKey"
+      }
+    ]
+  }
+}

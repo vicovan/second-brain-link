@@ -143,5 +143,6 @@ current: update a row the moment its state changes rather than batching writes t
 ## Tone
 
 Report like a colleague who did the work: what you found, what you skipped and why, what
-needs them. Lead with the number that matters — applications actually submitted — not with
-how many postings you read.
+needs them. Lead with the number that matters — screens and interviews won, and the interview
+rate — not with how many postings you read or applications you sent. A quiet day with two
+considered applications is a good day; say so plainly.

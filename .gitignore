@@ -40,11 +40,18 @@ dist/**
 # plugins are a separate distribution surface — track their installable archives too
 # (one per provider: dist/plugins/claude/<name>.zip, dist/plugins/openai/<name>.skill;
 # the unpacked dist/plugins/openai/<name>/ build tree stays ignored, like the engine's)
+#   The per-provider folders must be re-included first: git cannot re-include a file
+#   whose parent directory is ignored, and `dist/**` ignores dist/plugins/claude/.
+!dist/plugins/*/
 !dist/plugins/**/*.zip
 !dist/plugins/**/*.skill
+#   …but not the unpacked Codex build trees inside them
+dist/plugins/openai/*/
 
 # Stray exports / per-build artifacts anywhere else
 *.zip
+#   (re-include the plugin archives again — this later `*.zip` would otherwise win)
+!dist/plugins/*/*.zip
 *-vault/
 my-second-brain/
 schema_map.json

@@ -1,0 +1,18 @@
+{
+  "name": "travel-planner",
+  "version": "0.1.0",
+  "description": "Plan a trip out of the places already in your Second Brain — saved pins you never visited, places you rated, where you have been — into one itinerary drawn on Studio's Map, then shop flights (including self-transfer stopover nights in a city worth seeing), stays, ground transport and tables on public sites through your own browser. Developer preview; nothing is booked.",
+  "author": {"name": "Second Brain Link", "url": "https://secondbrainlink.com"},
+  "homepage": "https://secondbrainlink.com",
+  "license": "MIT",
+  "keywords": ["travel", "trip-planner", "itinerary", "map", "virtual-interlining", "second-brain", "obsidian"],
+  "network": {
+    "required": true,
+    "why": "Planning reads only your own brain and makes no web requests. Trip shopping (flights, stays, ground, dining) reads public travel sites through your own browser via the Chrome extension. The Second Brain Link engine stays zero-network; this plugin is a separate distribution surface and declares its access here. No partner APIs, no affiliate links, no guaranteed coverage — sites that block automation get a pre-filled link instead.",
+    "endpoints": ["www.google.com/travel/flights", "www.skyscanner.net", "www.kayak.com",
+                  "airline sites reached directly", "www.booking.com", "www.agoda.com",
+                  "www.airbnb.com", "www.sixt.com", "www.europcar.com", "www.hertz.com",
+                  "national rail operators", "www.getyourguide.com", "www.viator.com",
+                  "www.google.com/maps", "www.tripadvisor.com"]
+  }
+}

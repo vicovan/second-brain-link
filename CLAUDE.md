@@ -139,7 +139,11 @@ from one canonical `Collector` and has no source-specific code.
   message_signal/place/identity/**mirror**/**ad_segment** — the last two feed the
   `50-mirror/` layer). A rule may also declare **`tags`** (semantic tags like
   `person/friend`) put on every entity note it emits, joining the renderer's automatic
-  `source/<name>` + type tags (the basis for the cross-source graph). **Selector
+  `source/<name>` + type tags (the basis for the cross-source graph). A rule may also declare
+  **`require`** (a list of field names, e.g. `["lat","lng"]`): a record whose required fields
+  resolve empty emits nothing — used so an IG caption with no coordinates can never become a
+  coordinate-less place (implemented for `emit: place`). Walk-mode array hints strip any
+  `[..]` from a selector's first key (`media[0].x` → `media`). **Selector
   mini-language (no eval — mappings are DATA):** dotted keys,
   `a[]` iterate, `a[N]` index, `*` any key, `a[].b` pluck, `a[k=v].b`
   label-predicate (pick a value by its sibling label — unlocks Facebook/Instagram's
@@ -286,19 +290,24 @@ second-brain-link/
 ├── plugins/                      # capability packs that USE a brain (see plugins/README.md)
 │   ├── README.md                 #   the contract; why plugins are not engine payload
 │   ├── .gitignore                #   a user's ledger can never be staged from here
-│   └── job-search/               #   first plugin: sweep ATS boards → tailor CV → apply → 45-jobs/
-│       ├── .claude-plugin/plugin.json   #   identity + the network declaration
-│       ├── providers/openai/     #   the Codex packaging's manifest (+ agents/openai.yaml)
-│       ├── studio.json + studio/grounding.md   #   makes it the Jobs Agent in Studio
-│       ├── commands/  skills/{job-onboarding,job-scout,cv-tailor,job-apply,job-pipeline}/
-│       └── docs/scheduling.md
+│   ├── job-search/               #   first plugin: sweep ATS boards → tailor CV → apply → 45-jobs/
+│   │   ├── .claude-plugin/plugin.json   #   identity + the network declaration
+│   │   ├── providers/openai/     #   the Codex packaging's manifest (+ agents/openai.yaml)
+│   │   ├── studio.json + studio/grounding.md   #   makes it the Jobs Agent in Studio
+│   │   ├── commands/  skills/{job-onboarding,job-scout,cv-tailor,job-apply,job-pipeline}/
+│   │   └── docs/scheduling.md
+│   ├── fundraising/              #   the Fundraising Agent → 46-fundraising/
+│   └── travel-planner/           #   the Travel Agent → 47-travel/ (itinerary.json → Studio's Map)
+│       ├── skills/trip-planner/scripts/   #   the shared library: paths, places, taste, scout,
+│       │                                  #   itinerary, interline, geo, render_brain, learn
+│       └── skills/{travel-onboarding,trip-scout,flight-search,stay-search,ground-search,taste-scout,trip-pipeline}/
 ├── packaging/build_skill.py      # assembles engine + a manifest → dist/<provider>/…
 ├── packaging/build_plugin.py     # a plugin → dist/plugins/{claude/<n>.zip, openai/<n>.skill}
 ├── dist/
 │   ├── claude/second-brain-link.skill     # committed installable (unpacked folder git-ignored)
 │   └── openai/second-brain-link.skill
 ├── tests/
-│   ├── run.py                    # stdlib test harness (currently 667 checks)
+│   ├── run.py                    # stdlib test harness (currently 903 checks)
 │   └── fixtures/{personal,company}/<entity>/<source>/   # synthetic exports
 └── .github/                      # CI + issue/PR templates
 ```
@@ -320,7 +329,16 @@ target-companies, positions-i-hold [draft], positioning-gaps [draft]) ·
 `_notes/` (YOURS — never regenerated) · `99-uncategorized/` · `_quarantine/`.
 **`45-jobs/` (person) / `45-hiring/` (company)** is registered as the `jobs` layer key but is
 **written by the `job-search` plugin, not the builder** — the engine only knows the name so the
-tree, graph and dashboard render it when present (the same arrangement as analyze's `95-goals`). **Company brains use company-named folders** for the middle layers (20-brand, 30-content, 35-procurement, 40-pipeline w/ one note per deal, 50-market-view, 60-knowledge w/ meetings.md, 70-support, 80-signals, 85-locations) — driven by `mappings/brain/layout.json` `variants` via `VaultWriter.L(key)` (never hardcode a layer folder). Full field reference: `docs/ENTITY-MAP.md`.
+tree, graph and dashboard render it when present (the same arrangement as analyze's `95-goals`).
+**`46-fundraising/`** (both subjects) is the `fundraising` layer key, written the same way by the
+`fundraising` plugin (Funding Plan, target records, applications, email drafts; its own
+`_FUNDRAISE_GENERATED.json` manifest, so `--refresh` leaves it byte-identical).
+**`47-travel/`** (both subjects) is the `travel` layer key, written by the `travel-planner` plugin
+(Travel Dashboard, Trip Ideas, Places I Love, `Current Trip.geojson`, and per trip
+`trips/<id>/itinerary.json` + `map.geojson` + title-prefixed notes; own `_TRAVEL_GENERATED.json`
+manifest in the hidden ledger). Place notes carry `kind`/`country`/`city`/`rating` as fields
+(country/city from the offline gazetteer's reverse lookup, `geocode.nearest`), and
+`graph.json` copies them onto place nodes. **Company brains use company-named folders** for the middle layers (20-brand, 30-content, 35-procurement, 40-pipeline w/ one note per deal, 50-market-view, 60-knowledge w/ meetings.md, 70-support, 80-signals, 85-locations) — driven by `mappings/brain/layout.json` `variants` via `VaultWriter.L(key)` (never hardcode a layer folder). Full field reference: `docs/ENTITY-MAP.md`.
 
 **`graph.json` (schema `sbl-graph/1`)** is ALWAYS written at each brain root (+
 `_correlations/graph.json`): the machine-readable typed graph — `nodes` (id = note path
@@ -474,7 +492,7 @@ structure tags adapters emit).
 Real-world validation build (IG + Google Maps + LinkedIn + **Facebook**, `--full`): cross-source
 merge verified, `source/*` tags on every note, `_STRUCTURE.md`/`_DATA_POINTS.md`/`_GRAPH.md`
 present, default-mode PII sweep clean. Both providers package + install + run end-to-end.
-`tests/run.py` → **667 checks, 0 failed** (selector mini-language, mapping-wins,
+`tests/run.py` → **883 checks, 0 failed** (2026-09-25; was 667 when this list was written) (selector mini-language, mapping-wins,
 IG/Google fixture build, places + review note, harvester rescue, multi-entity 3-brain
 build, cross-person note, `works_at` edge, negative no-merge, multi-vault PII sweep, Codex
 `agents/openai.yaml` + `--install`, two-sibling-vault split, **Facebook full mapping +
@@ -545,11 +563,12 @@ python3 packaging/build_skill.py all --install
 python3 packaging/build_plugin.py all                    # both providers
 #   claude → dist/plugins/claude/<name>.zip   (load with --plugin-dir)
 #   openai → dist/plugins/openai/<name>.skill (flattened Codex skill)
+python3 packaging/build_plugin.py job-search --provider claude --install   # → ~/.claude/skills/ (what BOTH Studios read)
 python3 packaging/build_plugin.py job-search --provider openai --install   # → ~/.agents/skills/
-claude --plugin-dir plugins/job-search                   # or load straight from source
+claude --plugin-dir plugins/job-search                   # one CLI session only — Studio never lists it
 
 # test (stdlib only; must stay green)
-python3 tests/run.py            # → 667 passed, 0 failed
+python3 tests/run.py            # → 903 passed, 0 failed
 ```
 **Testing approach:** synthetic exports under
 `tests/fixtures/{personal,company}/<entity>/<source>/`; assert valid YAML on every
@@ -570,7 +589,7 @@ rescue. Never commit a real export or vault.
   dedupe); Studio reseed offers Update vs Rebuild. **Label corrected 2026-08-20: this is v1, not
   v1.5.** The workspace adopts the root `CLAUDE.md` numbering, which reserves **v1.5 for the
   hosted/scheduled managed sync** — still roadmap, and the paid cloud product.
-- v2: agentic twin (meeting prep, drafting in voice, relationship-revival nudges).
+- v2 — the brain that acts: **first slice shipped** — `plugins/` + three agents (Jobs, Fundraising, Travel) in Studio's Agents tab, parallel runs, approval gates, layers `45-jobs`/`46-fundraising`/`47-travel`. Next: meeting prep, drafting in voice, relationship-revival nudges.
 - Live `gbrain import` validation once a `gbrain` runtime is available.
 
 **Open questions / deferred:**

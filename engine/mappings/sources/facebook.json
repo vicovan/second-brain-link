@@ -770,7 +770,46 @@
     "date": [
      "start_timestamp",
      "start_date"
-    ]
+    ],
+    "location": "place.name"
+   }
+  },
+  {
+   "match": {
+    "path_contains": [
+     "facebook"
+    ],
+    "name_contains": [
+     "event_invitations",
+     "event_responses",
+     "your_events"
+    ],
+    "suffix": ".json"
+   },
+   "locate": "walk",
+   "emit": "place",
+   "tags": [
+    "place/event"
+   ],
+   "require": [
+    "lat",
+    "lng"
+   ],
+   "fields": {
+    "name": "place.name",
+    "date": "start_timestamp",
+    "address": "place.address",
+    "lat": [
+     "place.coordinate.latitude",
+     "place.location.latitude"
+    ],
+    "lng": [
+     "place.coordinate.longitude",
+     "place.location.longitude"
+    ],
+    "kind": {
+     "const": "event"
+    }
    }
   },
   {

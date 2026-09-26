@@ -11,7 +11,7 @@ description: Run a job hunt from your own career profile — sweep open ATS boar
 > workflows in `references/`, code in `scripts/`.
 
 **Nothing about any particular person is in this skill.** Your career facts, criteria
-and settled application answers live in five Markdown files under
+and settled application answers live in seven Markdown files under
 `<surface>/45-jobs/profile/`, which `references/job-onboarding.md` writes with you.
 Read them; never assume them, never invent them.
 
@@ -48,7 +48,15 @@ Supporting references: `references/sources.md` (where to look, and what not to r
 `references/scoring-rubric.md` (the 100-point method), `references/search-method.md`,
 `references/tailoring-playbook.md` (the CV rewriting moves), `references/ats-checklist.md`,
 `references/field-policy.md` (what may never be typed into a form),
-`references/profile-template.md` / `criteria-template.md` / `answers-template.md`.
+`references/profile-template.md` / `criteria-template.md` / `answers-template.md` /
+`archetypes-template.md` / `stories-template.md`.
+
+**The recruiter review (job-apply step 4b) has no subagent here.** Do it as a separate pass:
+read only `posting.md`, the CV Markdown and `answers.json` — not `fit.md` or your own notes —
+answer as the hiring manager in the step's JSON shape, and record the verdict with
+`lint_cv.py review`. Because this packaging never submits, the user logs the submission; if they
+send one whose gates are not green, `learn.py log-outcome --status applied --force-gates "<reason>"`
+records that honestly.
 
 ## Scripts
 
@@ -57,7 +65,13 @@ All paths are relative to this skill folder. Run them with `python3`.
 ```bash
 python3 scripts/paths.py                    # where everything resolves — run this first when unsure
 python3 scripts/scout_state.py stats        # daily gate, dedupe, report path
-python3 scripts/learn.py kpi                # the north star — applications actually submitted
+python3 scripts/learn.py kpi                # the north star — interviews, and the interview rate
+python3 scripts/learn.py calibrate          # does the score predict replies?
+python3 scripts/learn.py set-result --job-key K --result rejected   # feed outcomes back
+python3 scripts/knockout.py --jd posting.txt       # auto-reject questions, before any CV
+python3 scripts/lint_cv.py cv <cv.md> --profile <profile.md> --fit <fit.md>   # the CV gate
+python3 scripts/lint_cv.py answers <answers.json>  # the answers gate
+python3 scripts/lint_cv.py review <app dir> --verdict shortlist|maybe|reject
 python3 scripts/learn.py show               # lessons earned from real outcomes
 python3 scripts/ats_pool.py --titles "…" --domain "…" --regions "…"   # Tier 0 bulk board probe
 python3 scripts/ats_fetch.py auto <slug>    # one company's board

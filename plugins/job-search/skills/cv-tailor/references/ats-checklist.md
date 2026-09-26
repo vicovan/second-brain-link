@@ -1,20 +1,30 @@
 # ATS / AI-readability QA checklist — run before delivering
 
-Run `python3 scripts/check_pdf.py <file.pdf> --keywords "kw1;kw2;..."` and read
-its report. Then confirm each item by eye on the rendered page images.
+Run the two gates and read both reports, then confirm each item by eye on the rendered page images:
+
+```bash
+python3 scripts/lint_cv.py cv <cv.md> --profile <profile>/profile.md --fit <app dir>/fit.md
+python3 scripts/check_pdf.py <file.pdf> --keywords "kw1;kw2;..."
+```
+
+`lint_cv.py` records its result in `<app dir>/gates.json`; a FAIL there blocks the submission
+(`learn.py log-outcome --status applied` refuses). Fix every FAIL by rewriting, never by deleting
+the check's trigger word and leaving a broken sentence.
 
 ## Structure
 - [ ] Single column, no tables for body content (the builder only uses a
       borderless 2-cell row for role-title/date lines, which extracts in order).
 - [ ] Standard section names in this order: Professional Summary · Core
-      Competencies · Work Experience · (Founder/Why section if programme)
-      · Education · Technical Skills (optional) · Languages (optional).
+      Competencies · Work Experience · (programme-statement section ONLY for an accelerator or
+      investor programme that asks for one) · Education · Technical Skills (optional) ·
+      Languages (optional). No "Why <Company>" section on an employment CV.
 - [ ] Contact block on page 1 top: name, headline, email, phone, city+country,
       LinkedIn, website — all as real text (no icons-only, no header/footer
       objects; parsers skip headers/footers).
 - [ ] Every role line reads: Title · Company · Location · dates as MM/YYYY – MM/YYYY
       or YYYY – YYYY or "Present". Same format throughout.
-- [ ] Reverse-chronological, no unexplained gaps > 1 month.
+- [ ] Strictly reverse-chronological by start date (lint_cv.py checks), no unexplained gaps
+      > 1 month. Overlaps framed per the profile's framing policy.
 - [ ] ≤ 2 pages. Page 1 stands alone.
 
 ## Text & fonts
@@ -41,6 +51,8 @@ its report. Then confirm each item by eye on the rendered page images.
 ## Human gate
 - [ ] Headline mirrors the target title.
 - [ ] First bullet of the first role answers the JD's #1 requirement.
-- [ ] Bold lead-ins on bullets map to JD requirements.
-- [ ] No claim outside profile/profile.md.
+- [ ] Bold lead-ins on at most half the bullets per role, on the ones that answer a `critical`
+      row of fit.md.
+- [ ] No claim outside profile/profile.md (lint_cv.py `--profile` fact gate is green).
+- [ ] No first person, no gap named, no banned phrase (lint_cv.py is green).
 - [ ] Contact set matches the location decision; DOB absent unless required.

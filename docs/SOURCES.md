@@ -102,7 +102,8 @@ arrives in ~10 minutes; the full one within 24 h — use the second email's link
 ### Facebook
 **You get:** friends/followers/requests → people, posts/comments/reactions → voice,
 liked pages & saved items → interests, check-ins & cities → map places, ad-interests
-and off-Meta activity → the algorithmic mirror, events **with your RSVP**, notes &
+and off-Meta activity → the algorithmic mirror, events **with your RSVP** (and where they
+were — the event's venue becomes a map place), notes &
 page reviews → voice, marketplace listings.
 **Download:** accountscenter.facebook.com → Your information and permissions →
 *Download your information* → Facebook profile → **Format: JSON**, media quality low,
@@ -111,14 +112,17 @@ range All time. Ready within hours.
 
 ### Instagram
 **You get:** followers/following, posts & comments (voice), topics & liked/saved
-content → interests, last-known location + photo EXIF places → map, story
+content → interests, last-known location + the venue tagged on a post (or its photo EXIF)
+→ map — a post without coordinates never becomes a place, story
 interactions (polls/quizzes/likes) as activity counts.
 **Download:** same Accounts Center flow, choose the Instagram profile, **JSON**.
 **Import:** folder `instagram`.
 
 ### Google Takeout
 **You get:** contacts → people, calendar → events, Maps saved/reviewed/labeled places
-+ **Semantic Location History visits** + **photo-spot pins from EXIF sidecars** → the
++ **Semantic Location History visits** + **visits from the new on-device Timeline export**
+(`Timeline.json`: named by the nearest saved/reviewed place within ~75 m, else "Visited
+spot N"; home/work segments skipped) + **photo-spot pins from EXIF sidecars** → the
 map layer, Search & Ads My-Activity → search history + mirror, YouTube
 subscriptions/watch/search/likes/comments, Chrome bookmarks → interests.
 Raw GPS pings (Records.json), Gmail, Fit, Drive, Keep are **excluded by design** and

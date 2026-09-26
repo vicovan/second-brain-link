@@ -1,0 +1,86 @@
+{
+  "id": "fundraising",
+  "label": "Fundraising Agent",
+  "blurb": "Screens funds and programs against your own filter, builds a dated funding plan, drafts applications and investor emails — never sends them — and tracks every conversation.",
+  "icon": "rocket",
+  "grounding": "studio/grounding.md",
+  "entrySkill": "raise-pipeline",
+  "layer": "46-fundraising",
+  "homeNote": "46-fundraising/Funding Plan.md",
+  "homeNoteFallback": "46-fundraising/Fundraising Dashboard.md",
+  "watchGlob": "46-fundraising/**",
+  "tools": [
+    "Skill",
+    "Agent",
+    "mcp__claude-in-chrome__*"
+  ],
+  "chrome": true,
+  "requires": {
+    "profile": "46-fundraising/profile/round.md",
+    "onboardSkill": "raise-onboarding"
+  },
+  "providers": [
+    "claudecode"
+  ],
+  "color": "#0f9d74",
+  "suggestions": [
+    {
+      "t": "Set me up",
+      "q": "Set up my fundraising profile. Pull everything you can from this brain, my deck and my facts file first — then ask me only the decisions: the round, my minimum cheque, where I can raise from, entity, cofounder stance, exclusions and how autonomous you should be."
+    },
+    {
+      "t": "Build my funding plan",
+      "q": "Build my funding plan: screen every target against my filter chain, verify the survivors on their own sites (tell me the fan-out before you spend it), then write the Funding Plan with the ledger, a dated timeline, the tiers, the decisions I owe and what to do this week."
+    },
+    {
+      "t": "Screen this list",
+      "q": "Screen a list of investors or programs. I'll paste it or drop a CSV next — import it as unverified leads, run my filter chain, and tell me which survived, which fell out and on which filter, before verifying anything."
+    },
+    {
+      "t": "Apply to a program",
+      "q": "Apply to a program from my plan: find its real form, draft every answer from my profile and stories within the form's limits, lint it against my facts, fill it in my browser and verify every field — then finish the way my autonomy setting says."
+    },
+    {
+      "t": "Draft this week's emails",
+      "q": "Draft this week's investor emails: one per Tier 2 target, each with a hook from something verified on their own site, linted against my facts, saved as a note and as a Gmail draft. Do not send anything."
+    },
+    {
+      "t": "What's due?",
+      "q": "What's due? List follow-ups, program deadlines in the next two weeks and anything I need to re-verify — and draft the follow-ups that are due."
+    },
+    {
+      "t": "Record a reply",
+      "q": "I heard back from an investor or a program. I'll paste the email or tell you what happened — log it against the right target, update the plan, and if it's a meeting, prep me from the target note and my stories."
+    }
+  ],
+  "settings": {
+    "title": "Fundraising Agent settings",
+    "blurb": "Materials the agent reads when it drafts applications and emails. They live in your brain, in the fundraising profile — nothing is uploaded anywhere.",
+    "files": [
+      {
+        "id": "deck",
+        "label": "Pitch deck",
+        "hint": "PDF or PPTX. Onboarding reads it to fill your company facts; applications link or attach it.",
+        "dest": "46-fundraising/profile/materials",
+        "accept": [".pdf", ".pptx", ".key", ".md"],
+        "multiple": true
+      },
+      {
+        "id": "facts",
+        "label": "Facts file / one-pager",
+        "hint": "The source of truth for every claim — the agent will not state a number that is not in here or your profile.",
+        "dest": "46-fundraising/profile/materials",
+        "accept": [".md", ".markdown", ".txt", ".pdf", ".docx"],
+        "multiple": true
+      },
+      {
+        "id": "cv",
+        "label": "Founder CV",
+        "hint": "Used for the founder bio and for 'why you' answers.",
+        "dest": "46-fundraising/profile/materials",
+        "accept": [".pdf", ".docx", ".md", ".txt"],
+        "multiple": true
+      }
+    ]
+  }
+}

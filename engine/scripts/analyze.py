@@ -507,8 +507,14 @@ def _read_places(brain: Path):
     for p, fm in _iter_fm(brain / _L(brain, "places")):
         if p.name == "places.md":
             continue
+        kind = _scalar(fm, "kind")
+        if not kind:  # brains built before `kind:` was a field carry it only as a tag
+            tags = fm.get("tags") if isinstance(fm.get("tags"), list) else []
+            kind = next((str(t).split("/", 1)[1] for t in tags
+                         if str(t).startswith("place/") and str(t).count("/") == 1
+                         and not str(t).startswith("place/list")), "")
         out.append({"name": _scalar(fm, "title") or p.stem,
-                    "kind": _scalar(fm, "kind"), "address": _scalar(fm, "address")})
+                    "kind": kind, "address": _scalar(fm, "address")})
     return out
 
 

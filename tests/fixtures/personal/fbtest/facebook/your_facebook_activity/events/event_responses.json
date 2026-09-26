@@ -1,2 +1,1 @@
-{"event_responses_v2": {"events_joined": [{"name": "Maker Faire Springfield", "start_timestamp": 1712000000}],
-                        "events_interested": [{"name": "Woodturning Expo", "start_timestamp": 1714000000}]}}
+{"event_responses_v2": {"events_joined": [{"name": "Maker Faire Springfield", "start_timestamp": 1712000000, "place": {"name": "Springfield Expo Hall", "coordinate": {"latitude": 39.7817, "longitude": -89.6501}}}], "events_interested": [{"name": "Woodturning Expo", "start_timestamp": 1714000000}]}}

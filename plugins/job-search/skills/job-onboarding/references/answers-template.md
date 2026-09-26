@@ -56,6 +56,26 @@ box answers itself well; leave it empty and they answer thinly.
 ## 5. Framing
 How to describe a current side venture or period of self-employment on an employer's form.
 
+## Knock-outs
+The answers an ATS auto-rejects on. `job-apply/scripts/knockout.py` reads these exact keys and
+screens every posting against them **before** a CV is written, so a job the truthful answer
+disqualifies is skipped instead of sent. Comma-separated; ISO country codes or `EU` / `EEA`.
+
+- right_to_work: <countries where no sponsorship is needed, e.g. EU, EEA>
+- sponsorship_acceptable: <countries where a sponsored role is wanted — applied to ONLY when the posting offers sponsorship>
+- based_in: <where the person lives now>
+- relocate_to: <where they would move for the right role>
+- nationalities: <citizenships held>
+- languages: <languages at working level or better>
+- degrees: <degrees held, as named on the certificate>
+- clearances: <security clearances held, or leave empty>
+- years_experience: <total professional years>
+- salary_floor: <currency amount per year, e.g. EUR 100000>
+- salary_figures: <the figure to type when a form demands one, per currency, e.g. EUR 130000, GBP 115000>
+
+A number, never an instruction: a salary field that receives "prefer to discuss" is either
+rejected by validation or read as evasive.
+
 ## 6. Never answered by an agent
 Passwords · passport or national identity number · payment details · date of birth · anything
 requiring a legal declaration the user has not read. These stop the run and go to the user.

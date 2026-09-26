@@ -73,9 +73,13 @@ def machinery_dir(root, dest):
 # something learn.py can actually write — STATUSES, or a RESULTS value promoted onto the row
 # — or an application can reach a state the vault renders but nothing can record. "replied"
 # was such a key: no code path ever produced it. The equivalent real value is `screen`.
+# Files job-apply writes into an application folder that are NOT the CV.
+WORKING_FILES = {"posting.md": "Posting", "fit.md": "Fit", "company.md": "Company research",
+                 "cover-letter.md": "Cover letter"}
+
 STATUS_GLYPH = {"applied": "✅", "filled": "🟡", "not_started": "⬜", "skipped": "⛔",
                 "disqualified": "❌", "excluded": "🚫", "screen": "🔵", "interview": "🎯",
-                "prior_external": "📁"}
+                "prior_external": "📁", "skipped_knockout": "⛔", "skipped_review": "⛔"}
 
 
 # ---------------------------------------------------------------- small helpers
@@ -609,9 +613,17 @@ def render(dest, quiet=False):
         day = day or str(r.get("date") or "")
         base = f"applications/{day}/{key}" if DAY_RE.match(day or "") else f"applications/{key}"
         cvs = []
+        note = safe(f"{r.get('company','?')} — {r.get('role','?')}")
         if app:
+            # The working files job-apply writes beside the CV. Rendered under their own
+            # titles — they are the interview-prep pack — and never mistaken for a CV,
+            # which is what a bare "every .md but ANSWERS.md" rule would do.
+            for fname, kind in WORKING_FILES.items():
+                src = app / fname
+                if src.is_file():
+                    w.text(f"{base}/{note} · {kind}.md", src.read_text(encoding="utf-8"))
             for md in sorted(app.glob("*.md")):
-                if md.name == "ANSWERS.md":
+                if md.name == "ANSWERS.md" or md.name in WORKING_FILES:
                     continue
                 # One label per CV, allocated HERE. It used to be allocated once before the
                 # loop and again at the end of every iteration, so each application burned a
@@ -628,7 +640,6 @@ def render(dest, quiet=False):
         r["_cv"] = cvs[0] if cvs else None
         if cvs:
             labels[key] = cvs[0]
-        note = safe(f"{r.get('company','?')} — {r.get('role','?')}")
         w.text(f"{base}/{note}.md", application_note(r, app, cvs, known))
 
     reports = sorted((root / "reports").glob("*.md")) if (root / "reports").is_dir() else []

@@ -63,6 +63,18 @@ Where a truthful answer would hurt (e.g. "years of Portuguese: 0" on a role requ
 Portuguese), answer truthfully and flag it — or skip the job. Never soften it into something
 untrue.
 
+**Knock-out questions are screened BEFORE the CV, not discovered at the form.** Right to work
+in a named country, "are you located in…", a required language, degree or clearance, and a
+salary figure are the answers an ATS auto-rejects on — usually within hours. `scripts/knockout.py`
+checks the posting (and, once the form is open, the question text) against the `## Knock-outs`
+block in `application-answers.md`. A `STOP` means the truthful answer disqualifies: skip the job
+and log `skipped_knockout` rather than send an application that is rejected on arrival.
+
+**Salary fields take a number.** A mandatory numeric or short salary field gets the per-currency
+figure from `## Knock-outs` (`salary_figures`), never instruction text like "prefer to discuss".
+Where a free-text box allows it, the figure may be followed by "negotiable depending on the full
+package". If no figure is recorded for that currency, `supervised` asks; `autonomous` skips.
+
 ### 3b. COMPOSED fields — written, every time, never bounced back
 
 Why this company · why this role · cover letter · biggest achievement · management scope ·
@@ -70,8 +82,26 @@ Why this company · why this role · cover letter · biggest achievement · mana
 
 These are **written**, not looked up, so the answer-source rule above does not apply and must
 not be used to refuse them. Compose from the profile, `application-answers.md` §4, the
-tailored CV and the job description's own vocabulary. Match the length the form asks for —
-if it says 200–400 words, write 200–400 words.
+tailored CV, **`<app dir>/company.md`** and the job description's own vocabulary. Match the
+length the form asks for — if it says 200–400 words, write 200–400 words; read the field's
+real `maxlength` and stay inside it.
+
+**What makes a composed answer land** (and what an auto-rejecting reader looks for):
+- **Specific to this employer.** Each answer names one real fact from `company.md` (a product,
+  a stated priority, a recent launch or problem) *and* one real fact from the profile, and
+  connects the two. Test: *could this paragraph be pasted into another company's form?* If yes,
+  rewrite it.
+- **Proof, not adjectives.** "Took the platform from v0 to v1.6 alone" beats "deeply hands-on".
+- **Short.** 2–4 sentences unless the form asks for more. Long answers read as generated.
+- **Behavioural questions** ("tell us about a time…") come from `profile/stories.md` — pick the
+  story whose tags match, keep its numbers exactly, cut it to the field.
+- **Never volunteer a gap or a disqualifier.** A composed answer argues for the application; it
+  does not pre-empt the rejection. "I have not worked inside a licensed bank" in a free-text box
+  is the rejection reason written by the candidate. Factual questions are still answered
+  truthfully (§3a) — this rule is about prose nobody asked for.
+- **Voice.** First person is right here (unlike the CV). No banned phrases, no "not just X but
+  Y", at most one em-dash. `lint_cv.py answers <answers.json>` enforces all of it and records the
+  result in `gates.json`.
 
 **A composed field is never left blank and never returned to the user as a question.** A
 required input still empty when the form is verified is a bug in the run, not something to
@@ -134,6 +164,9 @@ that visibly contain the right text. This has wasted a submit more than once.
 | **Own-site forms** (a company's own careers page, not an ATS) | Hidden **honeypot** field — often "Website" with no placeholder, before Name, beside a hidden input. Filling it bins the application. | Leave any unlabelled/oddly-placed extra field blank. The real portfolio field is clearly labelled. |
 | **join.com** | Public posting, but "Apply now" → `/apply/authentication`. | Account wall — skip. |
 | **Greenhouse (embedded)** | The form is an iframe on the company domain; the extension may lack `greenhouse.io` permission. | Ask the user to allow the domain — never drop the job for this. |
+| **Ashby (submit)** | Deduplicates by email per company, and can silently reject automated sessions at submit — the page may look successful while nothing arrives. | After submit, read the confirmation text from the DOM and record it in `ANSWERS.md`; if an application to the same company went out in the last 30 days, do not send a second. |
+| **Lever** | Checkbox clicks can raise an hCaptcha. | A CAPTCHA stops the run (§1) — report it; never try to solve it. |
+| **Any ATS** | A "success" state is not proof of receipt. | Record the confirmation wording verbatim; a later confirmation email is the real receipt. |
 
 
 ## 6d. React dropdowns need PAUSES, and display text is not a value

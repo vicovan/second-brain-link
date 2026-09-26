@@ -110,3 +110,77 @@ def resolve(location):
         if hit:
             return (hit[3], hit[4])
     return None
+
+
+# ---- reverse lookup: coordinates → (city, country) --------------------------
+# Used by build_vault.places() to stamp `city:`/`country:` on place notes, which
+# carry real coordinates but no city field. Same precision bias: a pin with no
+# gazetteer city within `max_km` gets none rather than a wrong one.
+_grid = None           # {(int lat, int lng): [(name, cc, lat, lng, pop), …]}
+
+
+def _load_grid():
+    global _grid
+    if _grid is not None:
+        return bool(_grid)
+    _grid = {}
+    if not _load():
+        return False
+    for cands in _gaz.values():
+        for name, cc, _admin, lat, lng, pop in cands:
+            _grid.setdefault((int(lat // 1), int(lng // 1)), []).append((name, cc, lat, lng, pop))
+    return bool(_grid)
+
+
+def _km(a_lat, a_lng, b_lat, b_lng):
+    import math
+    p1, p2 = math.radians(a_lat), math.radians(b_lat)
+    dp, dl = p2 - p1, math.radians(b_lng - a_lng)
+    h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * 6371.0 * math.asin(min(1.0, math.sqrt(h)))
+
+
+def nearest(lat, lng, max_km=30.0):
+    """(city, iso2 country UPPER) of the gazetteer city nearest (lat, lng), or None
+    beyond `max_km`. A metropolis (≥1M people) within 25 km wins over its own wards and
+    suburbs — a pin in Asakusa is in Tokyo, not Taitō; otherwise, among cities within a
+    quarter of the nearest distance + 5 km, the most populous wins."""
+    try:
+        lat, lng = float(lat), float(lng)
+    except (TypeError, ValueError):
+        return None
+    if not _load_grid():
+        return None
+    gy, gx = int(lat // 1), int(lng // 1)
+    found = []
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            for name, cc, clat, clng, pop in _grid.get((gy + dy, gx + dx), ()):
+                d = _km(lat, lng, clat, clng)
+                if d <= max_km:
+                    found.append((d, -pop, name, cc))
+    if not found:
+        return None
+    metro = [f for f in found if f[0] <= 25 and -f[1] >= 1000000]
+    if metro:
+        _d, _p, name, cc = min(metro)
+        return name, cc.upper()
+    # a dominant city (≥10× the nearest's population, ≥100k) within 15 km wins too —
+    # a pin in Marvila is in Lisbon
+    near0 = min(found)
+    dom = [f for f in found if f[0] <= 15 and -f[1] >= max(100000, 10 * -near0[1])]
+    if dom:
+        _d, _p, name, cc = min(dom, key=lambda f: (f[1], f[0]))
+        return name, cc.upper()
+    best = near0[0]
+    close = [f for f in found if f[0] <= best * 1.25 + 5]
+    _d, _p, name, cc = min(close, key=lambda f: (f[1], f[0]))
+    return name, cc.upper()
+
+
+def country_code(name):
+    """ISO-2 (UPPER) for a country name / iso2 / iso3, from the bundled gazetteer,
+    or '' when unknown."""
+    if not name or not _load():
+        return ""
+    return (_country_of.get(_nk(name)) or "").upper()

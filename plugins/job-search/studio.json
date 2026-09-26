@@ -42,7 +42,11 @@
     },
     {
       "t": "How is the pipeline doing?",
-      "q": "Show me the KPI: applications actually submitted, shortlist conversion, what got blocked and why, and what the outcomes so far say I should change."
+      "q": "Show me the KPI: interview rate by archetype, score band and portal, what the gates stopped and why, and what the outcomes so far say I should change."
+    },
+    {
+      "t": "Record a reply",
+      "q": "I heard back on an application. I'll paste the email or tell you what happened — log it against the right application, and if it's a screen or interview, prep me from that role's fit file and my stories."
     }
   ],
   "settings": {

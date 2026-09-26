@@ -193,6 +193,18 @@ def _tag_slug(s):
     s = re.sub(r"[^a-z0-9_]+", "-", str(s).lower()).strip("-")
     return s
 
+def _nearest_city(lat, lng):
+    """(city, CC) for a place's coordinates via the bundled gazetteer (zero
+    network), or None — a missing city beats a wrong one."""
+    if lat in ("", None) or lng in ("", None):
+        return None
+    try:
+        import geocode
+        return geocode.nearest(lat, lng)
+    except Exception:
+        return None
+
+
 def note_tags(base, sources=None, extra=None):
     """Build a note's `tags` list: the layer/type tag(s) + one `source/<name>` per
     contributing source + any rule-declared semantic tags. This is what lets the
@@ -253,7 +265,8 @@ def keywords(text, n=20):
 _LAYERS_PERSON = {
     "root": "00-me", "people": "10-people", "orgs": "15-organizations",
     "reputation": "20-reputation", "voice": "30-voice", "shopping": "35-shopping",
-    "career": "40-career", "jobs": "45-jobs",
+    "career": "40-career", "jobs": "45-jobs", "fundraising": "46-fundraising",
+    "travel": "47-travel",
     "mirror": "50-mirror", "learning": "60-learning", "services": "70-services",
     "search": "80-search", "places": "85-places", "synthesis": "90-synthesis",
     "uncategorized": "99-uncategorized", "quarantine": "_quarantine",
@@ -262,7 +275,8 @@ _LAYERS_PERSON = {
 _LAYERS_COMPANY = {
     "root": "00-org", "people": "10-people", "orgs": "15-organizations",
     "reputation": "20-brand", "voice": "30-content", "shopping": "35-procurement",
-    "career": "40-pipeline", "jobs": "45-hiring",
+    "career": "40-pipeline", "jobs": "45-hiring", "fundraising": "46-fundraising",
+    "travel": "47-travel",
     "mirror": "50-market-view", "learning": "60-knowledge", "services": "70-support",
     "search": "80-signals", "places": "85-locations", "synthesis": "90-synthesis",
     "uncategorized": "99-uncategorized", "quarantine": "_quarantine",
@@ -286,6 +300,10 @@ _LAYER_ROLE_TEXT = {
                "PIPELINE — deals and campaigns from the CRM (one note per deal)."),
     "jobs": ("JOB SEARCH — written by the job-search plugin, not the builder: shortlists, one folder per application, tailored CVs.",
              "HIRING — written by the job-search plugin, not the builder: open roles, candidates and application records."),
+    "fundraising": ("FUNDRAISING — written by the fundraising plugin, not the builder: the funding plan, target records, applications and email drafts.",
+                    "FUNDRAISING — written by the fundraising plugin, not the builder: the funding plan, target records, applications and email drafts."),
+    "travel": ("TRAVEL — written by the travel-planner plugin, not the builder: trip ideas, itineraries, the map data the Studio Map canvas draws.",
+               "TRAVEL — written by the travel-planner plugin, not the builder: trips, itineraries and their map data."),
     "mirror": ("HOW THE ALGORITHMS SEE YOU — inferences + ad-targeting segments (fed by the mirror/ad_segment emits).",
                "MARKET VIEW — how platforms/audiences model the org: follower/visitor demographics, segments."),
     "learning": ("Courses/coaching + events.",
@@ -1022,6 +1040,19 @@ class VaultWriter:
                    # combined key the Obsidian "Map View" plugin reads by default,
                    # so saved places plot on a map with no extra config.
                    "location": f"{lat},{lng}" if (lat and lng) else ""}
+            # kind / country / city / rating as FIELDS (not only tags) — the Studio
+            # Map filters and the travel-planner plugin read them. country: the
+            # export's own code first, else the offline reverse lookup; city only
+            # from the gazetteer, and a bare key when nothing is within range.
+            fmd["kind"] = p.get("kind") or "place"
+            cc = next((str(t).split("/")[-1].upper() for t in (p.get("tags") or ())
+                       if str(t).lower().startswith("place/country/")), "")
+            near = _nearest_city(lat, lng)
+            fmd["country"] = cc or (near[1] if near else "")
+            fmd["city"] = near[0] if near and (not cc or near[1] == cc) else ""
+            m_r = re.match(r"\s*★\s*(\d(?:\.\d)?)", p.get("note") or "")
+            if m_r:
+                fmd["rating"] = m_r.group(1)
             if lists:
                 fmd["lists"] = lists
             fmd["created"] = p.get("date", "")

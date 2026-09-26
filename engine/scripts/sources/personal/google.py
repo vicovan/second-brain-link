@@ -25,6 +25,7 @@ Coverage:
   Saved/*.csv  (place lists)            -> places
   Maps/Your local followed places/*.csv -> places
   Semantic Location History/*.json      -> places   (visits, aggregated top 200)
+  Timeline.json (new on-device format)  -> places   (visits, named by nearby saved place)
   My Activity/Search/MyActivity.*       -> searches (capped)
   My Activity/Ads/MyActivity.json       -> ad segments (50-mirror)
   Google Photos/*.jpg.json sidecars     -> places   (photo spots, aggregated; never images)
@@ -62,6 +63,55 @@ _COUNTRY_CODE = {
     "malaysia": "MY", "vietnam": "VN", "philippines": "PH",
 }
 
+def _country_code(name):
+    """ISO code for a country name: the curated table first (it carries the everyday
+    aliases — "uk", "england", "uae"), then the bundled gazetteer's full country list,
+    so a pin outside the table no longer loses its country."""
+    cc = _COUNTRY_CODE.get((name or "").strip().lower(), "")
+    if cc:
+        return cc
+    try:
+        import geocode
+        return geocode.country_code(name)
+    except Exception:
+        return ""
+
+
+_TL_FILES = {"timeline", "location-history", "timeline-edits"}
+_TL_SKIP_TYPES = {"HOME", "INFERRED_HOME", "WORK", "INFERRED_WORK"}
+
+
+def _tl_latlng(loc):
+    """(lat, lng) from a Timeline placeLocation — {"latLng": "38.71°, -9.14°"} or
+    "geo:38.71,-9.14" — or None."""
+    raw = loc.get("latLng") if isinstance(loc, dict) else loc
+    m = re.match(r"\s*(?:geo:)?\s*(-?\d+(?:\.\d+)?)\s*°?\s*,\s*(-?\d+(?:\.\d+)?)\s*°?",
+                 str(raw or ""))
+    if not m:
+        return None
+    lat, lng = float(m.group(1)), float(m.group(2))
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180) or (lat == 0 and lng == 0):
+        return None
+    return lat, lng
+
+
+def _is_num(v):
+    try:
+        float(v)
+        return str(v).strip() != ""
+    except (TypeError, ValueError):
+        return False
+
+
+def _m_between(a_lat, a_lng, b_lat, b_lng):
+    """Great-circle metres between two points."""
+    import math
+    p1, p2 = math.radians(a_lat), math.radians(b_lat)
+    h = (math.sin((p2 - p1) / 2) ** 2 +
+         math.cos(p1) * math.cos(p2) * math.sin(math.radians(b_lng - a_lng) / 2) ** 2)
+    return 2 * 6371000.0 * math.asin(min(1.0, math.sqrt(h)))
+
+
 _COORD_RE = re.compile(r"^-?\d+\.\d+\s*,\s*-?\d+\.\d+$")
 
 
@@ -87,7 +137,7 @@ def _place_from_maps_url(url):
         return "", "", ""
     parts = [s.strip() for s in q.split(",") if s.strip()]
     name = next((s for s in parts if re.search(r"[A-Za-z]", s)), q)
-    cc = _COUNTRY_CODE.get(parts[-1].lower(), "") if len(parts) > 1 else ""
+    cc = _country_code(parts[-1]) if len(parts) > 1 else ""
     return name, q, cc
 
 
@@ -269,6 +319,7 @@ def extract(root, file_index, all_paths, col):
     pc = cc = ec = pl = yc = wc = sc = 0  # counters
     visits = {}   # nk(place name) -> {"name","address","lat","lng","n"}  (Semantic Location History)
     photos = {}   # rounded (lat,lng) -> {"lat","lng","n","first_date"}   (Photos EXIF sidecars)
+    tl_visits = {}  # placeId -> {"lat","lng","n","date"}  (new on-device Timeline export)
     ac = mac = 0  # My Activity: searches / ad segments
 
     for p in all_paths:
@@ -479,6 +530,42 @@ def extract(root, file_index, all_paths, col):
             consumed.add(key)
             continue
 
+        # ---- Timeline (new on-device format) -> aggregated place visits --------
+        # Takeout / the phone's own export now ships `Timeline.json` (Android:
+        # {"semanticSegments":[{"visit":{"topCandidate":{"placeId","semanticType",
+        # "placeLocation":{"latLng":"38.71°, -9.14°"}}}}]}; iOS: a top-level list with
+        # "placeLocation":"geo:38.71,-9.14" and "placeID"). Visits carry NO place name —
+        # names are recovered after the loop by matching coordinates against the
+        # saved/reviewed places. Home/work segments are skipped (labeled places already
+        # cover them); `rawSignals` (raw GPS) and `timelinePath` are never read.
+        # Only Timeline-named files are opened: `Records.json` (raw GPS, can be GB-scale)
+        # shares the folder and must never even be read.
+        if sfx == ".json" and p.stem.lower().replace("_", "-") in _TL_FILES:
+            data = read_json(p)
+            segs = (data.get("semanticSegments") if isinstance(data, dict) else
+                    data if isinstance(data, list) else None)
+            if isinstance(segs, list) and any(isinstance(x, dict) and "visit" in x for x in segs):
+                for seg in segs:
+                    v = seg.get("visit") if isinstance(seg, dict) else None
+                    top = (v or {}).get("topCandidate") if isinstance(v, dict) else None
+                    if not isinstance(top, dict):
+                        continue
+                    if str(top.get("semanticType") or "").upper() in _TL_SKIP_TYPES:
+                        continue
+                    ll = _tl_latlng(top.get("placeLocation"))
+                    if not ll:
+                        continue
+                    pid = str(top.get("placeId") or top.get("placeID") or "") or \
+                        f"{round(ll[0], 4)},{round(ll[1], 4)}"
+                    rec = tl_visits.setdefault(pid, {"lat": ll[0], "lng": ll[1], "n": 0,
+                                                     "date": ""})
+                    rec["n"] += 1
+                    tl_d = iso_date(str(seg.get("startTime") or ""))
+                    if tl_d and (not rec["date"] or tl_d < rec["date"]):
+                        rec["date"] = tl_d
+                consumed.add(key)
+                continue
+
         # ---- raw Location History pings / Timeline edits (skipped, by design) ----
         # Records.json is surveillance-grade raw GPS (can be GB-scale). Deliberately
         # never parsed — visits above carry the human-meaningful signal.
@@ -659,6 +746,27 @@ def extract(root, file_index, all_paths, col):
         col.add_place(NAME, name=rec["name"], address=rec["address"],
                       lat=rec["lat"], lng=rec["lng"], kind="visited",
                       note=note, tags=["place/visited"])
+    # ---- emit aggregated Timeline (new format) visits (top 200) -------------
+    # Name each by the nearest saved/reviewed place within ~75 m (it merges onto
+    # that note, tagging it visited); otherwise a digit-light "Visited spot N".
+    known = [(r["name"], float(r["lat"]), float(r["lng"])) for r in col.places.values()
+             if _is_num(r.get("lat")) and _is_num(r.get("lng"))]
+    spot = 0
+    for rec in sorted(tl_visits.values(), key=lambda r: -r["n"])[:200]:
+        near = min(((_m_between(rec["lat"], rec["lng"], la, ln), nm) for nm, la, ln in known),
+                   default=None)
+        note = f"{rec['n']} visit(s) recorded in Timeline" if rec["n"] > 1 else ""
+        if near and near[0] <= 75:
+            col.add_place(NAME, name=near[1], kind="visited", note="",
+                          tags=["place/visited"])
+            continue
+        spot += 1
+        col.add_place(NAME, name=f"Visited spot {spot}", lat=round(rec["lat"], 5),
+                      lng=round(rec["lng"], 5), kind="visited", date=rec["date"],
+                      note=note, tags=["place/visited"])
+    if tl_visits:
+        col.note(f"[google] {sum(v['n'] for v in tl_visits.values())} timeline visits "
+                 f"→ {min(len(tl_visits), 200)} places")
     # ---- emit aggregated Photos EXIF places (top 200 cells) ---------------
     # NOTE: keep titles digit-light — "Photo spot 2024-04-01 (3 photos)" reads
     # like a phone number to PII sweeps; the date/count go in note + frontmatter.

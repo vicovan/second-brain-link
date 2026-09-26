@@ -5,6 +5,18 @@ gates — (1) the ATS / AI screener that ranks by keyword and title match, and
 (2) the human who reads the top 20 for six seconds each. Everything below
 serves one of those two gates.
 
+**Three things decide more than any wording, and they are settled before this playbook runs:**
+the knock-out answers (`job-apply/scripts/knockout.py` — right to work, location, language, pay),
+whether the job is winnable at all (`job-scout/references/scoring-rubric.md`, shortlist
+likelihood), and the requirement table in `<app dir>/fit.md` (§1b). A perfect CV for a job the
+screener auto-rejects on location is wasted work.
+
+**The rules below are enforced, not advisory.** `scripts/lint_cv.py cv` fails the build on the
+things a screener rejects fastest: roles out of date order, a "Why …" section, a sentence that
+names the candidate's own gap, first person, banned phrases, negative-parallel cadence, too many
+em-dashes or bold lead-ins, and — with `--profile` — any number, employer or title not in the
+profile. The phrase lists live in that script, so this file and the gate cannot drift.
+
 ## 0. The truth boundary (read first)
 
 You may freely change: emphasis, ordering, wording, which bullets appear,
@@ -39,11 +51,39 @@ touching the CV:
    stack (Python, TS, K8s…), scale words (multi-tenant, enterprise, global).
 8. Culture / narrative signals: what they brag about (open source, speed,
    customer obsession, security, regulated, founder-led).
-9. The three questions this employer is silently asking (e.g. "has they done
+9. The three questions this employer is silently asking (e.g. "have they done
    this exact thing before?", "will they stay?", "can they hire in our region?").
 
 Keep this as a short table at the top of your reasoning; every section of the
 CV must answer something in it.
+
+## 1b. The fit file — two passes, written before the CV (`<app dir>/fit.md`)
+
+Rating requirements *after* reading the profile inflates the ones the candidate happens to meet.
+So rate them first, blind:
+
+**Pass 1 — from the JD alone.** One row per requirement: the requirement, the JD's own words
+quoted verbatim, and an importance — `critical` (named as required, or the role's headline
+purpose), `high`, `medium`, `low`. An importance that is inferred rather than stated is never
+`critical`. Do not revise importance in pass 2.
+
+**Pass 2 — against `profile/profile.md` only.** For each row: the evidence (role + fact), and a
+status — `existing` (the profile names it), `supported` (the profile shows it in other words — may
+be restated in the JD's words), or `gap` (no trace).
+
+Then, in the same file:
+- `## Keywords` — the 15–20 ATS terms, most important first, `;`-separated on one bullet line.
+  `lint_cv.py --fit fit.md` checks them.
+- `## Reviewer doubts` — the three things a hiring manager would question, each with the one fact
+  that answers it (or `none — interview prep`).
+- `## Gaps` — every `gap` row, for interview prep. **Gaps never go on the CV and never go into a
+  free-text answer.**
+
+The CV is built only from `existing` and `supported` rows. If a `critical` row is a `gap`, the job
+should not have cleared the scout's shortlist-likelihood bar — say so rather than paper over it.
+
+**Writing "used X" as "built X" is fabrication.** It is the most common one, because the tool name
+really is in the profile. The verb must be the profile's verb.
 
 ## 2. Contact-set decision — pick exactly one
 
@@ -233,7 +273,7 @@ target. **Never reuse a summary between applications.**
 2. **Their #1 requirement, answered with a specific fact.** Not a claim — evidence, with a number
    or a named thing from `profile/profile.md`.
 3. **Their #2 and #3 requirements, compressed.** Usually a domain proof and a delivery proof.
-4. **Scale / leadership credential**, or the honest calibration line where one is needed.
+4. **Scale / leadership credential** — team size, org size, budget or users, from the profile.
 
 ### Worked openings — same person, four targets
 
@@ -255,32 +295,33 @@ that the CV was written for them, and it costs nothing in truth.
   `profile/profile.md` §6; never invent one to make the sentence land.
 - **90–120 words.** Longer and the six-second read is lost.
 - Use **their** vocabulary throughout — this is where §3b Move 3 matters most.
-- **Include the honest calibration when there is a real gap** (see below).
+- **No first person.** CVs use the implied subject: *"Ran engineering across two countries…"*,
+  never *"I ran…"*. First person reads as a cover letter pasted into the wrong box.
+- **The top five keywords from `fit.md` appear in the summary**, and the proof for the JD's
+  riskiest requirement (the `critical` row most likely to be doubted) comes before anything else.
 
-### The honest calibration line
-Where the JD asks for something the user does not have, say it plainly in one clause rather than
-hoping it is not noticed. The shape, on three kinds of gap:
+### Gaps never go on the CV
+An earlier version of this playbook asked for an "honest calibration" clause naming the gap
+(*"…has not run engineering at your headcount"*). In practice a screener reading 300 CVs does not
+reward candour; it takes the sentence as the reason to reject, and the rejection arrives the same
+day. **The CV states what is true and relevant, and is silent on what is not.** Silence is not a
+lie — nothing false is claimed.
 
-- **Wrong flavour of the same discipline** — *"**Engineer and architect rather than research
-  scientist** — measured by what ships."*
-- **Wrong scale** — *"my CTO experience is at startups and scale-ups, **not as CIO inside a
-  Fortune 500**."*
-- **Adjacent but not the named specialism** — *"**High-performance training on TPUs is not my
-  depth** — my optimisation experience is in serving, retrieval and inference economics."*
+Where the gap is real, handle it where it can be argued: in `fit.md` → interview prep, and, if the
+form asks directly, with a truthful factual answer (field-policy §3a). `lint_cv.py` fails any CV or
+free-text answer that volunteers one ("I have not…", "not my depth", "limited experience").
 
-This is not modesty for its own sake. A recruiter who finds the gap themselves discounts the whole
-CV; one who is told plainly reads the rest as credible. Put it last, after the strengths.
+## 3d. No "Why This Role" section on an employment CV
 
-## 3d. The closing section — "Why This Role"
+Recruiters do not expect a CV to argue for the job, and a closing "Why <Company>" block is one of
+the clearest signs a CV was generated per application. `lint_cv.py` fails it. The same material
+belongs in:
+- the **cover letter**, when the form takes one (job-apply step 4), and
+- the **"why this company / why this role"** form answers, grounded in `company.md`.
 
-Every tailored CV ends with a 3-bullet section named for the target (*"Why This Role"*, *"Why
-<Company>, Why <City>"*, *"Why This Founder, This Venture"*). Structure:
-
-1. **The strongest match**, stated as *their* problem meeting *their* specific experience.
-2. **The second match**, usually leadership, commercial range, or domain.
-3. **A logistics or calibration line** — work authorization, relocation, language, or the honest gap.
-
-Keep it to three. Four reads as pleading.
+The single exception is an accelerator, fellowship or investor programme whose application asks
+for a statement of motivation *as part of the CV*. There, name the section after their own
+question.
 
 ## 3e. Writing so it does not read as machine-written
 
@@ -348,8 +389,8 @@ ATS and AI screeners rank by (a) title match, (b) required-keyword coverage,
    "10+ years in X", make sure X is visibly ≥10 years in the timeline.
 6. No keyword stuffing in white text, no hidden blocks — modern parsers flag
    it and humans hate it. Density comes from truthful bullets.
-7. Core Competencies section: 40–60 terms, "·"-separated, grouped loosely
-   (leadership → AI → domain → stack). Order matters: JD must-haves first.
+7. Core Competencies section: a `kv` block — four or five labelled groups, at most seven terms
+   each (§3e tell #2). JD must-haves first, within and across groups.
 8. **Seed must-have keywords into the BULLETS, not only the competencies list.** Many screeners
    weight body text above a keyword block, and a human discounts a list of terms that never appear
    in the evidence. Every must-have should be visible **once in Core Competencies and once inside a
@@ -372,8 +413,13 @@ answer "is this person exactly what we asked for?"
   proof points with numbers]. [Current role framed as relevant to them].
   [One line on why this company/role — only if it is specific and true].
 - Bullets = outcome-first, "Verb + what + scale/number + why it mattered".
-  Lead phrase in bold when a bullet maps to a JD requirement (the reader
-  can scan bold lead-ins as a checklist).
+  A bold lead-in on at most half the bullets of a role, used for the ones that answer a
+  `critical` row of `fit.md`.
+- **The first bullet of every role carries a keyword from `fit.md`.** Parsers weight the top of
+  each role; humans read nothing else.
+- **Roles appear in strict reverse-chronological order, always.** Relevance is shown by how many
+  bullets a role gets, never by moving it up. A timeline that jumps (2021 above 2025) reads as
+  something being hidden, and parsers compute tenure from order.
 - Most recent 2–3 roles get 3–5 bullets; older roles 1–2; studios (2003–2017)
   get one merged entry unless the JD is about agencies/services.
 - Never more than 2 pages. Page 1 must stand alone.
@@ -381,21 +427,29 @@ answer "is this person exactly what we asked for?"
   concurrent ventures for a full-time employer target — collapse or frame as
   "advisory / board" only if true; if not true, ask the user how to present it).
 
-## 6. Concurrency & "will they stay?" handling
+## 6. Concurrency, tenure & "will they stay?"
 
-For full-time employee targets the silent question is "they's a serial founder —
-will they leave?" Handle it deliberately:
-- Order: employee roles show the user has operated inside
-  other people's companies with investors and founders.
-- Frame founder roles as building companies for others' capital (venture-
-  backed, board-managed).
-- An own venture or open-source project: for employee targets, present as
-  "Founder (open-source side project)" ONLY if the user says so for that
-  application; default is to keep it as the current role. Ask them once per application if the target is a
-  full-time employed role: "Keep the venture as the current full-time role, or frame it as
-  open-source project alongside?"
-- Never hide a current venture entirely — it is on the user's LinkedIn; inconsistency
-  costs more than concurrency.
+For full-time employee targets the silent question is "a serial founder — will they leave?", and
+short tenures ask "will this one be short too?". Both are settled by the **framing policy** in
+`profile/profile.md` (§ Framing policy, written at onboarding, one line per archetype) — not asked
+per application, and not improvised:
+
+- **Current own venture or open-source project.** The policy says, per archetype, whether it is
+  shown as the current role, or as a line under the employed role it runs alongside
+  (*"Open-source: <Project> — maintainer"*). For employee-track archetypes the default is the
+  second: a founder title as the current full-time role, directly above a job application, is the
+  loudest "will leave" signal a CV can send.
+- **Overlapping roles** (`lint_cv.py` reports them). Never hide one; make the relationship
+  visible: an advisory or part-time role says so in its descriptor, and concurrent ventures can be
+  grouped under one `### Founder ventures` entry with the individual companies as bullets. The
+  chronology rule still holds for the entries that remain.
+- **Short tenures.** Give each role's descriptor the reason the profile records (acquisition,
+  funding round ended, contract scope, venture wound down). A stated reason costs a clause; an
+  unexplained year reads as a firing.
+- Frame founder roles as building companies for others' capital (venture-backed, board-managed)
+  where the profile says so.
+- Never hide a current venture entirely — it is on the user's LinkedIn; inconsistency costs more
+  than concurrency.
 
 ## 7. Company-type variants (what to emphasise)
 

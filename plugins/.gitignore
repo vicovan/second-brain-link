@@ -18,6 +18,25 @@ nudged.txt
 lessons.md
 *.jsonl
 
+# fundraising: rendered layer, machinery and working files
+46-fundraising/
+.plugins/
+_FUNDRAISE_GENERATED.json
+.ledger.lock
+gates.json
+outreach/
+
+# travel-planner: rendered layer, machinery and ledger working files
+47-travel/
+trips/
+quotes/
+bookings/
+current.json
+ideas.json
+_TRAVEL_GENERATED.json
+_TRAVEL_BUILD_REPORT.md
+*.lock
+
 # generated CVs and reports
 *.pdf
 *.docx

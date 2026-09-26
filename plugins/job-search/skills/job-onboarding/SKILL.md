@@ -6,7 +6,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 
 # Job Onboarding
 
-Everything the other four skills know about a person lives in five Markdown files. This skill writes
+Everything the other four skills know about a person lives in seven Markdown files. This skill writes
 them. Nothing else may.
 
 Without a profile the pipeline cannot run: a scout with an invented compensation floor and guessed
@@ -20,8 +20,11 @@ proceed on assumptions — run this instead.**
     profile.md              career facts, contact sets, allowed title variants, education
     search-criteria.md      lanes, target titles, geography, comp floor, hard exclusions
     scoring.md              the weights, the thresholds, the disqualifiers
-    application-answers.md  settled answers — work authorization, notice, salary, framing
+    application-answers.md  settled answers — work authorization, notice, salary, framing,
+                            and the ## Knock-outs block knockout.py screens against
     sources.md              which boards and queries to sweep for this person
+    archetypes.md           the 2–3 role types targeted, and how each is argued
+    stories.md              STAR+R stories for behavioural questions and interview prep
 ```
 
 The surface root is the brain when the session is running inside one, otherwise the working folder
@@ -39,7 +42,7 @@ ls -1 "$DIR" 2>/dev/null || echo "(no profile yet)"
 ls -1 "$DIR/cv" 2>/dev/null || true
 ```
 
-The profile is exactly these five files. Each is independent — a run that can only fill three
+The profile is exactly these seven files. Each is independent — a run that can only fill three
 of them should write those three and say which are still missing, rather than refusing or
 writing placeholders:
 
@@ -50,6 +53,8 @@ writing placeholders:
 | `scoring.md` | the weights behind the 100-point score, and the disqualifiers | scoring falls back to the rubric's defaults |
 | `application-answers.md` | **the autonomy level** (§0), plus the settled answers reused on every form — work authorisation, notice period, consents, languages, and the raw material free text is composed from | the run defaults to `supervised` and gates every step, and every application re-asks the same questions |
 | `sources.md` | the boards and lanes worth sweeping for this person | the scout uses only its neutral defaults |
+| `archetypes.md` | the lanes, each with target titles, trigger keywords, lead proof points, why-angles, framing policy | the scout cannot tell a fitting job from an adjacent one, and CVs are argued generically |
+| `stories.md` | eight STAR+R stories built from real events | behavioural form questions are answered from scratch, thinly |
 
 Rules for this step:
 - **A file that exists is not rewritten** unless the user asked to update it. Read it, use it, and
@@ -78,6 +83,28 @@ ls -1 "$DIR/cv" 2>/dev/null
 
 Extract it with `pypdf` (PDF) or `python-docx` (DOCX); Markdown and text read directly. If several
 are present, use the most recently modified and say which one you took.
+
+### Upgrading an older profile — the v2 additions
+
+Profiles written before the knock-out screen, the archetypes and the story bank lack them, and
+without them every job is unscreened and every CV generic. Like the autonomy section, these are
+**additions, never rewrites**: when onboarding runs over an existing profile (or the user says
+"upgrade my profile"), check for each and add only what is missing, leaving every other line
+untouched, then list what was added:
+
+1. `## Knock-outs` in `application-answers.md` (template in `answers-template.md`). Ask per country
+   group, and ask for a **number** per currency for salary fields.
+2. `archetypes.md` — propose two or three lanes from the profile and the criteria's target titles,
+   mark each lane's evidence strength honestly, and ask the user to confirm or cut. Recommend
+   dropping any lane whose `critical` requirements the profile cannot show.
+3. `profile.md` §4 **Scale / Why it ended / Employment type** per role, and §9 **Framing policy** —
+   ask for team sizes, budgets and users role by role; record `TBD` for anything unknown.
+4. `stories.md` — draft eight from the profile's bullet bank, then ask the user to correct the
+   situation and action of each. Mark any number not in `profile.md` as `(unconfirmed)`.
+5. `scoring.md` — if it has no **shortlist likelihood** component, propose the rubric's default
+   weights and apply floor, showing old → new, and write them only on a yes.
+6. If a legacy state folder with applications exists, offer
+   `learn.py import-legacy <folder>` (it copies; the source is untouched).
 
 ## Step 1 — Look before you ask
 
@@ -129,6 +156,10 @@ A CV never states these, and every one of them changes the shortlist:
    visa status, how to frame a current side venture.
 7. **Languages spoken**, honestly. A required language nobody checks for is the biggest silent
    filter in a European search.
+8. **Knock-outs** — for each country group: right to work, would live there, would relocate
+   there; citizenships; degrees; clearances; the salary figure to type per currency.
+9. **Archetypes** — which two or three kinds of role, and which near-misses to exclude.
+10. **Scale and stories** — team sizes, budgets, users per role; eight real stories.
 
 Ask these in **small batches with sensible defaults offered**, not as a form. Anything the user
 declines to answer is recorded as a TBD in the file, never invented.
@@ -177,7 +208,7 @@ Ask only what you could not find, and ask in one pass per file rather than one a
 
 **`profile.md`** is confirmation, not interview: step 2 covers it.
 
-## Step 4 — Write the five files
+## Step 4 — Write the seven files
 
 Each carries frontmatter so it is indexable if the profile lives in a vault:
 
@@ -196,8 +227,9 @@ updated: <today>
 
 Use the shipped templates in `references/` for the shape of each file, and the structure of the
 existing profile if one is being updated. `references/` carries `profile-template.md`,
-`criteria-template.md` and `answers-template.md`; `scoring.md` and `sources.md` follow the shape
-described in `job-scout/references/scoring-rubric.md` and `sources.md`.
+`criteria-template.md`, `answers-template.md`, `archetypes-template.md` and
+`stories-template.md`; `scoring.md` and `sources.md` follow the shape described in
+`job-scout/references/scoring-rubric.md` (its default weights and apply floor) and `sources.md`.
 
 **Write every file that is missing, even the ones the user did not discuss.** A `sources.md` that
 says only "no preferred boards yet — using defaults" is a real answer and stops the next run
