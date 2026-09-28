@@ -14,8 +14,10 @@ without it, ask for the origin — never guess one.
 
 `list_connected_browsers` → **ask which browser, once per run** (the extension requires the
 user to choose even when one is connected) → `select_browser` → `tabs_context_mcp`.
-No browser tools at all → say which (absent, not connected, errored) and stop this skill;
-the plan is still complete without it.
+Empty list, stale deviceId, blocked site or no browser tools → follow
+`references/browser-setup.md` (the user's exact steps to install, sign in and reconnect the
+extension; ask once; list again). Still nothing after two rounds → say which (absent, not
+connected, errored) and stop this skill; the plan is still complete without it.
 
 ## 2. The market's shape — metasearch
 

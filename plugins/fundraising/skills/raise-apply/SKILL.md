@@ -96,7 +96,9 @@ founder never said is a false statement made in their name. Record the result in
 ### 7. Finish according to the level
 
 - `autonomous` and every gate green → click submit, confirm the success state (a confirmation page or
-  message), then
+  message), take ONE small screenshot of it (`computer` screenshot, `scale: 0.3`, `save_to_disk:
+  true`), copy it beside the program's answers as `confirmation.png`, show it in your report as
+  `![<Program> — submitted](<path relative to the brain>/confirmation.png)`, then
   `ledger.py set-status <key> filed --by agent --note "submitted <url>"`.
 - `supervised` → gate **Submit / Not yet**. On Submit, click, confirm, and log `filed --by founder`.
 - A red anywhere → leave it filled, do not submit, say which field and why, move on.
@@ -110,6 +112,10 @@ Steps 1–4 fan out as parallel subagents (≤ `max_research_agents`), each retu
 writes the ledger.**
 
 ## When the browser is not available
+
+First follow `references/browser-setup.md`: it walks the founder through installing, signing in to
+(the same claude.ai account as Claude Code) and reconnecting the Chrome extension, asks once, and
+lists again. Only if it still is not there after two rounds:
 
 Say which it was (tool missing, no browser connected, a domain blocked by the extension — name the
 domain), then hand over `answers.md` and the form URL for the founder to paste. That is an honest

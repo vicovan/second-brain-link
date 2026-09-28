@@ -283,12 +283,16 @@ the point is to be able to quote it back.
 **Never record a NEVER-TYPE value here** (`field-policy.md` §1): no passwords, no identity or
 passport numbers, no payment details. Those are not answered, so there is nothing to record.
 
-### 4b. Independent recruiter review — one cheap subagent, no web
+### 4b. Independent recruiter review — one subagent, no web
 The model that tailored the CV cannot grade it. Before any form is touched, dispatch **one**
 reviewer:
 ```
-Agent(subagent_type: "general-purpose", model: "haiku", prompt: <brief>)
+Agent(subagent_type: "general-purpose", prompt: <brief>)
 ```
+**No `model:` override — the reviewer runs on the same model as you.** Its verdict decides what
+is sent in the user's name; a smaller model is a worse hiring manager, not a cheaper one. This
+holds for every subagent that judges, writes or fills anything: never pin a smaller model for
+it. (A purely mechanical, independently verified chore is the only place a smaller model fits.)
 The brief contains, verbatim: `posting.md`, `fit.md`, the CV Markdown, `answers.json`, and:
 
 > You are the hiring manager for this role, screening 300 applications. Do not use any tools.
@@ -331,8 +335,10 @@ Then pass the **tabId** in the brief and tell the subagent explicitly *not* to c
 `list_connected_browsers` or `select_browser` — the connection is already made.
 
 If `list_connected_browsers` errors, returns nothing, or is not present in this session,
-stop trying: say which of those happened, and finish by preparing the CV, `answers.json`
-and the form URL for a manual submit. A browser you never reached must never be narrated
+do NOT just stop: follow `references/browser-setup.md` — tell the user the exact steps to install,
+sign in (same claude.ai account as Claude Code) and reconnect the extension, ask once whether it is
+connected, and list again. Still nothing after two rounds → say which of those happened, and finish
+by preparing the CV, `answers.json` and the form URL for a manual submit. A browser you never reached must never be narrated
 as one you did.
 
 **Copy the CV into the session scratchpad before dispatching.** `file_upload` refuses any path the
@@ -346,12 +352,14 @@ and give the subagent **that** path. Keep the canonical copy in the application 
 scratchpad copy is only to satisfy the uploader. (If the session was started outside the
 working folder: `/add-dir "<working folder>"`.)
 
-Form-filling is the token-expensive step, so it runs on a small model and works through the DOM:
+Form-filling is the token-expensive step. It stays affordable by working through the DOM (no
+screenshot loops — see the brief), NOT by a smaller model: what it types is what the employer
+receives in the user's name, and a filler that skips a field or mis-picks a dropdown costs the
+application. So it runs on the same model as you — no `model:` override:
 
 ```
 Agent(
   subagent_type: "general-purpose",
-  model: "haiku",
   prompt: "<the full brief below>"
 )
 ```
@@ -403,8 +411,9 @@ Only a human who submitted by hand may log past it, with `--force-gates "<reason
 `--status filled`, put the reason in the report row, and go on to the next one. A submitted
 application with a wrong or empty answer cannot be taken back; an unsent one costs a minute.
 
-**`autonomous`:** with verification green, click submit, confirm the success state, screenshot
-it, then log `--status applied` and update the report row immediately. `answers.json` and
+**`autonomous`:** with verification green, click submit, confirm the success state, then take
+the **confirmation snapshot** (below), then log `--status applied` and update the report row
+immediately. `answers.json` and
 `ANSWERS.md` must be complete **before** the click — they are what the user reads instead of
 approving beforehand, so an application that is sent but not recorded is the one unacceptable
 outcome. Then report in three lines what went out.
@@ -513,8 +522,26 @@ If a result arrives later (`learn.py set-result`), come back and update the stat
 always be current.** A report that says "not started" for something already submitted is worse
 than no report.
 
+### Confirmation snapshot — one small screenshot per submitted application
+Once the page confirms the submission ("Thank you", "Application submitted"), whoever submitted
+(you, or the user tapping Submit in `supervised`), take ONE screenshot of it — small, saved:
+```
+mcp__claude-in-chrome__computer(action: "screenshot", tabId: <tab>, scale: 0.3, save_to_disk: true)
+cp "<the path the tool returned>" "<app dir>/confirmation.png"
+```
+`scale: 0.3` keeps what you receive to a few hundred tokens; the file on disk is the record. Then
+show it in the chat, in the step-9 report, as a Markdown image whose path is **relative to the
+brain** (Studio draws images from the brain; nothing is fetched from the web):
+```
+![<Company> — submitted](<app dir, relative to the brain root>/confirmation.png)
+```
+When the state root is not inside the brain, give the file's path in words instead. The job
+renderer copies it next to the application note as `<Company — Role> · Confirmation.png`.
+Never screenshot pages that show a password, ID or payment field.
+
 ### 9. Tell them what happened
-Four lines maximum: what was submitted, where, which CV, and what to expect. Remind them to run
+Four lines maximum: what was submitted, where, which CV, and what to expect — plus the
+confirmation snapshot image for each submitted application. Remind them to run
 `learn.py set-result --job-key <key> --result screen|rejected|...` when a reply arrives — **the loop
 only improves if results go back in.**
 

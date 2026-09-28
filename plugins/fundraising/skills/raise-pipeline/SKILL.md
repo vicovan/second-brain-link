@@ -58,7 +58,8 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts/ledger.py due --days
   own send is the gate.
 - `autonomous`: none of those three. `max_submits_per_run` caps submissions; on reaching it, stop,
   finish the records, list what is prepared but unsent.
-- **Both levels**: which browser (once per run), and a missing fact (ask when supervised; skip that
+- **Both levels**: which browser (once per run; not connected → `references/browser-setup.md`, the
+  founder's steps to install, sign in and reconnect the extension), and a missing fact (ask when supervised; skip that
   item with a reason when autonomous).
 
 ## Recording an outcome

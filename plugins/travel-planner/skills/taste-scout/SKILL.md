@@ -31,7 +31,7 @@ web: `itinerary.py brain-pois <trip> --stop <id>` adds them with their `why`.
 For each day with room (fewer than the pace in `travel-criteria.md`), search near that day's
 route — Google Maps and Tripadvisor for food, GetYourGuide and Viator for tours
 (`references/dining-sources.md`), in the user's browser (ask which once per run), or
-`WebSearch` when no browser is available. Match on the loved categories and their own words.
+`WebSearch` when no browser is available (to connect one, `references/browser-setup.md`). Match on the loved categories and their own words.
 
 Add each pick with coordinates read from the page and an honest reason:
 

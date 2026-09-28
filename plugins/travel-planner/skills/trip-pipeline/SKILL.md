@@ -49,7 +49,8 @@ exist, and `level:` from §0 of `booking-answers.md` (missing → `research`).
 
 Two decisions are always the user's, at every level: **which trip** (from the scout's ideas)
 and **which flight journey** (because a self-transfer moves risk onto them — show the risk
-line verbatim before they choose). Plus the browser choice, once per run. Ask with
+line verbatim before they choose). Plus the browser choice, once per run (not connected →
+`references/browser-setup.md`: the user's steps to install, sign in and reconnect the extension). Ask with
 `AskUserQuestion`; in a non-interactive stream without it, emit one fenced `gate` block and
 end the turn.
 

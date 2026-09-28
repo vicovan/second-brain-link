@@ -94,6 +94,10 @@ do not send the user to a terminal — Studio runs you with the Chrome integrati
      for every job in the run. This one question survives `autonomous`, because it is the
      extension's requirement rather than an approval.
    - `select_browser <deviceId>` → `tabs_context_mcp` (createIfEmpty) for a tab id.
+   - **Empty list, stale deviceId, or an extension that "isn't connected"?** Don't just report it
+     — follow `browser-setup.md` (job-apply's references): give the user the numbered steps to
+     install, pin and sign in to the Claude extension with the SAME claude.ai account as Claude
+     Code, restart Chrome if needed, then ask once and list again. Never reuse an old deviceId.
 
    Then fill every field from the profile and `answers.json`, and **read the DOM to confirm
    each value actually registered** — a field that displays a value it never registered is

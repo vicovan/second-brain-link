@@ -75,7 +75,14 @@ def machinery_dir(root, dest):
 # was such a key: no code path ever produced it. The equivalent real value is `screen`.
 # Files job-apply writes into an application folder that are NOT the CV.
 WORKING_FILES = {"posting.md": "Posting", "fit.md": "Fit", "company.md": "Company research",
-                 "cover-letter.md": "Cover letter"}
+                 "cover-letter.md": "Cover letter", "form-fields.md": "Form fields",
+                 "application-answers.md": "Application answers"}
+
+# A tailored CV is named <First>_<Last>_CV_<Company>.md (cv-tailor). Only files that LOOK like
+# one are rendered as a CV; any other working file job-apply adds later is rendered under its
+# own humanised name instead of being mislabelled "CV <Company> 2" — which is exactly what
+# happened to form-fields.md when it was introduced.
+CV_NAME_RE = re.compile(r"(^|[_\s-])CV([_\s-]|$)", re.I)
 
 STATUS_GLYPH = {"applied": "✅", "filled": "🟡", "not_started": "⬜", "skipped": "⛔",
                 "disqualified": "❌", "excluded": "🚫", "screen": "🔵", "interview": "🎯",
@@ -417,6 +424,8 @@ def application_note(row, app_dir, cv_names, known=frozenset()):
     body.append(f"Company: {org_link(company, known)}\n")
     if row.get("url"):
         body.append(f"Posting: <{row['url']}>\n")
+    if app_dir and (pathlib.Path(app_dir) / "confirmation.png").is_file():
+        body.append(f"\n## Submitted\n\n![[{title} · Confirmation.png]]\n")
     if cv_names:
         # Wikilinks, with a short alias, for BOTH the Markdown and the PDF. Second Brain Studio's
         # renderer only turns `[text](url)` into a link when the url starts with http(s)
@@ -625,6 +634,10 @@ def render(dest, quiet=False):
             for md in sorted(app.glob("*.md")):
                 if md.name == "ANSWERS.md" or md.name in WORKING_FILES:
                     continue
+                if not CV_NAME_RE.search(md.stem):
+                    kind = re.sub(r"[-_]+", " ", md.stem).strip().capitalize() or md.stem
+                    w.text(f"{base}/{note} · {kind}.md", md.read_text(encoding="utf-8"))
+                    continue
                 # One label per CV, allocated HERE. It used to be allocated once before the
                 # loop and again at the end of every iteration, so each application burned a
                 # spare name and a company's second role came out "CV Foo 2" rather than
@@ -637,6 +650,11 @@ def render(dest, quiet=False):
                 if pdf_name:
                     w.binary(f"{base}/{pdf_name}", pdf_src)
                 cvs.append((label, pdf_name))
+            # The submission's confirmation screenshot (job-apply takes one small shot of the
+            # "thank you" page), beside the note that embeds it.
+            conf = app / "confirmation.png"
+            if conf.is_file():
+                w.binary(f"{base}/{note} · Confirmation.png", conf)
         r["_cv"] = cvs[0] if cvs else None
         if cvs:
             labels[key] = cvs[0]

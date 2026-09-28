@@ -70,7 +70,10 @@ a limit whose unit you have not tested.
 
 **Which browser** is asked once per run at both levels — the Chrome extension's contract requires
 the user to choose, even with one browser connected: `list_connected_browsers`, gate on the choice,
-`select_browser`, then `tabs_context_mcp`.
+`select_browser`, then `tabs_context_mcp`. Empty list, stale deviceId or "not connected" → follow
+`browser-setup.md` (raise-apply's references): the founder's numbered steps to install, pin and sign
+in to the Claude extension with the SAME claude.ai account as Claude Code, then ask once and list
+again. Never reuse an old deviceId.
 
 ## Cost is a setting too
 

@@ -12,7 +12,8 @@ For each pair of consecutive stops not joined by a flight, and each `daytrip` st
    centre. Otherwise a car, a bus or a ferry. Read `references/ground-traps.md` before
    recommending a car.
 2. Search the operator (national rail site) or the rental sites in `providers.md` (default
-   Sixt, Europcar, Hertz) in the user's browser — ask which browser once per run.
+   Sixt, Europcar, Hertz) in the user's browser — ask which browser once per run (not connected →
+   `references/browser-setup.md`).
 3. Record each option as a leg: write a JSON file and add it.
 
 ```bash

@@ -15,7 +15,7 @@ with no trip at all** ("hotels in Iași 12–19 Oct").
    addresses. For a stopover, stay near the airport-train line into town.
 2. **What.** Read `taste.md` (hotel style, neighbourhood) and `travel-criteria.md` (budget per
    night). No profile → ask the one question that matters (budget), not all of them.
-3. **Search** in the browser (ask which browser once per run — see `flight-search` §1), in the
+3. **Search** in the browser (ask which browser once per run — see `flight-search` §1; not connected → `references/browser-setup.md`), in the
    order `providers.md` gives (default **Google Hotels** for the market and real availability
    across sites, then Booking.com, Agoda, Airbnb for the rate actually sold —
    `references/stay-sources.md`), for the dates, guests from `traveler.md`. A place that shows

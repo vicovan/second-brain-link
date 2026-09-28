@@ -238,8 +238,8 @@ screen (2b — on `STOP` it returns the quoted sentence and builds nothing), cre
 searches, no more), invoke `job-search:cv-tailor` with that folder as the output directory,
 write `answers.json`, and run both `lint_cv.py` gates until they pass.
 
-**Then you, not the subagents, run job-apply step 4b** — one Haiku recruiter review per built
-application, sequentially, and record each verdict with `lint_cv.py review`. A subagent cannot
+**Then you, not the subagents, run job-apply step 4b** — one recruiter review per built
+application (on your own model — never pin a smaller one for it), sequentially, and record each verdict with `lint_cv.py review`. A subagent cannot
 dispatch its own reviewer, and a reviewer briefed by the agent that wrote the CV is not
 independent. Log `skipped_knockout` / `skipped_review` rows yourself from what the agents return.
 
@@ -267,7 +267,8 @@ the end look like nothing happened for four minutes.
 
 ### 6. Phase B — fill and submit, one at a time
 
-Connect and select the browser **once** in this session, then for each job in score order:
+Connect and select the browser **once** in this session (not connected → `references/browser-setup.md`,
+the user's steps to install, sign in and reconnect the extension), then for each job in score order:
 open a tab, invoke **`job-search:job-apply`** from its step 5, verify every required field in
 the DOM, submit (`autonomous`) or gate (`supervised`), close the tab, log
 `--status applied`, `render_brain.py --quiet`, next.

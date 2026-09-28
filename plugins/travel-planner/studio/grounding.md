@@ -118,8 +118,11 @@ Flights, stays, ground and dining are read from **public sites in the user's own
 4. A site that blocks automation, shows a CAPTCHA, or wants a login: **stop on that site**,
    say which one in one line, and hand over a pre-filled search link instead. Never solve a
    CAPTCHA, never create an account, never retry a block more than once.
-5. If the browser tools are not present at all, say which it was — not connected, errored, or
-   absent — and carry on with everything that needs no browser.
+5. Empty list, stale deviceId, "not connected" or no browser tools → follow `browser-setup.md`
+   (flight-search's references): the user's numbered steps to install, pin and sign in to the
+   Claude extension with the SAME claude.ai account as Claude Code, then ask once and list again.
+   Still nothing after two rounds → say which it was — not connected, errored, or absent — and
+   carry on with everything that needs no browser.
 
 **Self-transfer is the traveller's risk, and you say so every time.** When `interline.py`
 proposes separate tickets, the risk sentence it produces goes to the user verbatim, before
