@@ -25,7 +25,7 @@ is used, headline, summary, keyword density.
 You may never change: employers, dates, degrees, numbers, or claim outcomes,
 customers, revenue, certifications or titles not in profile/profile.md.
 "Adjust job titles" means choosing the truthful label that mirrors the target
-(e.g. Co-Founder & CTO → "CTO & Co-Founder"; Technical Product Director ↔ "Staff
+(e.g. Co-Founder & CTO → "CTO & Co-Founder"; Director of Product ↔ "Staff
 Software Architect", where the profile lists both for that role; Founder & CEO →
 "Founder, CEO & CTO"). It
 never means inventing a title the company would not confirm.
@@ -45,9 +45,9 @@ touching the CV:
    remote-US-hours, GCC/MENA.
 5. Must-have keywords: every noun phrase in "requirements" / "must have" /
    "you have" — copy them verbatim into a list (both acronym and long form:
-   "IAM" and "Identity and Access Management").
+   "CI/CD" and "Continuous Integration / Continuous Delivery").
 6. Nice-to-have keywords: from "bonus", "preferred", "nice to have".
-7. Domain signals: industry (fintech, travel, identity, commerce, defense…),
+7. Domain signals: industry (fintech, health, retail, logistics, public sector…),
    stack (Python, TS, K8s…), scale words (multi-tenant, enterprise, global).
 8. Culture / narrative signals: what they brag about (open source, speed,
    customer obsession, security, regulated, founder-led).
@@ -139,7 +139,7 @@ accurate for that role, including ones the user actually used at the time. Pick 
 the target. Examples already sanctioned there:
 
 - **Northwind Data** (the current role) → `Staff Software Architect` for architect/IC targets ·
-  `Technical Product Director` for product-leadership targets, when the profile lists both as
+  `Director of Product` for product-leadership targets, when the profile lists both as
   genuinely held. Never both on one CV.
 - **Jane's own venture** → `Founder & CEO` · `Founder, CEO & CTO` · `Founder & CTO` — pick the one
   whose emphasis matches the target.
@@ -167,7 +167,7 @@ More patterns:
   *"Principal-architect scope: owned every architectural decision on the platform personally,
   end to end."*
 - Target **Head of AI**, role was Staff Software Architect →
-  *"Head-of-AI scope: set the AI technical direction for the platform and its agent governance."*
+  *"Head-of-AI scope: set the AI technical direction for the platform and its model roadmap."*
 
 Use the target's exact noun. If they say "Director", the line says "Directed". If they say
 "Principal Architect", the line says "Principal-architect scope".
@@ -206,11 +206,11 @@ world. Same company, same truth, different emphasis:
 
 | Company | For an AI/agents target | For a fintech target | For an enterprise/security target |
 |---|---|---|---|
-| **Northwind Data** | *agent-first B2B SaaS infrastructure* | *B2B SaaS with multi-gateway payment orchestration* | *multi-tenant enterprise SaaS platform* |
-| **Meridian Labs** | *real-time AI rules engine* | *B2B fintech — instant digital payouts* | *regulated real-time transaction platform* |
+| **Northwind Data** | *ML-powered analytics platform* | *B2B SaaS with usage-based billing* | *multi-tenant enterprise SaaS platform* |
+| **Meridian Labs** | *recommendation engine for retail* | *checkout and loyalty platform* | *high-availability retail platform* |
 | **Acme Robotics** | *ML-driven fleet platform, API-first* | *orchestration and payments platform* | *enterprise integration platform* |
-| **Globex** | *enterprise AI-agent governance platform* | *platform for regulated industries* | *enterprise governance & administration vendor* |
-| **Jane's own venture** | *open-source AI context engine, MIT* | *privacy-first data platform* | *data-sovereign knowledge platform, zero-network core* |
+| **Globex** | *document-AI platform for logistics* | *invoice-automation platform* | *enterprise document-management vendor* |
+| **Jane's own venture** | *open-source developer tooling* | *subscription analytics for small businesses* | *self-hosted analytics, SOC 2-ready* |
 
 The point is the *shape*, not these companies: one row per employer on the CV, one column per kind
 of target, and the same truthful descriptor pointed in a different direction each time. Build the
@@ -282,7 +282,7 @@ target. **Never reuse a summary between applications.**
 | Chief Architect | *"**Chief Architect** profile: 15 years of hands-on software architecture in product companies, including **CTO of a B2B SaaS platform**…"* |
 | Principal AI/ML Engineer | *"A **pragmatic builder** who leads AI/ML work by shipping it…"* |
 | CPTO | *"**Chief Product & Technology Officer** who owns the roadmap and still writes the code…"* |
-| Director of PM, Security | *"**Technical Product Director** who owns security product strategy and can argue the details with engineering rather than approve what they propose."* |
+| Director of PM, Security | *"**Director of Product** who owns security product strategy and can argue the details with engineering rather than approve what they propose."* |
 
 The last one lifts the JD's own phrasing — they wrote *"argue the details with engineering, not just
 approve what they propose"*. Quoting a JD's distinctive line back is the strongest signal available
@@ -455,13 +455,13 @@ per application, and not improvised:
 
 | Target | Emphasise | De-emphasise |
 |---|---|---|
-| Seed–Series B startup | 0→1 speed, hands-on coding, fundraising, scrappy team-building, accelerator wins | enterprise process, defense PoCs |
-| Scale-up / Series C+ | org growth, process, architecture standards, multi-tenant SaaS, hiring across countries | studio years, personal-finance app |
+| Seed–Series B startup | 0→1 speed, hands-on coding, fundraising, scrappy team-building, accelerator wins | enterprise process, long procurement cycles |
+| Scale-up / Series C+ | org growth, process, architecture standards, multi-tenant SaaS, hiring across countries | agency years, side projects |
 | Enterprise / vendor | governance and standards work, enterprise architecture, platform depth | consumer apps |
-| Defense / regulated | DDIL, air-gapped, local inference, PII stripping, provenance/audit, GDPR | growth-hacking language |
-| FinTech / payments | scheme integrations, tokenisation, payment orchestration | travel matching |
-| Travel tech | GDS and distribution work, passenger-rights automation, airline retailing | identity depth |
-| AI-native / agents | shipped AI systems, MCP/A2A, agent governance, retrieval, local inference | unrelated platform rebuilds |
+| Defense / regulated | on-premise delivery, audit trails, data residency, GDPR | growth-hacking language |
+| FinTech / payments | payment integrations, reconciliation, risk controls | unrelated consumer work |
+| Travel tech | booking and inventory systems, pricing, partner integrations | deep back-office tooling |
+| AI-native / agents | shipped AI features, evaluation, retrieval, model operations | unrelated platform rebuilds |
 | VC / accelerator / investor | thesis, market, moat, business model, stage honesty, founder track record, "focus" | technical stack lists |
 | Consultancy / fractional CTO | breadth across sectors and companies, executive education, languages | single-company depth |
 

@@ -667,7 +667,8 @@ def cmd_log_draft(a):
         recs = load()
         rec = need(recs, a.key)
         entry = {"path": a.path, "gmail_draft_id": a.gmail_id or None,
-                 "channel": a.channel, "at": TODAY.isoformat()}
+                 "channel": a.channel, "at": TODAY.isoformat(),
+                 "mailto": bool(getattr(a, "mailto", None)), "package": getattr(a, "package", None)}
         rec["drafts"] = [d for d in rec["drafts"] if d.get("path") != a.path] + [entry]
         if rec["status"] in ("screened", "verified"):
             _transition(rec, "queued", "agent", "picked for outreach")
@@ -903,7 +904,9 @@ def main():
     g.add_argument("--note"); g.add_argument("--different"); g.set_defaults(f=cmd_set_status)
     g = sub.add_parser("log-app"); g.add_argument("key"); g.add_argument("--day"); g.set_defaults(f=cmd_log_app)
     g = sub.add_parser("log-draft"); g.add_argument("key"); g.add_argument("--path", required=True)
-    g.add_argument("--gmail-id"); g.add_argument("--channel", default="email",
+    g.add_argument("--gmail-id"); g.add_argument("--mailto", help="the pre-filled mailto link (stored as a flag)")
+    g.add_argument("--package", help="the package folder, relative to the fundraising layer")
+    g.add_argument("--channel", default="email",
                                                  choices=["email", "intro", "form", "linkedin", "x", "other"])
     g.set_defaults(f=cmd_log_draft)
     g = sub.add_parser("sent"); g.add_argument("key"); g.add_argument("--days", type=int)

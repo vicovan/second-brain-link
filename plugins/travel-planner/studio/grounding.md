@@ -67,7 +67,7 @@ POI, stop or suggestion ids (`g1`…). Nothing in it is saved. Never put coordin
 never use it instead of editing the itinerary.
 
 **Every place you recommend goes on the Map.** With a trip, through `itinerary.py add-poi`.
-Without one — "where should I get coffee in Iași?" — through `suggest.py` (a suggestion set;
+Without one — "where should I get coffee in Lisbon?" — through `suggest.py` (a suggestion set;
 see `taste-scout`), then `render_brain.py --quiet` and end with
 ```` ```map {"fit":"suggestions"}``` ````. Coordinates come from the page you read them on
 (a Google Maps URL's `@lat,lng`), never from memory; `suggest.py` refuses one that is far

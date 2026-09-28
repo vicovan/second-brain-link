@@ -15,7 +15,7 @@ Follow `memory-protocol.md` (in `skills/flight-search/references/`). Tool:
 4. **Last:** at most 3 inferred lessons → `observe --source agent` (saved and used at once, flagged as inferred — the user can edit or remove them); end with *"Learned: …"*.
 
 
-Works with a trip (`itinerary.py show <trip>`) **or without one** — "what does Dubai → Iași
+Works with a trip (`itinerary.py show <trip>`) **or without one** — "what does Lisbon → Tokyo
 cost on 12 October?" is a real question. `traveler.md` gives home airports and citizenships;
 without it, ask for the origin — never guess one.
 
@@ -56,9 +56,9 @@ and `render_brain.py` writes the same list as a note.
 
 ```bash
 S=${CLAUDE_PLUGIN_ROOT}/skills/trip-planner/scripts/
-python3 $S/quotes.py new flights --id dxb-ias-oct12 --title "Dubai → Iași · 12 Oct" \
-    --from DXB --to IAS --date YYYY-MM-DD [--return YYYY-MM-DD] [--adults 1] [--trip <trip_id>]
-python3 $S/quotes.py add dxb-ias-oct12 --file options.json     # a list; the shape is in quotes.py
+python3 $S/quotes.py new flights --id lis-hnd-oct12 --title "Lisbon → Tokyo · 12 Oct" \
+    --from LIS --to HND --date YYYY-MM-DD [--return YYYY-MM-DD] [--adults 1] [--trip <trip_id>]
+python3 $S/quotes.py add lis-hnd-oct12 --file options.json     # a list; the shape is in quotes.py
 python3 $S/render_brain.py --quiet
 ```
 

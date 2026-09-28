@@ -16,7 +16,7 @@ Follow `memory-protocol.md` (in `skills/flight-search/references/`). Tool:
 
 
 Per stop in the itinerary — stopovers included, they are stops — **or for a city and dates
-with no trip at all** ("hotels in Iași 12–19 Oct").
+with no trip at all** ("hotels in Lisbon 12–19 Oct").
 
 1. **Where.** The best base is walking distance from that stop's places. Get the cluster:
    `itinerary.py show <trip>` for the stops, and the centre of each stop's POIs from
@@ -36,9 +36,9 @@ with no trip at all** ("hotels in Iași 12–19 Oct").
 
 ```bash
 S=${CLAUDE_PLUGIN_ROOT}/skills/trip-planner/scripts/
-python3 $S/quotes.py new stays --id iasi-oct --title "Iași · 12–19 Oct" --city "Iasi" \
+python3 $S/quotes.py new stays --id lisbon-oct --title "Lisbon · 12–19 Oct" --city "Lisbon" \
     --checkin YYYY-MM-DD --checkout YYYY-MM-DD --guests 2 [--trip <trip_id> --stop s1]
-python3 $S/quotes.py add iasi-oct --file options.json
+python3 $S/quotes.py add lisbon-oct --file options.json
 python3 $S/render_brain.py --quiet
 ```
 

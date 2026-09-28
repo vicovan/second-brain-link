@@ -42,6 +42,14 @@ founder and the company. The brain tunes *who to approach*; the profile supplies
    *draft* tool is available in this session — a Gmail draft. If only a send tool exists, you do
    not use it; you write the note and a `mailto:` link and say so in one line. A record becomes
    `contacted` only when the founder says it was sent (`ledger.py sent`).
+
+   **Packages and buttons.** Every email is built as a package (`raise-outreach`: brief → fit →
+   draft → lint → an independent investor review → buttons). A PASS package carries two buttons the
+   founder clicks in the note or on the dashboard's **Ready to send** table: **✉ Open in Mail** (a
+   `mailto:` link — opens a new, pre-filled message in their own mail app; they press Send) and
+   **✓ I sent it**, which arrives here as the founder's own message *"I sent the <Name> email"* →
+   run `ledger.py sent <key>` for that target at once (it starts the follow-up clock), re-render, and
+   confirm in one line. Never treat anything else as "sent".
 2. **Every claim traces to the profile.** Run `lint_claims.py` on every answer set and every email
    draft. Red stops that item at every autonomy level. Never "fix" a red by inventing the missing
    fact — ask for it (supervised) or skip the item with a one-line reason (autonomous).

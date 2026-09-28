@@ -13,8 +13,8 @@ Run `memory.py` from inside the brain (Studio's working folder), or pass `--brai
 memory.py recall --scope <scope> --tags <tags>
 ```
 Apply every item it returns. Then tell the user in ONE line which remembered items changed what
-you are doing, with their ids — e.g. *"From memory: excluding IGA companies (m-20260927-7f3a1c),
-keeping Toptal (m-20260928-02be44)."* If nothing applied, say nothing about memory.
+you are doing, with their ids — e.g. *"From memory: skipping roles that need relocation
+(m-20300101-7f3a1c), cover letters under 200 words (m-20300102-02be44)."* If nothing applied, say nothing about memory.
 **Never ask the user something memory already answers.** Memory wins over this skill's defaults;
 the user's words in THIS conversation win over memory (and are then saved — step 2).
 

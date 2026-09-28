@@ -23,7 +23,7 @@ AMBER (reported, does not stop):
   - a limit whose unit was never tested ("unknown") — type one character and watch the counter
   - an email with no `to:` address yet
 """
-import argparse, json, os, pathlib, re, sys
+import argparse, datetime, json, os, pathlib, re, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import founder_profile as prof  # noqa: E402
@@ -165,7 +165,84 @@ def lint(paths, pdir=None):
     return {"ok": not red, "red": red, "amber": amber, "checked": [str(p) for p in paths]}
 
 
+REVIEW_VERDICTS = ("take-meeting", "maybe", "pass")
+
+
+def _gates(pkg):
+    p = pathlib.Path(pkg)
+    return p / "gates.json" if p.is_dir() else p
+
+
+def _read(gp):
+    try:
+        return json.loads(gp.read_text(encoding="utf-8")) if gp.is_file() else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _recompute(g):
+    lint_ok = (g.get("lint") or {}).get("ok", False)
+    rev = g.get("review") or {}
+    dom = g.get("dom") or {}
+    g["ok"] = bool(lint_ok and rev.get("pass") and dom.get("ok", True))
+    return g
+
+
+def gates_ok(pkg):
+    """(ok, why) — lint green AND an investor review that passed (take-meeting, or maybe
+    after one round of fixes) AND, for a form, the DOM check."""
+    g = _read(_gates(pkg))
+    if not g:
+        return False, "no gates.json — run the lint and the investor review"
+    if "lint" not in g:
+        return False, "lint not run"
+    if not g["lint"].get("ok"):
+        return False, "lint red: " + "; ".join(g["lint"].get("red", [])[:2])
+    rev = g.get("review")
+    if not rev:
+        return False, "investor review not run"
+    if not rev.get("pass"):
+        return False, f"review '{rev.get('verdict')}': {rev.get('reason', '')}"
+    if "dom" in g and not g["dom"].get("ok", True):
+        return False, "form fields did not verify"
+    return True, "PASS" + (" (flagged: maybe)" if rev.get("flag") else "")
+
+
+def review_main(argv):
+    ap = argparse.ArgumentParser(prog="lint_claims.py review")
+    ap.add_argument("pkg")
+    ap.add_argument("--verdict", required=True, choices=REVIEW_VERDICTS)
+    ap.add_argument("--reason", default="")
+    ap.add_argument("--round", type=int, default=1,
+                    help="2 = the second review after applying top_fixes once")
+    a = ap.parse_args(argv)
+    gp = _gates(a.pkg)
+    g = _read(gp)
+    # maybe on the second round is allowed through, flagged; pass never is
+    ok = a.verdict == "take-meeting" or (a.verdict == "maybe" and a.round >= 2)
+    g["review"] = {"pass": ok, "verdict": a.verdict, "reason": a.reason, "round": a.round,
+                   "flag": "maybe" if (a.verdict == "maybe" and ok) else None,
+                   "at": datetime.datetime.now().replace(microsecond=0).isoformat()}
+    _recompute(g)
+    gp.parent.mkdir(parents=True, exist_ok=True)
+    gp.write_text(json.dumps(g, indent=1, ensure_ascii=False), encoding="utf-8")
+    print(f"review '{a.verdict}' (round {a.round}) recorded in {gp} — gates {'PASS' if g['ok'] else 'FAIL'}")
+    return 0
+
+
+def status_main(argv):
+    ap = argparse.ArgumentParser(prog="lint_claims.py status")
+    ap.add_argument("pkg")
+    a = ap.parse_args(argv)
+    ok, why = gates_ok(a.pkg)
+    print("GATES:", "PASS" if ok else "FAIL — " + why)
+    return 0 if ok else 1
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] in ("review", "status"):
+        fn = review_main if sys.argv[1] == "review" else status_main
+        sys.exit(fn(sys.argv[2:]))
     ap = argparse.ArgumentParser()
     ap.add_argument("drafts", nargs="+")
     ap.add_argument("--out", help="write gates.json here (default: beside the first draft)")
@@ -177,7 +254,8 @@ def main():
         prev = json.loads(out.read_text(encoding="utf-8")) if out.is_file() else {}
     except (OSError, ValueError):
         prev = {}
-    prev.update({"lint": res, "ok": res["ok"] and prev.get("dom", {}).get("ok", True)})
+    prev["lint"] = res
+    _recompute(prev) if "review" in prev else prev.update({"ok": res["ok"] and prev.get("dom", {}).get("ok", True)})
     prev["red"] = res["red"] + prev.get("dom", {}).get("red", [])
     out.write_text(json.dumps(prev, indent=1, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(res, indent=1, ensure_ascii=False))

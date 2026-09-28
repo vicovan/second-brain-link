@@ -788,7 +788,7 @@ COPILOT_PROMPTS = {
         "frontmatter (strength, status, last_contact)."),
     "for-me": (
         "Knowing me from my second brain, recommend: {}.\n\n"
-        "Examples: 'coffee shops in Lisbon', 'a hotel in Dubai for a work trip', 'things to do "
+        "Examples: 'coffee shops in Lisbon', 'a hotel in Madrid for a work trip', 'things to do "
         "this weekend', 'where should I travel in October'. Ground every pick in MY real data — "
         "the places I've saved/checked into (`85-places/`, each with kind + lat/lng), the "
         "interests/pages I follow (`30-voice/interests.md`), and how the algorithms profile me "

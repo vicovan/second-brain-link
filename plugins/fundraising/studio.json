@@ -41,6 +41,10 @@
       "q": "Apply to a program from my plan: find its real form, draft every answer from my profile and stories within the form's limits, lint it against my facts, fill it in my browser and verify every field — then finish the way my autonomy setting says."
     },
     {
+      "t": "Prepare this week's packages",
+      "q": "Prepare this week's packages: for each Tier 2 target, build the brief, score the fit, draft the email, lint it, run the independent investor review, and give me the Open-in-Mail buttons for everything that passes. Do not send anything."
+    },
+    {
       "t": "Draft this week's emails",
       "q": "Draft this week's investor emails: one per Tier 2 target, each with a hook from something verified on their own site, linted against my facts, saved as a note and as a Gmail draft. Do not send anything."
     },
@@ -62,7 +66,12 @@
         "label": "Pitch deck",
         "hint": "PDF or PPTX. Onboarding reads it to fill your company facts; applications link or attach it.",
         "dest": "46-fundraising/profile/materials",
-        "accept": [".pdf", ".pptx", ".key", ".md"],
+        "accept": [
+          ".pdf",
+          ".pptx",
+          ".key",
+          ".md"
+        ],
         "multiple": true
       },
       {
@@ -70,7 +79,13 @@
         "label": "Facts file / one-pager",
         "hint": "The source of truth for every claim — the agent will not state a number that is not in here or your profile.",
         "dest": "46-fundraising/profile/materials",
-        "accept": [".md", ".markdown", ".txt", ".pdf", ".docx"],
+        "accept": [
+          ".md",
+          ".markdown",
+          ".txt",
+          ".pdf",
+          ".docx"
+        ],
         "multiple": true
       },
       {
@@ -78,7 +93,12 @@
         "label": "Founder CV",
         "hint": "Used for the founder bio and for 'why you' answers.",
         "dest": "46-fundraising/profile/materials",
-        "accept": [".pdf", ".docx", ".md", ".txt"],
+        "accept": [
+          ".pdf",
+          ".docx",
+          ".md",
+          ".txt"
+        ],
         "multiple": true
       }
     ]

@@ -20,20 +20,23 @@ used, ever**, and a record only becomes `contacted` when the founder says it wen
 
 Read `references/email-playbook.md` before the first draft of a run.
 
-## For each target
+## For each target — build a package, review it, then hand over the buttons
 
-1. **Pick the channel** from the record: `cold_path` ✅ email → email · pitch form → a short
-   form message (the form itself is `raise-apply`) · warm-only → an **intro request to a
-   connection** (below) · X/LinkedIn-only → a note the founder sends by hand.
-2. **The hook** — one sentence on *why this fund*, taken from a ✅ claim on the target (their
-   thesis page, a portfolio company, a partner's published piece), with the claim's URL kept in the
-   note. A hook resting on a 📋 or ⚠ claim is refused by the linter: verify it first or write a
-   plainer email.
-3. **The body** — five lines: who (one line from `founder.md`), what (the one-liner from
-   `company.md`), proof (one or two checkable facts — never anything on the do-not-claim list), the
-   hook, one clear ask. Links: deck URL from `answers.md`, site. No attachment claims you cannot keep.
-4. **Write the note** at `46-fundraising/outreach/<YYYY-MM-DD>/<Name> — email <YYYY-MM-DD>.md`
-   (the filename *is* the title, so links resolve):
+Every email goes out of a **package**: one folder per target per day,
+`46-fundraising/outreach/<YYYY-MM-DD>/<key>/`, the fundraising twin of a job application folder.
+Read `references/fit-rubric.md` before the first fit of a run.
+
+1. **Brief** — `python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-outreach/scripts/package.py init <key>` writes `brief.md`: every claim with its stamp and source,
+   people, what the lists said, possible warm paths (name-only), and a **From memory** block
+   (recalled for this run, item ids cited). Read it before writing a word.
+2. **Fit** — `python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-outreach/scripts/package.py fit <key> --comparable N --why "<a portfolio company or published piece>"`
+   writes `fit.md` (100 points, with its working) and the band. Add up to three **objections to
+   pre-empt** under that heading. Band **park** (< 60) → stop; `ledger.py add-lesson` if the research
+   tiered it high. Band **prepare-if-hook** → continue only with a ✅ hook.
+3. **Channel** from the record: `cold_path` ✅ email → email · pitch form → a short form message (the
+   form itself is `raise-apply`) · warm-only → an **intro request to a connection** (below) ·
+   X/LinkedIn-only → a note the founder sends by hand.
+4. **Draft `email.md`** in the package folder:
 
    ```yaml
    ---
@@ -51,22 +54,44 @@ Read `references/email-playbook.md` before the first draft of a run.
    ---
    ```
 
-   Body below the frontmatter, then a `mailto:` link line the founder can click.
-5. **Lint it** — red stops this draft (fix and re-lint, or skip with a reason):
+   Body: five lines — the hook (why *this* fund, from a ✅ claim; a hook on 📋/⚠ is refused), what
+   (the one-liner from `company.md`), proof (one or two checkable facts, never anything on the
+   do-not-claim list), who (one line from `founder.md`), one clear ask with the deck URL. Apply what
+   the brief's **From memory** block says.
+5. **Lint** — red stops; fix and re-lint:
+   `python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts/lint_claims.py "<package>/email.md" --out "<package>/gates.json"`
+6. **Investor review — one subagent, no tools, same model as you** (never pin a smaller one). The
+   brief contains, verbatim, `brief.md` (incl. its From-memory block) and `email.md`, and:
 
-   ```bash
-   python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts/lint_claims.py "<note path>" --out "<folder>/gates.json"
-   ```
-6. **Gmail draft** — only if a Gmail tool whose purpose is *creating a draft* is available in this
-   session. Create the draft (to, subject, body), write its id into `gmail_draft_id`. If only a
-   send-capable tool exists, **do not use it**; say in one line that drafts are in the vault only.
-   Never BCC, never one draft to several investors.
-7. **Record it**:
+   > You are a partner at <fund>, reading 200 cold emails this week. Do not use any tools. Read the
+   > brief for who you are, then the email as it would arrive. Return JSON only:
+   > `{"verdict": "take-meeting|maybe|pass", "first_read": "<what the first two lines told you>",
+   > "objections": ["…"], "hook_strength": "strong|weak", "top_fixes": ["…"], "reads_generated": true|false}`.
+   > take-meeting only if you would reply asking for a call over the other 199.
 
+   Save it as `<package>/review.json`, then record it:
+   `python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts/lint_claims.py review "<package>" --verdict <v> --reason "<first reason>"`
+   - **take-meeting** → continue.
+   - **maybe** → apply `top_fixes` once, re-lint, review again with `--round 2`; still maybe → it
+     passes **flagged**.
+   - **pass** → stop; the package stays parked; an objection that will recur →
+     `memory.py observe --source agent --tags review,targeting` (flagged, removable in Review).
+7. **Buttons** — `python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-outreach/scripts/package.py mail <key>` writes into `email.md` the pre-filled
+   **✉ Open in Mail** link (`mailto:` — to, subject, body; opens a NEW message in the founder's own
+   mail app, nothing is sent) and **✓ I sent it** (`sbl-ask:` — types "I sent the … email" into this
+   chat as the founder). Over-long emails get recipient + subject pre-filled and a copy-the-body note.
+8. **Gmail draft** — only if a Gmail tool whose purpose is *creating a draft* is available in this
+   session; never a send-capable tool. Write its id into `gmail_draft_id`.
+9. **Record and render**:
    ```bash
-   python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts/ledger.py log-draft <key> --path "<note path>" --channel email [--gmail-id <id>]
+   python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts/ledger.py log-draft <key> --path "outreach/<day>/<key>/email.md" --package "outreach/<day>/<key>" --mailto yes --channel email
    python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts/render_brain.py --quiet
    ```
+   `python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-outreach/scripts/package.py status <key>` must say `GATES: PASS` — only then does the dashboard's
+   **Ready to send** table show the ✉ button.
+
+**Older flat drafts** (`outreach/<date>/<Name> — email <date>.md`) are upgraded with
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-outreach/scripts/package.py adopt <key> "<flat note>"` (a move, never a copy + delete), then steps 2, 5–7, 9.
 
 ## Warm-intro requests
 

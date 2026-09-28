@@ -538,7 +538,7 @@ def test_new_sources():
             act = out / "85-places" / "Morning Run.md"
             check("new: strava GPX start → place", act.exists())
             atxt = act.read_text() if act.exists() else ""
-            check("new: strava place has lat/lng", "lat: 44.4323" in atxt, atxt[:300])
+            check("new: strava place has lat/lng", "lat: 38.7223" in atxt, atxt[:300])
             # spotify → interests + mirror
             check("new: spotify artist interest", "Organ Masters" in allmd)
             mirror = "\n".join(p.read_text() for p in (out / "50-mirror").rglob("*.md")) \
@@ -1019,7 +1019,7 @@ def _fundraising_checks(fr):
         prof_dir = tmp / "46-fundraising" / "profile"
         prof_dir.mkdir(parents=True)
         (prof_dir / "round.md").write_text(
-            "---\ntype: fundraising-profile\nmin_net_cash: 100000\ngeography_ok: [global, europe]\n"
+            "---\ntype: fundraising-profile\nmin_net_cash: 150000\ngeography_ok: [global, europe]\n"
             "relocation: ok\nexclusions: [crypto]\nthesis_keywords: [ai, developer, data]\n"
             "off_thesis: [consumer]\n---\n", encoding="utf-8")
         (prof_dir / "company.md").write_text(
@@ -1127,6 +1127,74 @@ def _fundraising_checks(fr):
         check("fundraising: detect_form flags login, fee and video",
               o["needs_login"] and o["fee_signal"] and o["video_signal"], r.stdout)
 
+        # --- v0.2: mailto, packages, the investor-review gate, Ready to send, import_doc ---
+        import importlib.util as _iu
+        spec = _iu.spec_from_file_location("sbl_mailto", S / "mailto.py")
+        mm = _iu.module_from_spec(spec); spec.loader.exec_module(mm)
+        from urllib.parse import urlparse as _up, parse_qs as _pq
+        u, fb = mm.build("a@b.co", "x & y | ?#", "l1\nl2 é")
+        q = _pq(_up(u).query)
+        check("fundraising: mailto round-trips subject and body (CRLF, unicode, & | ? #)",
+              not fb and q["subject"][0] == "x & y | ?#" and q["body"][0] == "l1\r\nl2 é" and "|" not in u, u)
+        check("fundraising: an over-long mailto drops the body, keeps to + subject",
+              mm.build("a@b.co", "s", "x" * 3000) == ("mailto:a@b.co?subject=s", True))
+        PK = fr / "skills/raise-outreach/scripts/package.py"
+        (tmp / "00-me").mkdir(exist_ok=True)
+        (tmp / "00-me" / "identity.md").write_text("---\ntitle: Test Founder\n---\n", encoding="utf-8")
+        benv = dict(env); benv.pop("FUNDRAISE_HOME", None)   # a brain: the state lives in .plugins/
+        def brun(script, *args):
+            return _sp.run([sys.executable, str(script), *args], cwd=tmp, env=benv, capture_output=True, text=True)
+        brun(S / "ledger.py", "upsert", "--json", _js.dumps({"name": "Pkg Fund", "claims": {
+            "thesis": {"v": "ai data infrastructure", "stamp": "✅", "src": "https://pkg.example", "at": "2026-01-15"},
+            "cheque": {"v": "$250K-$1M", "stamp": "✅"}, "geography": {"v": "global", "stamp": "✅"},
+            "cold_path": {"v": "email hello@pkg.example", "stamp": "✅"}}}))
+        brun(S / "ledger.py", "rescreen")
+        r = brun(PK, "init", "pkg-fund")
+        pdir = Path(_js.loads(r.stdout)["package"]) if r.returncode == 0 else tmp
+        check("fundraising: package init writes brief.md with a From-memory block",
+              (pdir / "brief.md").is_file() and "## From memory" in (pdir / "brief.md").read_text(encoding="utf-8"), r.stderr[-300:])
+        r = brun(PK, "fit", "pkg-fund", "--comparable", "10", "--why", "a comparable")
+        fit = _js.loads(r.stdout) if r.returncode == 0 else {}
+        check("fundraising: package fit scores and bands", fit.get("band") == "prepare" and fit.get("score", 0) >= 75, r.stdout + r.stderr[-200:])
+        (pdir / "email.md").write_text('---\ntype: fundraising-email\ntitle: "Pkg Fund — email"\nto: hello@pkg.example\n'
+                                       'subject: "Hello"\nhook_stamp: ✅\n---\nHi,\n\n609 tests.\n', encoding="utf-8")
+        brun(PK, "mail", "pkg-fund"); brun(PK, "mail", "pkg-fund")
+        em = (pdir / "email.md").read_text(encoding="utf-8")
+        check("fundraising: mail writes both buttons once, and the mailto into frontmatter",
+              em.count("[✉ Open in Mail") == 1 and "sbl-ask:" in em and "\nmailto: " in em, em[-400:])
+        r = brun(PK, "status", "pkg-fund")
+        check("fundraising: a package without a review is not ready", r.returncode == 1 and "review" in r.stdout)
+        brun(S / "lint_claims.py", str(pdir / "email.md"), "--out", str(pdir / "gates.json"))
+        brun(S / "lint_claims.py", "review", str(pdir), "--verdict", "pass", "--reason", "wrong stage")
+        brun(S / "render_brain.py", "--quiet")
+        dash = (tmp / "46-fundraising" / "Fundraising Dashboard.md").read_text(encoding="utf-8")
+        check("fundraising: a 'pass' review renders no Mail button", "[✉ Open in Mail]" not in dash)
+        brun(S / "lint_claims.py", "review", str(pdir), "--verdict", "take-meeting", "--reason", "strong")
+        r = brun(PK, "status", "pkg-fund")
+        brun(S / "render_brain.py", "--quiet")
+        dash = (tmp / "46-fundraising" / "Fundraising Dashboard.md").read_text(encoding="utf-8")
+        check("fundraising: lint green + take-meeting → PASS and a Mail button on the dashboard",
+              r.returncode == 0 and "## Ready to send" in dash and "[✉ Open in Mail](mailto:hello@pkg.example" in dash, r.stdout)
+        check("fundraising: a package index note is rendered", any(pdir.glob("* package *.md")))
+        flat = tmp / "46-fundraising" / "outreach" / "2026-01-15"
+        flat.mkdir(parents=True, exist_ok=True)
+        (flat / "Old — email 2026-01-15.md").write_text("old body\n", encoding="utf-8")
+        brun(S / "ledger.py", "upsert", "--json", _js.dumps({"name": "Old Fund"}))
+        r = brun(PK, "adopt", "old-fund", str(flat / "Old — email 2026-01-15.md"))
+        check("fundraising: adopt moves a flat draft into its package",
+              not (flat / "Old — email 2026-01-15.md").exists()
+              and (flat / "old-fund" / "email.md").read_text(encoding="utf-8") == "old body\n", r.stdout + r.stderr[-200:])
+        srcdoc = tmp / "plan-src" / "Plan.md"
+        srcdoc.parent.mkdir(exist_ok=True)
+        (srcdoc.parent / "list.csv").write_text("Name\nX\n", encoding="utf-8")
+        srcdoc.write_text("See [the list](list.csv), [facts](../YC/FACTS.md) and [site](https://x.example).\n", encoding="utf-8")
+        r = brun(S / "import_doc.py", str(srcdoc), "--title", "Imported Plan")
+        imp = tmp / "46-fundraising" / "research" / "Imported Plan.md"
+        itxt = imp.read_text(encoding="utf-8") if imp.is_file() else ""
+        check("fundraising: import_doc rewrites relative links, keeps http, copies the CSV",
+              "[site](https://x.example)" in itxt and "](../YC" not in itxt and "`../YC/FACTS.md`" in itxt
+              and (tmp / "46-fundraising" / "profile" / "materials" / "list.csv").is_file(), r.stdout + r.stderr[-200:])
+
     # shipped defaults and rails
     tmpl = (fr / "skills/raise-onboarding/references/answers-template.md").read_text(encoding="utf-8")
     check("fundraising: answers template defaults to supervised",
@@ -1142,19 +1210,34 @@ def _fundraising_checks(fr):
     import os as _os2
     nf = _os2.environ.get("SBL_PERSONAL_NEEDLES")
     if nf and Path(nf).is_file():
-        needles = [l.strip().lower() for l in Path(nf).read_text(encoding="utf-8").split("\n")
-                   if l.strip() and not l.startswith("#")]
+        import re as _re_n
+        # one term per line; `re:` = a regex; an optional $SBL_PERSONAL_ALLOW file lists
+        # "path-substring | term" pairs judged generic (lookup data, not a life)
+        needles = []
+        for l in Path(nf).read_text(encoding="utf-8").split("\n"):
+            l = l.strip()
+            if l and not l.startswith("#"):
+                needles.append((l, _re_n.compile(l[3:] if l.startswith("re:") else _re_n.escape(l), _re_n.I)))
+        af = _os2.environ.get("SBL_PERSONAL_ALLOW")
+        allow = [tuple(x.strip().lower() for x in l.split("|", 1)) for l in
+                 (Path(af).read_text(encoding="utf-8").split("\n") if af and Path(af).is_file() else [])
+                 if "|" in l and not l.strip().startswith("#")]
         hits = []
         for f in fr.rglob("*"):
             if f.is_file() and f.suffix in (".md", ".py", ".json", ".sh", ".yaml", ".txt") \
                     and "__pycache__" not in f.parts:
-                low = f.read_text(encoding="utf-8", errors="replace").lower()
-                hits += [f"{f.relative_to(fr)}:{n}" for n in needles if n in low]
+                txt = f.read_text(encoding="utf-8", errors="replace")
+                rel = str(f.relative_to(fr))
+                for raw, rx in needles:
+                    m = rx.search(txt)
+                    if m and not any((a == "*" or a in rel.lower()) and (b == "*" or b == m.group(0).lower())
+                                     for a, b in allow):
+                        hits.append(f"{rel}:{m.group(0)}")
         check("fundraising: no personal needles in the shipped plugin (local sweep)", not hits,
               str(hits[:6]))
     rt = (fr / "skills/raise-onboarding/references/round-template.md").read_text(encoding="utf-8")
-    check("fundraising: round template's worked example is not a shipped floor of 100K",
-          "min_net_cash: 100000" not in rt)
+    check("fundraising: round template ships a worked-example floor",
+          bool(__import__("re").search(r"min_net_cash:\s*\d+", rt)))
 
 
 def _json_load(p):
@@ -1302,7 +1385,7 @@ def test_plugins():
         # Two SHAPES that a real de-personalisation leak took, caught structurally so
         # this file never has to contain the words it is guarding against.
         #
-        # 1. A named attribution in prose — `- Pipedrive: "…"`. A reference file's
+        # 1. A named attribution in prose — `- <Company>: "…"`. A reference file's
         #    examples come from the shipped fictional persona; a real company credited
         #    by name beside a quote means the example came from someone's actual run.
         # 2. A bold placeholder — `**<current employer>**`. Replacing the NAME while
@@ -1561,7 +1644,7 @@ def test_travel_plugin():
               {"provider": "Emirates", "url": "https://www.emirates.com", "price": 620, "currency": "EUR",
                "quoted_at": "2030-01-01T10:04", "total_min": 445,
                "segments": [dict(seg("EK 73", "DXB", "CDG", "2030-05-01T08:30", "2030-05-01T13:55"), carrier="EK")]}]
-        q1 = run("quotes.py", "new", "flights", "--id", "dxb-cdg", "--title", "Dubai to Paris",
+        q1 = run("quotes.py", "new", "flights", "--id", "dxb-cdg", "--title", "Madrid to Paris",
                  "--from", "DXB", "--to", "CDG", "--date", "2030-05-01", "--trip", "paris-test")
         q2 = run("quotes.py", "add", "dxb-cdg", "--json", json.dumps(fl))
         noq = run("quotes.py", "add", "dxb-cdg", "--json", json.dumps(dict(fl[0], quoted_at="")))
@@ -1592,9 +1675,9 @@ def test_travel_plugin():
         run("render_brain.py")
         a3 = run("render_brain.py")
         check("travel: each quote set renders a list note",
-              (layer / "quotes" / "Dubai to Paris.md").is_file()
-              and "| f2 ✔ picked |" in (layer / "quotes" / "Dubai to Paris.md").read_text()
-              if (layer / "quotes" / "Dubai to Paris.md").is_file() else False)
+              (layer / "quotes" / "Madrid to Paris.md").is_file()
+              and "| f2 ✔ picked |" in (layer / "quotes" / "Madrid to Paris.md").read_text()
+              if (layer / "quotes" / "Madrid to Paris.md").is_file() else False)
         check("travel: a suggestion set renders a note, and a second render writes nothing",
               (layer / "suggestions" / "Coffee in Paris.md").is_file() and " 0 written" in a3.stdout, a3.stdout)
         # an engine --refresh leaves the plugin's layer byte-identical
@@ -1951,7 +2034,7 @@ def test_mapping_engine():
     check("selector: const", rf({}, {"const": "x"}) == ["x"])
     # label predicate — Facebook/Instagram {label,value} shape: pick value by sibling label
     lv = {"label_values": [{"label": "Message", "value": "hello"},
-                           {"label": "Detected dialect", "value": "Romanian"}]}
+                           {"label": "Detected dialect", "value": "Portuguese"}]}
     check("selector: label predicate", rf(lv, "label_values[label=Message].value") == ["hello"])
     vec = {"label_values": [{"label": "Friend suggestions", "vec": [{"value": "Ann"}, {"value": "Bob"}]}]}
     check("selector: label predicate + vec",

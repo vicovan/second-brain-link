@@ -59,7 +59,7 @@ separately; never blur the two.
 ## Best-reviewed, read against their taste — Google Maps
 
 For "the best X in <place>", search **Google Maps** in the user's browser ("specialty coffee
-in Iași"), and do not stop at the star average:
+in Lisbon"), and do not stop at the star average:
 
 1. Take the candidates with a strong rating **on enough reviews** (4.5 on 12 reviews is
    noise; say how many a rating rests on).
@@ -83,13 +83,13 @@ Never copy a reviewer's name or photo, and never quote more than a sentence.
 
 ## No trip yet? A suggestion set — so it is still on the Map
 
-"Where should I get coffee in Iași?" does not need an itinerary, but the answer still goes on
+"Where should I get coffee in Lisbon?" does not need an itinerary, but the answer still goes on
 the Map and into a note. Record it as a **suggestion set** instead of only writing prose:
 
 ```bash
-python3 $S/suggest.py new --id iasi-coffee --title "Specialty coffee in Iași" --near "Iasi" --country RO
-python3 $S/suggest.py add iasi-coffee --name "Foundry Cafe 64"        # a place in the brain: linked
-python3 $S/suggest.py add iasi-coffee --name "Fika" --lat 47.1702 --lng 27.5756 --kind cafe \
+python3 $S/suggest.py new --id lisbon-coffee --title "Specialty coffee in Lisbon" --near "Lisbon" --country PT
+python3 $S/suggest.py add lisbon-coffee --name "Fábrica Coffee Roasters"        # a place in the brain: linked
+python3 $S/suggest.py add lisbon-coffee --name "Fika" --lat 38.7139 --lng -9.1334 --kind cafe \
     --url "https://maps.google.com/…" --rating 4.7 \
     --why "no brain signal — web only · bright, specialty, like the cafés you saved"
 python3 $S/render_brain.py --quiet

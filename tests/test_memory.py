@@ -37,7 +37,7 @@ def load():
 class MemoryTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.brain = pathlib.Path(self.tmp.name) / "adi-brain"
+        self.brain = pathlib.Path(self.tmp.name) / "jane-brain"
         self.brain.mkdir(parents=True)
         (self.brain / "_STRUCTURE.md").write_text("# structure\n")
         self.m = load()
@@ -51,7 +51,7 @@ class MemoryTest(unittest.TestCase):
 
     # -- tiers
     def test_tiers(self):
-        u = self.m.observe("job-search", "rule", "user", "Exclude IGA companies — non-compete.", ["scoring"], brain=self.b)
+        u = self.m.observe("job-search", "rule", "user", "Skip roles that require relocation.", ["scoring"], brain=self.b)
         o = self.m.observe("job-search", "lesson", "outcome", "Director roles at 1,000+ person companies got no reply (0/4).", ["scoring"], brain=self.b)
         a = self.m.observe("job-search", "lesson", "agent", "Lead with the identity archetype for security companies.", ["cv"], brain=self.b)
         # default policy "auto" (user decision 2026-09-28): inferences are active at once, flagged agent
@@ -92,10 +92,10 @@ class MemoryTest(unittest.TestCase):
         self.assertEqual(self.items("travel-planner")[a["id"]]["status"], "active")
 
     def test_supersede_by_user_only(self):
-        old = self.m.observe("job-search", "rule", "user", "Exclude Toptal.", brain=self.b)
-        self.m.observe("job-search", "rule", "agent", "Include Toptal again.", supersedes=old["id"], new=True, brain=self.b)
+        old = self.m.observe("job-search", "rule", "user", "Exclude Globex.", brain=self.b)
+        self.m.observe("job-search", "rule", "agent", "Include Globex again.", supersedes=old["id"], new=True, brain=self.b)
         self.assertEqual(self.items("job-search")[old["id"]]["status"], "active", "an inference may not retire a user rule")
-        self.m.observe("job-search", "rule", "user", "Keep Toptal.", supersedes=old["id"], new=True, brain=self.b)
+        self.m.observe("job-search", "rule", "user", "Keep Globex.", supersedes=old["id"], new=True, brain=self.b)
         self.assertEqual(self.items("job-search")[old["id"]]["status"], "retired")
 
     # -- recall
@@ -133,13 +133,13 @@ class MemoryTest(unittest.TestCase):
         a = self.m.observe("brain", "preference", "user", "Answers in English.", brain=self.b)
         b = self.m.observe("brain", "preference", "user", "Use metric units.", brain=self.b)
         p = self.brain / "_memory" / "brain.md"
-        txt = p.read_text().replace("Answers in English.", "Answers in English, never Romanian.")
+        txt = p.read_text().replace("Answers in English.", "Answers in English, never French.")
         txt = "\n".join(l for l in txt.splitlines() if b["id"] not in l)
         p.write_text(txt)
         res = self.m.sync(brain=self.b)
         self.assertEqual(res, {"edited": 1, "retired": 1})
         its = self.items("brain")
-        self.assertEqual(its[a["id"]]["text"], "Answers in English, never Romanian.")
+        self.assertEqual(its[a["id"]]["text"], "Answers in English, never French.")
         self.assertEqual(its[b["id"]]["status"], "retired")
 
     # -- legacy imports

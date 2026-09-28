@@ -21,6 +21,7 @@ it applies to every provider.
   copies into the agent discovery dirs.
 
 ## Non-negotiables (same as CLAUDE.md §2)
+- **This repository is PUBLIC — no personal information, ever** (names, employers, hometowns, contacts, vault names, keystore details, or run history such as which funds/jobs were applied to and their outcomes). Examples use a fictional persona; lessons are written as rules, not stories. Sweep tracked files and the `dist/` archives before finishing, and rebuild `dist/` after a fix. Full rule: CLAUDE.md §8.
 - Local-first, zero network in the core (only opt-in `--gbrain-import` may reach out).
 - Privacy enforced in CODE at the `Collector` boundary; `--full` is owner-only.
 - Deterministic core; AI only on the residual (unknown-file mapping, synthesis

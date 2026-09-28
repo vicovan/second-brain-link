@@ -1,5 +1,24 @@
 # Email playbook
 
+## What independent investor reviews reject
+
+Every one of these was flagged by the reviewers as templated or disqualifying. The linter cannot see
+them; the review can. Do not write them:
+
+- **Opening by reading the fund's own website or thesis back to it** ("X backs Y; we are Y"). It is the
+  most common first line in any partner's inbox. Open with the strongest *true* fact or a concrete
+  buyer's pain instead — and if the hook is their thesis, *engage* with it (disagree, extend, give the
+  example only a builder would know), never paraphrase it.
+- **"My day job is …"** — reads as part-time. State commitment plainly ("full-time on this since …").
+- **Engineering counts as the proof line** (tests, number of connectors). Reviewers read them as vanity
+  metrics. With no usage to show, say so honestly and lead with pain + the business model.
+- **No ask in the body.** State the round (size, instrument) and, for a small-ticket fund, the ticket.
+- **No business model.** One line on how an open-source core makes money (the founder's public pricing).
+- **Hedged bios** ("founder or CTO of N companies"). Name one or two companies and a checkable outcome.
+- **"Fund × Company — topic — stage" subjects and em-dash stacks.** Machine-written tells.
+- **Addressed to a named partner but sent to a generic inbox.** Pick the partner on purpose, or say "Hi <Fund> team".
+- **Written as an email for a form.** When the channel is a form, write to the form's fields.
+
 ## The cold email — five lines, one ask
 
 ```

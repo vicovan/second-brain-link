@@ -27,6 +27,8 @@ import argparse, datetime, hashlib, json, os, pathlib, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from paths import state_root, render_dir, brain_layer  # noqa: E402
 import ledger as L  # noqa: E402
+import founder_profile as prof  # noqa: E402
+from lint_claims import gates_ok  # noqa: E402
 
 MANIFEST = "_FUNDRAISE_GENERATED.json"
 DASHBOARD = "Fundraising Dashboard.md"
@@ -209,7 +211,60 @@ def app_note(rec, rel, folder):
     return "\n".join(out) + "\n"
 
 
-def dashboard(recs, known):
+def scan_packages(dest, by_key):
+    """[{key, name, day, dir, rel, ok, why, score, band, verdict, mailto, to}] — newest first."""
+    out = []
+    base = pathlib.Path(dest) / "outreach"
+    if not base.is_dir():
+        return out
+    for d in sorted(base.glob("*/*"), key=lambda p: (p.parent.name, p.name), reverse=True):
+        if not d.is_dir() or d.name not in by_key:
+            continue
+        ok, why = gates_ok(d)
+        fit = prof.frontmatter((d / "fit.md").read_text(encoding="utf-8")) if (d / "fit.md").is_file() else {}
+        em = prof.frontmatter((d / "email.md").read_text(encoding="utf-8")) if (d / "email.md").is_file() else {}
+        try:
+            g = json.loads((d / "gates.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            g = {}
+        out.append({"key": d.name, "name": by_key[d.name]["name"], "day": d.parent.name, "dir": d,
+                    "rel": f"outreach/{d.parent.name}/{d.name}", "ok": ok, "why": why,
+                    "score": fit.get("score"), "band": fit.get("band"),
+                    "verdict": (g.get("review") or {}).get("verdict"),
+                    "flag": (g.get("review") or {}).get("flag"),
+                    "mailto": str(em.get("mailto") or ""), "to": str(em.get("to") or "")})
+    return out
+
+
+def package_note(rec, pk):
+    files = sorted(p.name for p in pk["dir"].iterdir()
+                   if p.is_file() and " package " not in p.name) if pk["dir"].is_dir() else []
+    state = "PASS" if pk["ok"] else "not ready — " + pk["why"]
+    fm = frontmatter([("type", "fundraising-package"), ("title", f"{safe(rec['name'])} package {pk['day']}"),
+                      ("target", f"[[{title_of(rec)}]]"), ("status", rec["status"]), ("date", pk["day"]),
+                      ("fit", pk["score"]), ("review", pk["verdict"] or ""), ("gates", "PASS" if pk["ok"] else "FAIL")],
+                     ["fundraising", "fundraising/package"])
+    out = [fm, f"# {rec['name']} — package {pk['day']}\n",
+           f"Target: [[{title_of(rec)}]] · status **{rec['status'].replace('_', ' ')}** · fit **{pk['score'] or '—'}**"
+           f" ({pk['band'] or 'not scored'}) · review **{pk['verdict'] or 'not run'}**"
+           + (" ⚑ flagged" if pk.get("flag") else "") + f" · gates **{state}**\n"]
+    if pk["ok"] and pk["mailto"]:
+        ask = "sbl-ask:" + L_quote(f"I sent the {rec['name']} email")
+        out.append(f"[✉ Open in Mail — pre-filled]({pk['mailto']})   ·   [✓ I sent it]({ask})\n")
+        out.append("Opens a new message in your own mail app — **nothing is sent until you press Send**.\n")
+    elif pk["ok"]:
+        out.append("Ready — no email address; send through the fund's own path (see `email.md`).\n")
+    out.append("## Files in this package\n")
+    out += [f"- `{f}`" for f in files] or ["- (empty — being prepared)"]
+    return "\n".join(out) + "\n"
+
+
+def L_quote(s):
+    from urllib.parse import quote
+    return quote(s, safe="")
+
+
+def dashboard(recs, known, packages=()):
     live = [r for r in recs if r["status"] != "out"]
     counts = {}
     for r in recs:
@@ -225,6 +280,25 @@ def dashboard(recs, known):
     for s in L.STATUSES:
         if counts.get(s):
             out.append(f"| {GLYPH.get(s, '')} {s.replace('_', ' ')} | {counts[s]} |")
+    ready = [p for p in packages if p["ok"]]
+    waiting = [p for p in packages if not p["ok"]]
+    out.append("\n## Ready to send\n")
+    if ready:
+        out.append("Each button opens a **new message in your mail app**, pre-filled — you press Send. "
+                   "Then tell the agent, or press ✓ in the package note.\n")
+        out.append("| Target | Fit | Review | Package | Mail |\n|---|---|---|---|---|")
+        for p in ready:
+            r = next(x for x in recs if x["key"] == p["key"])
+            mail = f"[✉ Open in Mail]({p['mailto']})" if p["mailto"] else "form / no address"
+            out.append(f"| [[{title_of(r)}]] | {p['score'] or '—'} | {p['verdict'] or '—'}"
+                       + (" ⚑" if p.get("flag") else "") + f" | [[{safe(r['name'])} package {p['day']}]] | {mail} |")
+    else:
+        out.append("Nothing has passed its gates yet.")
+    if waiting:
+        out.append(f"\n### Being prepared ({len(waiting)})\n\n| Target | Fit | What it is waiting on |\n|---|---|---|")
+        for p in waiting:
+            r = next(x for x in recs if x["key"] == p["key"])
+            out.append(f"| [[{title_of(r)}]] | {p['score'] or '—'} | {cell(p['why'])[:120]} |")
     due = L.due_items(14)
     out.append("\n## Due\n")
     if due:
@@ -307,11 +381,17 @@ def render(dest=None, quiet=False):
                 t = f"{safe(r['name'])} application {day}"
                 w.text(f"{rel}/{t}.md", app_note(r, rel, folder))
                 app_titles.add(t)
+    by_key = {r["key"]: r for r in live}
+    packages = scan_packages(dest, by_key)
+    for pk in packages:
+        t = f"{safe(by_key[pk['key']]['name'])} package {pk['day']}"
+        w.text(f"{pk['rel']}/{t}.md", package_note(by_key[pk["key"]], pk))
+        app_titles.add(t)
     exists = existing_stems | app_titles
     for r in live:
         w.text(f"targets/{title_of(r)}.md",
                target_note(r, [e for e in evs if e["key"] == r["key"]], exists))
-    w.text(DASHBOARD, dashboard(recs, known))
+    w.text(DASHBOARD, dashboard(recs, known, packages))
     w.text(KPI, kpi_note())
 
     mdir = state_root()

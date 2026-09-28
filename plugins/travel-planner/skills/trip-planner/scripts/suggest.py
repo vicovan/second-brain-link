@@ -2,7 +2,7 @@
 """
 suggest.py - places the Travel Agent suggests, before (or without) a trip.
 
-"Where should I get coffee in Iași?" is a real answer that belongs on the Map, but it is not
+"Where should I get coffee in Lisbon?" is a real answer that belongs on the Map, but it is not
 an itinerary. A suggestion SET is that answer as a file:
 
     <travel layer>/suggestions/<set_id>.json      (schema "sbl-suggest/1")
@@ -21,9 +21,9 @@ The same three honesty rules as itinerary.py, applied to a list:
   3. A web pick's `why` starts with "no brain signal — web only". A pick with no coordinates
      at all is kept (it is still a suggestion) and listed as "not on the map".
 
-    suggest.py new --id iasi-coffee --title "Specialty coffee in Iași" --near "Iasi" [--country RO]
+    suggest.py new --id lisbon-coffee --title "Specialty coffee in Lisbon" --near "Lisbon" [--country PT]
     suggest.py add <set_id> --name "Fika" --lat 47.17 --lng 27.57 --kind cafe --why "…" [--url …] [--rating 4.7]
-    suggest.py add <set_id> --name "Foundry Cafe 64"          (a place in the brain - linked)
+    suggest.py add <set_id> --name "Fábrica Coffee Roasters"          (a place in the brain - linked)
     suggest.py remove <set_id> <pick_id>
     suggest.py activate <set_id>        (the set the Map shows; `new` activates too)
     suggest.py clear                    (show no set - Trip Ideas stay on the Map)

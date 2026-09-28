@@ -85,6 +85,18 @@ cannot support are **asked** (supervised) or **stop this application** (autonomo
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts/lint_claims.py "<folder>/answers.json" --out "<folder>/gates.json"
 ```
 
+### 4b. Selection-committee review — one subagent, no tools, same model
+
+The model that wrote the answers cannot grade them. Brief one reviewer with, verbatim, the
+program's brief (`python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-outreach/scripts/package.py init <key>` writes one; copy it into the application folder as
+`brief.md`), `answers.json`, and: *"You sit on <program>'s selection committee reading 1,000
+applications. Return JSON only: {"verdict": "take-meeting|maybe|pass", "first_read": "…",
+"objections": ["…"], "top_fixes": ["…"], "reads_generated": true|false} — take-meeting only if you
+would invite this founder to interview."* Save `review.json`, then
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts/lint_claims.py review "<folder>" --verdict <v> --reason "…"` (`--round 2` after one round of fixes).
+`pass` stops the application at every level; `maybe` twice passes flagged.
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts/lint_claims.py status "<folder>"` must say PASS before step 6 — at `autonomous` too.
+
 ### 5. Gate on the answers (supervised)
 
 Three lines: the program, the nearest deadline, anything amber. Then `AskUserQuestion`: Approve ·

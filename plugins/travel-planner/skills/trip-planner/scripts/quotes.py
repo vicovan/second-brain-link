@@ -11,7 +11,7 @@ hotels list - drawn from exactly what was recorded rather than retyped:
 
 and render_brain.py turns each set into a note with the same list as a table.
 
-No trip is needed ("what does Dubai → Iași cost on 12 October?"); with `--trip` a set
+No trip is needed ("what does Lisbon → Tokyo cost on 12 October?"); with `--trip` a set
 belongs to one, and `pick` writes the chosen option into its itinerary.
 
 The honesty rules are itinerary.py's, applied to a price list:
@@ -21,9 +21,9 @@ The honesty rules are itinerary.py's, applied to a price list:
   - Nothing is invented: every field is what the page showed. Unknown stays absent.
   - Nothing is held or booked. `pick` records a choice; the user books through the link.
 
-    quotes.py new flights --id dxb-ias-oct12 --title "Dubai → Iași · 12 Oct" \\
-        --from DXB --to IAS --date YYYY-MM-DD [--return YYYY-MM-DD] [--adults 1] [--trip <id>]
-    quotes.py new stays --id iasi-oct --title "Iași · 12–19 Oct" --city "Iasi" \\
+    quotes.py new flights --id lis-hnd-oct12 --title "Lisbon → Tokyo · 12 Oct" \\
+        --from LIS --to HND --date YYYY-MM-DD [--return YYYY-MM-DD] [--adults 1] [--trip <id>]
+    quotes.py new stays --id lisbon-oct --title "Lisbon · 12–19 Oct" --city "Lisbon" \\
         --checkin YYYY-MM-DD --checkout YYYY-MM-DD [--guests 2] [--trip <id> --stop s1]
     quotes.py add <quote_id> --json '<one option>'  |  --file options.json   (a list)
     quotes.py show <quote_id>          a text table

@@ -427,6 +427,31 @@ Multiple entities → one brain each under `vault/personal/` + `vault/company/`,
 ---
 
 ## 8. Conventions for editing
+
+### ⚑ This repository is PUBLIC — no personal information, ever
+Everything committed here (source, docs, tests, templates, references, and the built `dist/`
+archives) is public. **Never write the maintainer's or any real person's personal information
+into it**: names of real people beyond the maintainer attribution already in LICENSE / README /
+CLAUDE.md / CODE_OF_CONDUCT / CONTRIBUTING; employers, past companies, hometowns, phone numbers,
+personal emails, brain/vault names, account ids, keystore details; **nor run history from anyone's
+real use** — which funds or jobs were applied to, outcomes, counts ("the first N packages…"),
+decisions, round sizes. Plugin templates and examples use a *fictional* persona. Lessons learned
+from real runs are written generically (the rule, not the story) — the story belongs in the
+user's own brain (`_memory/`, the plugin layer), which is outside this repo.
+Tests must not list the words they guard against (a public test that names a person's employer
+publishes it); the personal-needle sweep reads its words from `$SBL_PERSONAL_NEEDLES`, a file
+outside the repo. **Before finishing any change here, sweep every tracked file and every file
+inside `dist/**/*.skill` / `dist/plugins/**/*.zip` for personal descriptors, and rebuild `dist/`
+after a fix** (the archives are tracked too).
+**The sweep (maintainer's machine, never committed):** `python3 ~/.config/sbl/personal-sweep.py`
+— scans the working tree (minus the ignored `data/`, `vault/`) and the contents of every archive in
+`dist/`, using `~/.config/sbl/personal-needles.txt` (names, employers, places, run history; `re:`
+lines are regexes) and `~/.config/sbl/personal-allow.txt` (lookup data judged generic). The
+workspace Stop hook runs it after any engine/plugin change. The repo's own local check:
+`SBL_PERSONAL_NEEDLES=~/.config/sbl/personal-needles.txt SBL_PERSONAL_ALLOW=~/.config/sbl/personal-allow.txt python3 tests/run.py`.
+Examples use the fictional persona (Jane Doe · Northwind Data · Meridian Labs · Acme · Globex) and
+generic places (Lisbon, Madrid, Tokyo) — never the maintainer's city, route, employer, title or
+field described in other words.
 - **Prefer a mapping JSON over Python.** Reach for a Python adapter only for
   cross-file joins / bespoke logic. Mappings are data (no eval).
 - **Mappings return `norm_file(p.name)` consumed keys** (not `nk`) — §3, §10.
