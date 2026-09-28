@@ -15,6 +15,19 @@
 
 **⬇ [All downloads — desktop, mobile, the skill and the agents](#-downloads--everything-in-one-place)**
 
+### 🚀 Install — pick your path
+
+| You are… | Do this | You get |
+|---|---|---|
+| **Anyone** (no terminal) | Download **[Second Brain Studio](https://secondbrainlink.com/download)** for Mac, Windows or Linux and open it. Its **Setup wizard** installs your AI (Claude Code or Codex — or use an API key), signs you in, and installs the brain builder + all three agents in one click. **Python is built in.** | The app, the brain builder, the Jobs / Fundraising / Travel agents |
+| **Using Claude Code or Codex already** | macOS / Linux: `curl -fsSL https://secondbrainlink.com/install.sh \| sh` · Windows: `irm https://secondbrainlink.com/install.ps1 \| iex` | The brain builder + the agents, for every AI tool it finds, each file checksum-verified. Needs Python 3.8+ to build |
+| **Letting your AI do it** | Paste into Claude Code, Codex or Claude Desktop: *"Install Second Brain Link on this computer by following https://secondbrainlink.com/install.md"* | Your AI follows **[INSTALL.md](INSTALL.md)** for your OS, asking before each step |
+| **A developer** | `git clone` this repo → `python3 packaging/build_all.py` → `python3 packaging/build_skill.py all --install` and `python3 packaging/build_plugin.py all --provider all --install` | Everything, from source |
+
+Installs land in the standard folders on every OS — Claude Code: `~/.claude/skills/<name>`, Codex:
+`~/.agents/skills/<name>` — which Studio reads too, so one install serves the terminal and the app.
+Full per-OS guide + troubleshooting: **[INSTALL.md](INSTALL.md)**.
+
 **Bootstrap a brain — personal or company — from the data you already have. Turn your exports (LinkedIn, Facebook, Instagram, Google) — or your org's (LinkedIn Company, Google Workspace, Slack) — into a private, local, AI-queryable digital twin, on your machine, working *for* you.**
 
 `secondbrainlink.com` · Local-first · MIT licensed · A **cross-model Agent Skill** for [Claude Code](https://claude.com/claude-code) **and** [OpenAI Codex](https://openai.com) (Agent Skills standard) · opens in [Obsidian](https://obsidian.md) · also exports to [GBrain](https://github.com/garrytan/gbrain)
@@ -100,7 +113,7 @@ See [Agents — make the brain do work](#agents--make-the-brain-do-work) to inst
 | **Fundraising** | [**fundraising.zip**](https://github.com/vicovan/second-brain-link/raw/main/dist/plugins/claude/fundraising.zip) | [**fundraising.skill**](https://github.com/vicovan/second-brain-link/raw/main/dist/plugins/openai/fundraising.skill) |
 | **Travel** | [**travel-planner.zip**](https://github.com/vicovan/second-brain-link/raw/main/dist/plugins/claude/travel-planner.zip) | [**travel-planner.skill**](https://github.com/vicovan/second-brain-link/raw/main/dist/plugins/openai/travel-planner.skill) |
 
-Install: `unzip <agent>.zip -d ~/.claude/skills/` (Claude Code — the agent then appears in Studio's **Agents** tab) · `unzip <agent>.skill -d ~/.agents/skills/` (Codex). Each archive unpacks into its own `<agent>/` folder. From a clone instead: `python3 packaging/build_plugin.py <agent> --provider claude|openai --install`.
+**Easiest:** the desktop app installs the skill and all three agents for you (Setup wizard, or **Install** on each agent's card). **One line, everything:** `curl -fsSL https://secondbrainlink.com/install.sh | sh` (macOS / Linux) · `irm https://secondbrainlink.com/install.ps1 | iex` (Windows). **By hand:** `unzip <agent>.zip -d ~/.claude/skills/` (Claude Code — the agent then appears in Studio's **Agents** tab) · `unzip <agent>.skill -d ~/.agents/skills/` (Codex); each archive unpacks into its own `<agent>/` folder. From a clone: `python3 packaging/build_plugin.py <agent> --provider claude|openai --install`. Every file with its version and checksum: [`dist/manifest.json`](dist/manifest.json).
 
 > **How it fits together:** Second Brain Link (this repo) **builds** the vault from your exports; **Studio** is how you **see and use** it. Build with the skill below (or the CLI), then open the vault in Studio — or in [Obsidian](https://obsidian.md), or any AI agent.
 
@@ -123,7 +136,7 @@ data/personal/jane/google/…        ← your Takeout/ folder
 ```
 (One source is fine too. A company brain goes under `data/company/<org>/<source>/…` — rename `your-company` the same way.) The **folder name becomes your brain** (`vault/personal/jane-brain/`); multiple people/orgs each get their own. If you forget to rename and just drop files into `your-name/`, the builder still works — it names the brain after the identity it detects and prints a tip to rename the folder.
 
-**3 · Get the skill into your agent.** Clone, then build + install the Agent Skill for Claude Code and/or OpenAI Codex:
+**3 · Get the skill into your agent.** Simplest — no clone: `curl -fsSL https://secondbrainlink.com/install.sh | sh` (macOS / Linux) or `irm https://secondbrainlink.com/install.ps1 | iex` (Windows), or let the [desktop app](https://secondbrainlink.com/download) do it. From a clone, build + install the Agent Skill for Claude Code and/or OpenAI Codex:
 ```bash
 git clone https://github.com/vicovan/second-brain-link && cd second-brain-link
 python3 packaging/build_skill.py all --install

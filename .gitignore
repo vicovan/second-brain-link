@@ -52,6 +52,8 @@ dist/plugins/openai/*/
 *.zip
 #   (re-include the plugin archives again — this later `*.zip` would otherwise win)
 !dist/plugins/*/*.zip
+# the manifest the installers + Studio's "Update agents" read (packaging/build_all.py)
+!dist/manifest.json
 *-vault/
 my-second-brain/
 schema_map.json

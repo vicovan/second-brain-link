@@ -1,0 +1,95 @@
+{
+  "schema": "sbl-dist/1",
+  "built": "2026-09-28T15:17:32Z",
+  "base_url": "https://github.com/vicovan/second-brain-link/raw/main/dist/",
+  "artifacts": [
+    {
+      "name": "second-brain-link",
+      "kind": "engine",
+      "provider": "claude",
+      "version": "1.6.0",
+      "rev": "b18965f16767e536",
+      "file": "claude/second-brain-link.skill",
+      "sha256": "f31135cc46b6a70fe2a12d77ed5c393b689f43bdb816ffb653f10bb9a3ee8da6",
+      "bytes": 920788,
+      "installs_to": ".claude/skills/second-brain-link"
+    },
+    {
+      "name": "second-brain-link",
+      "kind": "engine",
+      "provider": "codex",
+      "version": "1.6.0",
+      "rev": "6955fea46cc554de",
+      "file": "openai/second-brain-link.skill",
+      "sha256": "ab56730a4bd0cbcaaec6402317eecad0b2ef97ef8e5ae2879be19245981b4c1c",
+      "bytes": 917579,
+      "installs_to": ".agents/skills/second-brain-link"
+    },
+    {
+      "name": "fundraising",
+      "kind": "agent",
+      "provider": "claude",
+      "version": "0.1.0",
+      "rev": "63533e075d0d4555",
+      "file": "plugins/claude/fundraising.zip",
+      "sha256": "8f83486a38c6dd4f7872f2c5c7cd9ad5f0ff841b283864ea7474ae1621c4fd94",
+      "bytes": 86500,
+      "installs_to": ".claude/skills/fundraising"
+    },
+    {
+      "name": "fundraising",
+      "kind": "agent",
+      "provider": "codex",
+      "version": "0.1.0",
+      "rev": "d9c59d0d6ba667b6",
+      "file": "plugins/openai/fundraising.skill",
+      "sha256": "903440fd1d8ec9a692cfb3038babcffecfbb98b81d65472653717c070b5eb252",
+      "bytes": 76212,
+      "installs_to": ".agents/skills/fundraising"
+    },
+    {
+      "name": "job-search",
+      "kind": "agent",
+      "provider": "claude",
+      "version": "1.1.0",
+      "rev": "83a42f23b0056a0a",
+      "file": "plugins/claude/job-search.zip",
+      "sha256": "5b168bee237b5a5aa63470fbe958647d13aa0b7df31840a7de6859c6acc68b5d",
+      "bytes": 199102,
+      "installs_to": ".claude/skills/job-search"
+    },
+    {
+      "name": "job-search",
+      "kind": "agent",
+      "provider": "codex",
+      "version": "1.1.0",
+      "rev": "cb607ab4447fe527",
+      "file": "plugins/openai/job-search.skill",
+      "sha256": "926084617938d77fa5a2c5bb02e964d79d56466891ae6fd72a805d45c01a4bf9",
+      "bytes": 190367,
+      "installs_to": ".agents/skills/job-search"
+    },
+    {
+      "name": "travel-planner",
+      "kind": "agent",
+      "provider": "claude",
+      "version": "0.1.0",
+      "rev": "bc8736c7f6d4d9ce",
+      "file": "plugins/claude/travel-planner.zip",
+      "sha256": "7ed7e935e7b08119cb71f34831a5664b331083cda89780ea41a8165260938ffd",
+      "bytes": 121578,
+      "installs_to": ".claude/skills/travel-planner"
+    },
+    {
+      "name": "travel-planner",
+      "kind": "agent",
+      "provider": "codex",
+      "version": "0.1.0",
+      "rev": "a8fef01152370239",
+      "file": "plugins/openai/travel-planner.skill",
+      "sha256": "6e80429da5c2fd371fad6754ab23c425f864bb715b6fa447cdaff3ad3551d356",
+      "bytes": 111281,
+      "installs_to": ".agents/skills/travel-planner"
+    }
+  ]
+}

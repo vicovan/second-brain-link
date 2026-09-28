@@ -567,6 +567,12 @@ python3 packaging/build_plugin.py job-search --provider claude --install   # →
 python3 packaging/build_plugin.py job-search --provider openai --install   # → ~/.agents/skills/
 claude --plugin-dir plugins/job-search                   # one CLI session only — Studio never lists it
 
+# EVERYTHING installable in one go (engine ×2 + every plugin ×2) + dist/manifest.json —
+# the file the install scripts, the website and Second Brain Studio read. Studio's installer
+# payload is GENERATED from this dist/ (second-brain-studio: npm run payload) — never copy
+# files into Studio by hand. The workspace Stop hook runs both after any change here.
+python3 packaging/build_all.py            # --check → exit 1 when dist/ is older than the sources
+
 # test (stdlib only; must stay green)
 python3 tests/run.py            # → 903 passed, 0 failed
 ```

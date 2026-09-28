@@ -325,6 +325,9 @@ def check_shared(names) -> bool:
 
 def main():
     argv = sys.argv[1:]
+    if {"-h", "--help"} & set(argv):
+        print(__doc__)   # help must never build (it used to overwrite dist/)
+        sys.exit(0)
     args = [a for a in argv if not a.startswith("--")]
     do_install = "--install" in argv
     provider = "all"

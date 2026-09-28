@@ -64,6 +64,9 @@ def build(provider: str):
             shutil.copy2(src_doc, out_dir / "references" / doc)
     # the provider manifest becomes the skill's SKILL.md
     shutil.copy2(manifest, out_dir / "SKILL.md")
+    # the engine version travels with the install (Studio's Setup reads it)
+    if (ENGINE / "VERSION").is_file():
+        shutil.copy2(ENGINE / "VERSION", out_dir / "VERSION")
     # copy any other provider-specific files alongside the manifest (e.g. the
     # Codex `agents/openai.yaml` metadata) so the installable matches the format.
     pdir = PROVIDERS / provider
@@ -119,6 +122,9 @@ def install(provider: str):
 
 
 def main():
+    if {"-h", "--help"} & set(sys.argv[1:]):
+        print(__doc__)
+        sys.exit(0)
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     do_install = "--install" in sys.argv[1:]
     which = (args[0] if args else "all").lower()
