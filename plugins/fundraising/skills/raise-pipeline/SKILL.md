@@ -6,6 +6,15 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch, Skill, 
 
 # Raise Pipeline
 
+## Memory — every run (recall → act → reflect)
+Follow `memory-protocol.md` (in `skills/raise-apply/references/`). Tool:
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts/memory.py`, scope `fundraising`, tags `targeting,research,planning,apply,outreach`.
+1. **First:** `memory.py recall --scope fundraising --tags targeting,research,planning,apply,outreach` — apply it, say in one line which items changed what you do, never re-ask what it answers.
+2. **User says a preference, rule or correction** → `observe --source user` at once (`--scope shared` if it holds for every agent).
+3. **An outcome lands** (an investor's reply or pass, a program's decision (`ledger.py log-outcome`), a claim the lint rejected) → `observe --source outcome` with the evidence, `--match` the item it strengthens.
+4. **Last:** at most 3 inferred lessons → `observe --source agent` (saved and used at once, flagged as inferred — the user can edit or remove them); end with *"Learned: …"*.
+
+
 The orchestrator. It **owns no logic of its own** — it sequences the other five and holds the gates.
 
 ```

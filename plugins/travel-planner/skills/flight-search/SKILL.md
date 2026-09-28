@@ -6,6 +6,15 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, TodoWrite, mcp__claude-in-ch
 
 # Flight Search
 
+## Memory — every run (recall → act → reflect)
+Follow `memory-protocol.md` (in `skills/flight-search/references/`). Tool:
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/trip-planner/scripts/memory.py`, scope `travel-planner`, tags `flights`.
+1. **First:** `memory.py recall --scope travel-planner --tags flights` — apply it, say in one line which items changed what you do, never re-ask what it answers.
+2. **User says a preference, rule or correction** → `observe --source user` at once (`--scope shared` if it holds for every agent).
+3. **An outcome lands** (a rating (`learn.py rate`), a booking or cancellation, a site that blocked you, a price that moved) → `observe --source outcome` with the evidence, `--match` the item it strengthens.
+4. **Last:** at most 3 inferred lessons → `observe --source agent` (saved and used at once, flagged as inferred — the user can edit or remove them); end with *"Learned: …"*.
+
+
 Works with a trip (`itinerary.py show <trip>`) **or without one** — "what does Dubai → Iași
 cost on 12 October?" is a real question. `traveler.md` gives home airports and citizenships;
 without it, ask for the origin — never guess one.

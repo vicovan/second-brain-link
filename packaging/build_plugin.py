@@ -281,6 +281,48 @@ def install(name: str, provider: str) -> bool:
     return True
 
 
+# Files every plugin ships byte-identical (the Codex build flattens per plugin, so each plugin
+# carries its own copy). The job-search copies are canonical; a drifted copy fails the build.
+SHARED_FILES = {
+    "memory.py": {
+        "job-search": "skills/job-scout/scripts/memory.py",
+        "fundraising": "skills/raise-research/scripts/memory.py",
+        "travel-planner": "skills/trip-planner/scripts/memory.py",
+    },
+    "memory-protocol.md": {
+        "job-search": "skills/job-apply/references/memory-protocol.md",
+        "fundraising": "skills/raise-apply/references/memory-protocol.md",
+        "travel-planner": "skills/flight-search/references/memory-protocol.md",
+    },
+    "browser-setup.md": {
+        "job-search": "skills/job-apply/references/browser-setup.md",
+        "fundraising": "skills/raise-apply/references/browser-setup.md",
+        "travel-planner": "skills/flight-search/references/browser-setup.md",
+    },
+}
+
+
+def check_shared(names) -> bool:
+    """Refuse to package a plugin whose shared file drifted from the canonical copy."""
+    import filecmp  # noqa: PLC0415
+
+    ok = True
+    for fname, where in SHARED_FILES.items():
+        canon = PLUGINS / "job-search" / where["job-search"]
+        for n in names:
+            rel = where.get(n)
+            if not rel:
+                continue
+            p = PLUGINS / n / rel
+            if not p.is_file():
+                print(f"  ! {n}: missing shared file {rel}")
+                ok = False
+            elif canon.is_file() and not filecmp.cmp(canon, p, shallow=False):
+                print(f"  ! {n}: {rel} differs from the canonical {canon.relative_to(PLUGINS)} — copy it over")
+                ok = False
+    return ok
+
+
 def main():
     argv = sys.argv[1:]
     args = [a for a in argv if not a.startswith("--")]
@@ -299,6 +341,8 @@ def main():
         sys.exit(0)
     provs = ["claude", "openai"] if provider == "all" else [provider]
     print(f"Packaging plugin(s): {', '.join(names)} → {', '.join(provs)}")
+    if not check_shared(names):
+        sys.exit(1)
     ok = True
     for n in names:
         for pv in provs:

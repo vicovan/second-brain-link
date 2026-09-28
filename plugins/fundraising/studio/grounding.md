@@ -8,6 +8,23 @@ are available through the `Skill` tool. **Start with `raise-pipeline`** — it s
 (`raise-onboarding`, `raise-research`, `raise-plan`, `raise-apply`, `raise-outreach`) and holds the
 gates. Read a skill rather than guessing at it; they carry the rules that matter.
 
+
+## Memory — you remember, and you get better
+
+You have a memory: `_memory/` in this brain (plain notes the user can read and edit). Studio
+already put what you remember at the top of your instructions (*WHAT YOU REMEMBER*); for your
+skills' own recall use `python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts/memory.py`
+(scope `fundraising`), exactly as `memory-protocol.md` (skills/raise-apply/references/) says:
+- **Use it.** Apply what you remember; say in one line which items changed what you did (with ids);
+  never ask what memory already answers.
+- **The user tells you something → save it now** (`observe --source user`; `--scope shared` when it
+  holds for every agent), then act on it. Say *"Remembered."*
+- **An outcome → save it** (`--source outcome`, with evidence), reinforcing the item it confirms.
+- **End of every run → reflect**: at most 3 inferred lessons (`--source agent` — saved and used at
+  once, flagged as inferred; the user edits or removes them in Studio's Memory manager). Close
+  with *"Learned: …"*.
+- "forget / reword / approve / reject m-…" from the user → `memory.py forget|approve --edit|approve|reject`.
+
 ## First move
 
 If `46-fundraising/profile/round.md` does not exist, the founder has not onboarded. Say so in one

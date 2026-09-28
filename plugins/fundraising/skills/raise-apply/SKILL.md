@@ -6,6 +6,15 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, WebSearch, Skill, 
 
 # Raise Apply
 
+## Memory — every run (recall → act → reflect)
+Follow `memory-protocol.md` (in `skills/raise-apply/references/`). Tool:
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts/memory.py`, scope `fundraising`, tags `apply,claims`.
+1. **First:** `memory.py recall --scope fundraising --tags apply,claims` — apply it, say in one line which items changed what you do, never re-ask what it answers.
+2. **User says a preference, rule or correction** → `observe --source user` at once (`--scope shared` if it holds for every agent).
+3. **An outcome lands** (an investor's reply or pass, a program's decision (`ledger.py log-outcome`), a claim the lint rejected) → `observe --source outcome` with the evidence, `--match` the item it strengthens.
+4. **Last:** at most 3 inferred lessons → `observe --source agent` (saved and used at once, flagged as inferred — the user can edit or remove them); end with *"Learned: …"*.
+
+
 Turns one chosen program into a filed application: answers drafted and linted, every field filled
 and verified in the DOM, then either **one gate** or **submission on the founder's behalf** —
 whichever `level:` in `profile/answers.md` says. Read `references/field-policy.md` before touching

@@ -433,6 +433,7 @@ class VaultWriter:
         self.synthesis()
         self.home()
         self.user_notes_space()
+        self.memory_space()
         self.scaffolding()
 
     def _save_avatar(self, title, rec):
@@ -1208,6 +1209,24 @@ Everything is plain Markdown you own.
                         "leave it exactly as you left it. Studio's \"save to "
                         "brain\" also lands here.\n")
 
+    def memory_space(self):
+        """Scaffold `_memory/` — the brain's memory (docs-memory/SBL-MEMORY-ARCHITECTURE.md).
+        Only the README, only if absent. Everything else in `_memory/` (the notes and the
+        `.store/` event logs) is written by memory.py, never by the engine, so rebuilds and
+        `--refresh` leave it exactly as it is."""
+        stub = self.out / "_memory" / "README.md"
+        if not stub.exists():
+            write(stub, "# Memory\n\nWhat this brain and its agents remember — preferences you "
+                        "stated, corrections, and lessons from real outcomes. Plain notes you can "
+                        "read, edit and delete; the engine never touches this folder.\n\n"
+                        "- `brain.md` — the main chat · `shared.md` — facts every agent should know "
+                        "· one note per agent (`job-search.md`, …)\n"
+                        "- lines marked *agent* were inferred by an agent — edit or remove any you "
+                        "disagree with (or switch the brain to review-first: `memory.py policy review`)\n"
+                        "- `.store/` — the machine log the notes are rendered from\n\n"
+                        "Tool: `memory.py` (ships with Second Brain Link and every plugin) — "
+                        "`recall`, `observe`, `review`, `approve`, `reject`, `forget`, `sync`.\n")
+
     def scaffolding(self):
         """Write the non-layer scaffolding: the provider's agent guide
         (CLAUDE.md/AGENTS.md), a `.gitignore` that excludes quarantine/attachments,
@@ -1967,6 +1986,19 @@ value is in connections, voice, and intent — not raw storage.
 ## Drafting
 - Ground voice in `30-voice/` + `90-synthesis/positions-i-hold.md`; never invent
   opinions the user hasn't expressed. Keep new links tight.
+
+## Memory — `_memory/` (read it first, keep it current)
+- Before answering, read `_memory/brain.md` and `_memory/shared.md` (and an agent's own
+  `_memory/<agent>.md`). Apply what is there; never re-ask what it answers.
+- When the user states a preference, a standing rule, a fact about themselves, or
+  corrects you, save it at once with the memory tool (it is active immediately):
+  `python3 <this skill>/scripts/memory.py observe --scope brain --kind preference|rule|fact|correction --source user --text "…"`
+  (`--scope shared` when it holds for every agent). The skill lives at
+  `~/.claude/skills/second-brain-link/` (Claude Code) or `~/.agents/skills/second-brain-link/` (Codex).
+- Something you only inferred goes in with `--source agent`: it is saved and used,
+  flagged as inferred, and the user can edit or remove it (in a brain set to
+  review-first it waits in `_memory/Review.md` until approved).
+- Never write memory anywhere else, and never store secrets.
 """
 
 def main():

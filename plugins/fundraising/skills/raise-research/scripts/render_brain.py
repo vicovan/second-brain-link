@@ -220,7 +220,7 @@ def dashboard(recs, known):
                      ["fundraising", "dashboard"])
     out = [fm, "# Fundraising Dashboard\n",
            (f"The plan: [[Funding Plan]] · " if plan_exists else "No plan yet — ask the agent to build one · ")
-           + "[[Fundraising KPI]]\n",
+           + "[[Fundraising KPI]] · [[Memory — Fundraising Agent]] (what the agent remembers; [[Review]] for its inferences)\n",
            "## Pipeline\n", "| Status | Count |\n|---|---|"]
     for s in L.STATUSES:
         if counts.get(s):

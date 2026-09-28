@@ -6,6 +6,15 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, Skill
 
 # CV Tailor
 
+## Memory — every run (recall → act → reflect)
+Follow `memory-protocol.md` (in `skills/job-apply/references/`). Tool:
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/memory.py`, scope `job-search`, tags `cv`.
+1. **First:** `memory.py recall --scope job-search --tags cv` — apply it, say in one line which items changed what you do, never re-ask what it answers.
+2. **User says a preference, rule or correction** → `observe --source user` at once (`--scope shared` if it holds for every agent).
+3. **An outcome lands** (a reply, rejection or interview (`learn.py set-result`), a reviewer's verdict, a knock-out, a form that failed) → `observe --source outcome` with the evidence, `--match` the item it strengthens.
+4. **Last:** at most 3 inferred lessons → `observe --source agent` (saved and used at once, flagged as inferred — the user can edit or remove them); end with *"Learned: …"*.
+
+
 **When this applies (the description above is capped at 200 chars, so the full
 trigger list lives here):** any time the user pastes or links a job description,
 company careers page, accelerator or investor programme; says "tailor my CV",

@@ -546,6 +546,7 @@ def dashboard_note(rows, reports, dest, profile_src, known=frozenset()):
     b.append("\n## The rest of this layer\n\n")
     b.append(f"- [[{LESSONS[:-3]}]] — what the outcomes have actually taught\n")
     b.append(f"- [[{KPI[:-3]}]] — the KPI and the conversion numbers\n")
+    b.append("- [[Memory — Jobs Agent]] — what this agent remembers and uses every run · [[Review]] — what it inferred, waiting for your OK\n")
     b.append(f"- `profile/` — the criteria every run reads (from `{profile_src}`)\n")
     # Link the brain's own career notes by their real `title:` — the filename is not what
     # resolves (brain-app.ts) — and only the ones that are actually there.

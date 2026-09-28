@@ -46,6 +46,33 @@ def _state_root():
 
 
 ROOT = _state_root()
+SCOPE = "job-search"
+ROOT_FOR_MEMORY = lambda: ROOT  # noqa: E731
+
+
+# ------------------------------------------------------------------ the shared memory layer
+def _brain_of(root):
+    """The brain a state root lives in (<brain>/.plugins/<plugin>/), else None."""
+    try:
+        p = pathlib.Path(root).resolve()
+        return str(p.parent.parent) if p.parent.name == ".plugins" else None
+    except (OSError, TypeError):
+        return None
+
+
+def _memory(kind, source, text, tags=(), evidence=None):
+    """Feed memory.py (beside this script) — see docs-memory/SBL-MEMORY-ARCHITECTURE.md.
+    Never fails the command it rides on: the ledger is the record; memory is what was learned."""
+    try:
+        here = str(pathlib.Path(__file__).resolve().parent)
+        if here not in sys.path:
+            sys.path.insert(0, here)
+        import memory as _mem  # noqa: PLC0415
+        r = _mem.observe(SCOPE, kind, source, text, [t for t in tags if t], evidence, brain=_brain_of(ROOT_FOR_MEMORY()))
+        print(f"memory: {r['action']} {r['id']} — " + ("used from now on" if r["status"] == "active" else "waiting for review"))
+    except Exception as e:  # noqa: BLE001
+        print(f"memory: not recorded ({e})", file=sys.stderr)
+
 OUT = ROOT / "outcomes.jsonl"
 OBS = ROOT / "observations.jsonl"
 LESSONS = ROOT / "lessons.md"
@@ -279,12 +306,28 @@ def cmd_set_result(a):
                 pass
             print(f"{r['job_key']} -> {a.result}")
     rewrite(OUT, recs)
+    # Outcomes are facts: the employer's words, and every reply that got somewhere, become
+    # memory the next scoring and tailoring run starts from.
+    for r in recs:
+        if r.get("job_key") not in keys:
+            continue
+        who = f"{r.get('company', '?')} ({r.get('role', '?')})"
+        shape = ", ".join(f"{k} {r[k]}" for k in ("archetype", "score", "portal", "market") if r.get(k))
+        if a.feedback:
+            _memory("lesson", "outcome", f"{who} answered {a.result}: \"{a.feedback.strip()[:300]}\"" + (f" — {shape}" if shape else ""),
+                    ["scoring", "cv"], evidence=f"set-result {r.get('job_key')}|{a.feedback.strip()[:300]}")
+        elif a.result in POSITIVE:
+            _memory("lesson", "outcome", f"{who} led to a {a.result}" + (f" — {shape}" if shape else "") + ". More roles of this shape are worth prioritising.",
+                    ["scoring", "sourcing"], evidence=f"set-result {r.get('job_key')}|{a.result}")
 
 
 def cmd_add_lesson(a):
     append(OBS, {"date": TODAY, "tag": a.tag, "text": a.text.strip()})
     n = sum(1 for o in rows(OBS) if norm(o["text"]) == norm(a.text))
-    print(f"observation recorded ({n}x). Promoted to a rule at 3x — run: learn.py consolidate")
+    print(f"observation recorded ({n}x).")
+    # An observation the agent drew is an INFERENCE: saved as memory (source agent, flagged as
+    # inferred; the user can edit or remove it — or set the brain to review-first).
+    _memory("lesson", "agent", a.text.strip(), [a.tag], evidence="learn.py add-lesson|" + a.text.strip())
 
 
 def compute_stats():
@@ -463,6 +506,10 @@ def cmd_calibrate(a):
             if mp - mn >= 5:
                 print(f"  Suggested floor: {min(p):.0f} (lowest {k} that drew a reply). "
                       "Change it in profile/scoring.md yourself if you agree.")
+                # an inference from the numbers — saved flagged as inferred (removable)
+                _memory("rule", "agent", f"Apply only when {k} >= {min(p):.0f}: the lowest {k} that drew a reply "
+                        f"across {len(applied)} results (replies average {mp:.0f}, rejections {mn:.0f}).",
+                        ["scoring"], evidence=f"learn.py calibrate|{len(applied)} results")
         elif not p:
             print(f"\n- **{k}**: no positive replies yet — nothing to calibrate a floor against. "
                   "Look at the archetype table: the lane with 0 replies is the first to narrow.")

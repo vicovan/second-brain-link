@@ -20,12 +20,40 @@ defence, not permission.
     learn.py kpi
 """
 import argparse, contextlib, datetime, json, os, sys
+import pathlib as _pl
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from paths import state_root  # noqa: E402
 
 KINDS = ("planned", "shopped", "held", "booked", "cancelled", "travelled", "rated")
 ROOT = state_root()
+SCOPE = "travel-planner"
+ROOT_FOR_MEMORY = lambda: ROOT  # noqa: E731
+
+
+# ------------------------------------------------------------------ the shared memory layer
+def _brain_of(root):
+    """The brain a state root lives in (<brain>/.plugins/<plugin>/), else None."""
+    try:
+        p = _pl.Path(root).resolve()
+        return str(p.parent.parent) if p.parent.name == ".plugins" else None
+    except (OSError, TypeError):
+        return None
+
+
+def _memory(kind, source, text, tags=(), evidence=None):
+    """Feed memory.py (beside this script) — see docs-memory/SBL-MEMORY-ARCHITECTURE.md.
+    Never fails the command it rides on: the ledger is the record; memory is what was learned."""
+    try:
+        here = str(_pl.Path(__file__).resolve().parent)
+        if here not in sys.path:
+            sys.path.insert(0, here)
+        import memory as _mem  # noqa: PLC0415
+        r = _mem.observe(SCOPE, kind, source, text, [t for t in tags if t], evidence, brain=_brain_of(ROOT_FOR_MEMORY()))
+        print(f"memory: {r['action']} {r['id']} — " + ("used from now on" if r["status"] == "active" else "waiting for review"))
+    except Exception as e:  # noqa: BLE001
+        print(f"memory: not recorded ({e})", file=sys.stderr)
+
 OUTCOMES = ROOT / "outcomes.jsonl"
 LESSONS = ROOT / "lessons.md"
 
@@ -101,6 +129,12 @@ def main():
     elif a.cmd == "rate":
         print(json.dumps(upsert({"trip_id": a.trip, "kind": "rated", "ref": a.ref,
                                  "stars": a.stars, "note": a.note, "at": now()}), ensure_ascii=False))
+        # A clear rating is a fact about taste the next plan starts from (the stars used to go nowhere).
+        if a.stars <= 2 or a.stars >= 4:
+            what = a.ref or a.trip
+            _memory("lesson", "outcome", f"Rated {what} {a.stars}/5 on trip {a.trip}" + (f": \"{a.note.strip()[:300]}\"" if a.note else "")
+                    + (" — more like this." if a.stars >= 4 else " — avoid places like this."), ["taste", "stays", "food"],
+                    evidence=f"learn.py rate|{a.stars} stars {what}")
     elif a.cmd == "add-lesson":
         with _locked(LESSONS):
             existing = LESSONS.read_text(encoding="utf-8") if LESSONS.exists() else "# Travel lessons\n\n"
@@ -108,6 +142,7 @@ def main():
             if a.text not in existing:
                 LESSONS.write_text(existing + line, encoding="utf-8")
         print(LESSONS)
+        _memory("lesson", "agent", a.text, [a.tag], evidence="learn.py add-lesson|" + a.text)
     elif a.cmd == "show":
         for r in rows():
             if not a.trip or r.get("trip_id") == a.trip:

@@ -6,6 +6,15 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, TodoWrite, mcp__claude-in-ch
 
 # Ground Search
 
+## Memory — every run (recall → act → reflect)
+Follow `memory-protocol.md` (in `skills/flight-search/references/`). Tool:
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/trip-planner/scripts/memory.py`, scope `travel-planner`, tags `ground`.
+1. **First:** `memory.py recall --scope travel-planner --tags ground` — apply it, say in one line which items changed what you do, never re-ask what it answers.
+2. **User says a preference, rule or correction** → `observe --source user` at once (`--scope shared` if it holds for every agent).
+3. **An outcome lands** (a rating (`learn.py rate`), a booking or cancellation, a site that blocked you, a price that moved) → `observe --source outcome` with the evidence, `--match` the item it strengthens.
+4. **Last:** at most 3 inferred lessons → `observe --source agent` (saved and used at once, flagged as inferred — the user can edit or remove them); end with *"Learned: …"*.
+
+
 For each pair of consecutive stops not joined by a flight, and each `daytrip` stop:
 
 1. **Rail first** when a direct or one-change train exists under ~5 hours — it lands in the

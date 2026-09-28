@@ -518,6 +518,8 @@ def render_dashboard(w, trips, current_id, surface, sets=(), current_set=None, q
         L.append("Missing: " + ", ".join(f"`{m}`" for m in missing) + " — ask the Travel Agent to set you up.")
     else:
         L.append("All five profile files are present.")
+    L += ["", "What the agent remembers about your taste and trips: [[Memory — Travel Agent]] · its "
+          "inferences waiting for your OK: [[Review]]."]
     L += ["", "> [!info] Prices are snapshots, never promises. The planner drives public travel sites "
           "through your own browser; some block automation, and then you get a pre-filled link "
           "instead. Nothing is booked in this version.", ""]

@@ -98,6 +98,28 @@ Three rules a plugin must not break:
 3. **Ship nothing personal.** No names, employers, locations, salary figures, or run history.
    Everything a plugin knows about its user comes from files that user's own onboarding wrote.
 
+## Memory — every plugin remembers and improves
+
+A plugin agent must get better with use. The memory layer
+(`second-brain-link-docs/docs-memory/`, format `sbl-memory/1`) is part of the contract:
+
+- **Ship `memory.py` and `memory-protocol.md` byte-identical** — `memory.py` in the plugin's
+  library skill's `scripts/`, `memory-protocol.md` in one skill's `references/` (beside
+  `browser-setup.md`). `packaging/build_plugin.py` refuses the build when a copy differs from
+  the canonical one (`plugins/job-search/…`), and `tests/test_memory.py` checks them too.
+- **Scope = the plugin id** (`studio.json` `id`). Memory lives in the user's brain under
+  `_memory/`, never in the plugin or its ledger.
+- **Every `SKILL.md` carries the memory block**: recall first (with the skill's tags), save what
+  the user says at once (`--source user`), save outcomes with evidence (`--source outcome`),
+  reflect at the end (≤ 3 inferences, `--source agent`). The same four lines go in
+  `studio/grounding.md`.
+- **Feed outcomes in code**, not only by prose: the plugin's own outcome/lesson commands call
+  `memory.observe` (see job-search `learn.py`, fundraising `ledger.py`, travel `learn.py`).
+- **Sources are enforced by `memory.py`**: user, outcome and — by default — agent items are active
+  at once; an agent item stays flagged as inferred so the user can edit or remove it, and a brain
+  set to review-first (`memory.py policy review`) holds inferences until approved. Never mark an
+  inference `user`/`outcome`.
+
 ## Plugins in this repo
 
 | Plugin | Does |

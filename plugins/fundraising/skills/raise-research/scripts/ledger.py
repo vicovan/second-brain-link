@@ -691,6 +691,34 @@ def cmd_sent(a):
     out({"key": rec["key"], "status": rec["status"], "next": rec["next"]})
 
 
+SCOPE = "fundraising"
+ROOT_FOR_MEMORY = lambda: root()  # noqa: E731
+
+
+# ------------------------------------------------------------------ the shared memory layer
+def _brain_of(root):
+    """The brain a state root lives in (<brain>/.plugins/<plugin>/), else None."""
+    try:
+        p = pathlib.Path(root).resolve()
+        return str(p.parent.parent) if p.parent.name == ".plugins" else None
+    except (OSError, TypeError):
+        return None
+
+
+def _memory(kind, source, text, tags=(), evidence=None):
+    """Feed memory.py (beside this script) — see docs-memory/SBL-MEMORY-ARCHITECTURE.md.
+    Never fails the command it rides on: the ledger is the record; memory is what was learned."""
+    try:
+        here = str(pathlib.Path(__file__).resolve().parent)
+        if here not in sys.path:
+            sys.path.insert(0, here)
+        import memory as _mem  # noqa: PLC0415
+        r = _mem.observe(SCOPE, kind, source, text, [t for t in tags if t], evidence, brain=_brain_of(ROOT_FOR_MEMORY()))
+        print(f"memory: {r['action']} {r['id']} — " + ("used from now on" if r["status"] == "active" else "waiting for review"))
+    except Exception as e:  # noqa: BLE001
+        print(f"memory: not recorded ({e})", file=sys.stderr)
+
+
 def cmd_log_outcome(a):
     if a.result not in RESULTS:
         sys.exit(f"result must be one of {RESULTS}")
@@ -702,6 +730,12 @@ def cmd_log_outcome(a):
             rec["next"] = None
         save(recs)
     out({"key": rec["key"], "status": rec["status"]})
+    # An investor's or a program's answer is a fact the next plan and outreach start from.
+    if a.result != "no_reply" or a.note:
+        shape = ", ".join(str(rec.get(k)) for k in ("kind", "tier", "channel") if rec.get(k))
+        _memory("lesson", "outcome", f"{rec.get('name') or rec['key']} answered {a.result}" + (f" ({shape})" if shape else "")
+                + (f": \"{a.note.strip()[:300]}\"" if a.note else "."), ["targeting", "outreach"],
+                evidence=f"log-outcome {rec['key']}|{(a.note or a.result)[:300]}")
 
 
 def cmd_next(a):
@@ -811,6 +845,7 @@ def cmd_add_lesson(a):
     with open(p, "a", encoding="utf-8") as f:
         f.write(f"- {TODAY.isoformat()} — {a.text.strip()}\n")
     print(p)
+    _memory("lesson", "agent", a.text.strip(), [], evidence="ledger.py add-lesson|" + a.text.strip())
 
 
 def cmd_stamp(a):

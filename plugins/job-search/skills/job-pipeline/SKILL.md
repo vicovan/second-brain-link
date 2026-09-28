@@ -6,6 +6,15 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch, Skill, 
 
 # Job Pipeline
 
+## Memory — every run (recall → act → reflect)
+Follow `memory-protocol.md` (in `skills/job-apply/references/`). Tool:
+`python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/memory.py`, scope `job-search`, tags `scoring,sourcing,cv,apply`.
+1. **First:** `memory.py recall --scope job-search --tags scoring,sourcing,cv,apply` — apply it, say in one line which items changed what you do, never re-ask what it answers.
+2. **User says a preference, rule or correction** → `observe --source user` at once (`--scope shared` if it holds for every agent).
+3. **An outcome lands** (a reply, rejection or interview (`learn.py set-result`), a reviewer's verdict, a knock-out, a form that failed) → `observe --source outcome` with the evidence, `--match` the item it strengthens.
+4. **Last:** at most 3 inferred lessons → `observe --source agent` (saved and used at once, flagged as inferred — the user can edit or remove them); end with *"Learned: …"*.
+
+
 The daily loop, start to finish. This skill **owns no logic of its own** — it sequences the other
 four and holds whatever gates the user's autonomy setting calls for.
 
