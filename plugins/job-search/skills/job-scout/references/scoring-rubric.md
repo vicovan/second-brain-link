@@ -100,9 +100,14 @@ Flag: <what to check before applying> → <apply url>
 Close with **one line** naming which lane dominated today and anything that changes the search — a
 dry geography, a repeated employer worth a Tier-2 drill-down.
 
-**Say plainly when the day is thin.** "Only four cleared the floor today" is a useful result and far
-better than padding to ten with roles the user would never be shortlisted for. The point of a daily
-scan is that most days are quiet.
+**Size the list to the daily target, not to ten.** `learn.py target` gives the shortlist size that,
+at the user's recent yield, produces `daily-target:` valid applications. **The daily target sets how wide you source, never how low you score.** Below target, widen
+the *sweep* — more ATS boards, a Tier-2 drill-down on every strong company, the full geography
+and every lane the profile allows. Never lower the apply floor, never add a lane, never relax
+an exclusion, never two roles at one company to reach the number.
+**Say plainly when the day is still thin** after the wider sweep — "only eleven of twenty cleared
+the floor" is a useful result and far better than padding with roles the user would never be
+shortlisted for.
 
 Close with an **excluded** line per reason — knock-out (with the count), no matching archetype,
 below the floor — so the user can see the gates working without reading every rejected job.

@@ -17,6 +17,8 @@ State (shared root, outside any skill folder):
 Subcommands:
     kpi           **THE NORTH STAR** — interview rate: applied → reply → screen → interview,
                   by archetype, score band, portal and market; submissions are secondary
+    target        the daily pace: valid applications today vs `daily-target:` (default 10),
+                  and the shortlist size the scout must deliver to reach it
     log-outcome   record an application, draft or skip. `--status applied` REFUSES unless
                   the application folder holds a non-empty answers.json and gates.json
                   shows the cv, answers and review gates passed (lint_cv.py)
@@ -31,7 +33,7 @@ Subcommands:
     stats         response rates by source, portal, score band
     pending       applications with no result yet, oldest first
 """
-import argparse, collections, datetime, json, os, pathlib, re, sys
+import argparse, collections, datetime, json, math, os, pathlib, re, sys
 try:
     import fcntl
 except ImportError:      # Windows — the lock is a hardening, not a requirement
@@ -237,9 +239,13 @@ def cmd_log(a):
                 rec[k] = v
         rec["date"] = prior.get("date") or TODAY
         rec["status"] = a.status
+        if a.status == "applied":
+            rec["applied_date"] = TODAY
         recs[recs.index(prior)] = rec
         rewrite(OUT, recs)
     else:
+        if a.status == "applied":
+            rec["applied_date"] = TODAY
         append(OUT, rec)
     # Dated folder: applications/YYYY-MM-DD/<job_key>/. On the second log for a job (the
     # `applied` follow-up to a `filled` row) reuse the day it was STARTED — creating a
@@ -462,6 +468,9 @@ def cmd_kpi(a):
                   f"applications reached a screen or better")
     else:
         print("- nothing sent yet")
+    p = pace()
+    print(f"- **Pace today**            : {len(p['today'])} / {p['target']} valid applications"
+          + (f" — shortlist {p['shortlist']} to close it (`learn.py target`)" if p["remaining"] else " ✅"))
     blocked = [r for r in recs if str(r.get("status", "")).startswith("skipped")]
     by = collections.Counter(r.get("status", "?") for r in recs)
     print("\n## Pipeline")
@@ -479,6 +488,85 @@ def cmd_kpi(a):
     if applied and not answered:
         print("\n_No results recorded — the loop learns nothing until they are: "
               "`learn.py set-result --job-key K --result rejected` (or `--all-open`)._")
+
+
+# ------------------------------------------------------------------ the daily pace
+DEFAULT_DAILY_TARGET = 10
+YIELD_PRIOR = 0.5        # share of shortlisted roles that become valid applications, before data
+YIELD_WINDOW_DAYS = 14
+SHORTLIST_CAP = 30       # beyond this the day is sourcing-bound, not shortlist-bound
+# every state a SHORTLISTED role can end in once it was picked — the denominator of the yield
+ATTEMPTED = {"applied", "filled", "skipped_walled", "skipped_knockout", "skipped_review",
+             "skipped_policy", "abandoned", "drafted_linkedin"}
+
+
+def _setting(name, default):
+    """One `name: value` line from §0 of profile/application-answers.md, else the default."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from paths import profile_dir
+        txt = (profile_dir() / "application-answers.md").read_text(encoding="utf-8")
+        m = re.search(rf"^\s*{re.escape(name)}\s*:\s*(\d+)", txt, re.M)
+        return int(m.group(1)) if m else default
+    except (OSError, ImportError, ValueError):
+        return default
+
+
+def valid(r):
+    """A valid application: sent, through every gate. A --force-gates row was sent, but it is
+    not what the target measures — the target exists to push volume THROUGH the gates."""
+    return r.get("status") == "applied" and "[gates overridden:" not in (r.get("note") or "")
+
+
+def sent_on(r):
+    return r.get("applied_date") or r.get("date")
+
+
+def pace():
+    recs = [r for r in rows(OUT) if r.get("status") != "prior_external"]
+    target = _setting("daily-target", DEFAULT_DAILY_TARGET)
+    today = [r for r in recs if valid(r) and sent_on(r) == TODAY]
+    since = (datetime.date.today() - datetime.timedelta(days=YIELD_WINDOW_DAYS)).isoformat()
+    tried = [r for r in recs if r.get("status") in ATTEMPTED and (r.get("date") or "") >= since]
+    ok = [r for r in tried if valid(r)]
+    # Blend the prior in until there are ~10 attempts, so two early skips do not ask for 30.
+    w = min(len(tried), 10) / 10
+    y = (len(ok) / len(tried) if tried else YIELD_PRIOR) * w + YIELD_PRIOR * (1 - w)
+    y = max(y, 1 / 3)
+    remaining = max(target - len(today), 0)
+    need = min(SHORTLIST_CAP, math.ceil(remaining / y)) if remaining else 0
+    return {"target": target, "today": today, "remaining": remaining, "yield": y,
+            "tried": len(tried), "ok": len(ok), "shortlist": need}
+
+
+def cmd_target(a):
+    """Today's valid applications against the daily target, and the shortlist size to aim for."""
+    p = pace()
+    if a.json:
+        print(json.dumps({k: (len(v) if k == "today" else v) for k, v in p.items()}))
+        return
+    print(f"# Daily target — {TODAY}\n")
+    print(f"## ✅ VALID TODAY: {len(p['today'])} / {p['target']}\n")
+    for r in p["today"]:
+        print(f"- {r.get('company')} — {r.get('role')}")
+    basis = (f"{p['ok']} valid of {p['tried']} picked in {YIELD_WINDOW_DAYS} days"
+             if p["tried"] >= 10 else f"prior {YIELD_PRIOR:.0%}, only {p['tried']} picked so far")
+    print(f"\n- Remaining          : {p['remaining']}")
+    print(f"- Yield (picked → valid): {p['yield']:.0%}  ({basis})")
+    if p["remaining"]:
+        print(f"- **Shortlist target**: {p['shortlist']} roles above the apply floor "
+              f"(fetch ~{min(2 * p['shortlist'], 60)} postings to get there)")
+        if p["shortlist"] >= SHORTLIST_CAP:
+            print(f"  _Capped at {SHORTLIST_CAP}: at this yield the day is limited by sourcing. "
+                  "Fix the biggest skip reason in `kpi` rather than sweeping wider still._")
+    else:
+        print("- Target met. Nothing more is needed today.")
+    week = collections.Counter(sent_on(r) for r in rows(OUT) if valid(r))
+    print("\n| Day | Valid | vs target |\n|---|---|---|")
+    for i in range(6, -1, -1):
+        d = (datetime.date.today() - datetime.timedelta(days=i)).isoformat()
+        n = week.get(d, 0)
+        print(f"| {d} | {n} | {'✅' if n >= p['target'] else '·'} |")
 
 
 def cmd_calibrate(a):
@@ -596,6 +684,8 @@ def main():
     g.add_argument("--threshold", type=int, default=3)
 
     sub.add_parser("kpi").set_defaults(f=cmd_kpi)
+    g = sub.add_parser("target"); g.set_defaults(f=cmd_target)
+    g.add_argument("--json", action="store_true", help="machine-readable, for the pipeline")
     sub.add_parser("calibrate").set_defaults(f=cmd_calibrate)
     g = sub.add_parser("import-legacy"); g.set_defaults(f=cmd_import_legacy)
     g.add_argument("src", help="the older state folder to copy from")

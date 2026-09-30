@@ -42,7 +42,7 @@
     },
     {
       "t": "How is the pipeline doing?",
-      "q": "Show me the KPI: interview rate by archetype, score band and portal, what the gates stopped and why, and what the outcomes so far say I should change."
+      "q": "Show me the KPI: interview rate by archetype, score band and portal, what the gates stopped and why, today's valid applications against my daily target, and what the outcomes so far say I should change."
     },
     {
       "t": "Record a reply",

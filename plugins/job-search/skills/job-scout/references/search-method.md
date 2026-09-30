@@ -11,8 +11,9 @@ location or a target title — a shortlist built on invented criteria wastes the
 ## 1. Freshness and volume
 
 Sweep the last **4–5 days** by default, widening from whatever `scout_state.py window` reports since
-the last run. **Deliver only what clears the apply floor** (`scoring-rubric.md`), up to ten. Widening
-the *sources* on a thin day is fine — another ATS board, a remote-flagged pass — but never widen the
+the last run. **Deliver only what clears the apply floor** (`scoring-rubric.md`), up to the
+shortlist target `learn.py target` prints for the day's `daily-target:`. Widening
+the *sources* to reach it is expected — another ATS board, a remote-flagged pass, a drill-down — but never widen the
 *lanes* or lower the floor to reach a number: a padded list is how a week of applications goes out
 to roles the candidate was never going to be shortlisted for. Say plainly how thin the day was.
 
@@ -35,7 +36,7 @@ either field, and only the body of the posting reveals what it actually does.
 
 ## 4. Read the real postings, but only the ones that survive
 
-Score everything cheaply from title, company and location first. Take the top ~15 and fetch each
+Score everything cheaply from title, company and location first. Take the top ~2× the shortlist target and fetch each
 posting for what only the full text reveals: compensation, work-authorization wording, whether the
 executive title means what it says, team size, funding. **Do not fetch all of them** — that is the
 expensive step, and most candidates die on the title alone.
@@ -62,8 +63,8 @@ after reading a role they liked. It is not optional.
 
 ## 6. Rank, cut, and be honest about the tail
 
-Apply `scoring-rubric.md` with the user's weights. Rank, break ties on work mode, cut at the target
-count. If fewer clear the bar, deliver fewer and say so.
+Apply `scoring-rubric.md` with the user's weights. Rank, break ties on work mode, cut at the shortlist
+target. If fewer clear the bar after the wider sweep, deliver fewer and say so.
 
 ## 7. Drill down when a company looks strong
 

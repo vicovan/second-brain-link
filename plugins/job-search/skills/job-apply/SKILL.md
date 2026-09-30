@@ -189,9 +189,15 @@ Why this is first: the fast, generic rejection is almost always an automatic rul
 these answers — right to work, location, language, a salary figure. A well-tailored CV does not
 survive a "No" to "Do you have the right to work in <country>?".
 
-**One company, one application per 30 days.** If the ledger shows an application to this
-employer in that window, stop: a second role at the same company, days later, tells their
-recruiters the first was not a considered choice.
+**One company, one application per 30 days — and never the same job twice.** Check it with
+the ledger gate, not by eye:
+```bash
+echo '[{"company":"<company>","title":"<role>","url":"<url>"}]' \
+  | python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py gate
+```
+An empty list means stop: it prints why (already applied / rejected, or the company rule and
+the date it lifts). A second role at the same company, days later, tells their recruiters the
+first was not a considered choice.
 
 ### 3. Build the tailored CV — main model, not the subagent
 
@@ -517,7 +523,7 @@ the moment they submit. Add the Application-log row when you pick the job up.
 Every application outcome must be reflected in `<state root>/reports/<date>.md`
 **immediately**, in two places:
 
-1. **The `Status` cell** for that row in the top-10 table:
+1. **The `Status` cell** for that row in the shortlist table:
    `✅ **APPLIED** <date>` · `🟡 **FILLED — awaiting the user's submit**` ·
    `⛔ **SKIPPED — <reason>**` · `❌ **DISQUALIFIED — <reason>**`
 2. **The "Application log" table** at the top of the report — add a row with the job, the portal,

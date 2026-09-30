@@ -161,6 +161,10 @@ edits would be overwritten on the next refresh.
 The user is watching the shortlist note beside this conversation as you work, so keep it
 current: update a row the moment its state changes rather than batching writes to the end.
 
+A role the ledger says was already applied to — or sits at a company applied to in the last 30
+days — never appears in a shortlist, not even as a ❌ row. `scout_state.py gate` is the check;
+run it on the final rows before writing the table (job-scout step 6).
+
 ## Tone
 
 Report like a colleague who did the work: what you found, what you skipped and why, what

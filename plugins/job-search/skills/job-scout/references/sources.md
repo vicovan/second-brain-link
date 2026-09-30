@@ -104,7 +104,7 @@ Also worth a WebSearch pass: `site:workatastartup.com "<lane A title>" remote <r
 ## Tier 4 — WebFetch on a specific posting
 
 Once a job is shortlisted, `WebFetch` the posting URL to read the real requirements, comp and
-work-authorization language before scoring it. Do this for the **top ~15 candidates only** —
+work-authorization language before scoring it. Do this for the **top ~2× the shortlist target only** (`learn.py target`) —
 it is the expensive step.
 
 ---

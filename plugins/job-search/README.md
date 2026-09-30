@@ -70,6 +70,7 @@ Then:
 /onboard      # builds your profile from a CV, a Second Brain vault, a LinkedIn export, or a chat
 /jobs         # the daily run: sweep -> score -> tailor -> apply
 /kpi          # the number that matters: interviews won, and the interview rate
+              #   plus the daily pace: valid applications vs `daily-target:` (default 10)
 /outcome      # paste a reply or rejection — it is logged against the right application
 /report       # re-render the dashboard
 ```

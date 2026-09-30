@@ -66,6 +66,7 @@ All paths are relative to this skill folder. Run them with `python3`.
 python3 scripts/paths.py                    # where everything resolves — run this first when unsure
 python3 scripts/scout_state.py stats        # daily gate, dedupe, report path
 python3 scripts/learn.py kpi                # the north star — interviews, and the interview rate
+python3 scripts/learn.py target             # daily pace: valid today vs daily-target, shortlist size
 python3 scripts/learn.py calibrate          # does the score predict replies?
 python3 scripts/learn.py set-result --job-key K --result rejected   # feed outcomes back
 python3 scripts/knockout.py --jd posting.txt       # auto-reject questions, before any CV

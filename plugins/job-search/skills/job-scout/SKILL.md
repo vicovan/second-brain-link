@@ -17,12 +17,16 @@ Follow `memory-protocol.md` (in `skills/job-apply/references/`). Tool:
 
 A daily sweep of the market for the roles the user actually wants **and can win**, scored against
 their real profile, deduped against everything they have already been shown, and delivered as a
-ranked shortlist of up to 10 — only jobs that clear the apply floor — with a saved report.
+ranked shortlist sized to the **daily target** — only jobs that clear the apply floor — with a
+saved report.
 
-**Fewer, better applications win more interviews than many average ones.** A recruiter who sees
-the same person apply as CTO, ML scientist and product director in one week reads none of them
-seriously, and every application that is auto-rejected teaches the system nothing. The shortlist
-is judged by the interviews it produces, not by its length.
+**The daily KPI is valid applications: `daily-target:` (default 10) a day**, counted across every
+run of the day. *Valid* means sent through every gate — knock-out, CV and answers lint, and a
+`shortlist` recruiter verdict. Roughly half of what gets picked dies at those gates, so the
+shortlist must be bigger than the target: `learn.py target` prints the size from the user's own
+recent yield. **Volume never buys a weaker application.** A recruiter who sees the same person
+apply as CTO, ML scientist and product director in one week reads none of them seriously — so the
+target is met with more roles *inside* the user's lanes, not with roles outside them.
 
 **This skill finds jobs. It does not write CVs.** If the user pastes *one* job description
 and wants a document, that is **`cv-tailor`** — hand off and stop. This skill's
@@ -80,6 +84,14 @@ Read the KPI's tables before sweeping:
   predicts replies. A flat or inverted score is a scoring bug to raise, not noise.
 - **Stopped before sending** — knock-out and review skips are the gates working; a *scouting* bug
   is a job that reached the shortlist and was then stopped for something visible in the posting.
+
+Then the pace:
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/learn.py target
+```
+It prints today's valid applications, what remains, and the **shortlist target** (and how many
+postings to fetch to reach it). Carry both numbers into steps 5–6. If the target is already met,
+say so and deliver a normal list — do not sweep for more.
 
 If applications are open with no result, remind the user once to record them
 (`learn.py set-result --job-key K --result rejected`, or `--all-open`) — the loop learns nothing
@@ -223,7 +235,8 @@ whose sector is unclear must be read before it is ranked. Report the count of ex
 ### 5. Shortlist, then read the real postings
 Map each candidate to an **archetype** from `profile/archetypes.md` by its title and trigger
 keywords; one that matches no lane is dropped here (count it, do not list it). Then score
-cheaply from title + company + location. Take the **top ~15** and `WebFetch` each posting for
+cheaply from title + company + location. Take the **top ~2× the shortlist target** (the fetch
+count `learn.py target` printed — ~40 on a fresh day) and `WebFetch` each posting for
 what only the full text reveals: comp, work-authorization wording, whether "CTO" means CTO,
 team size, funding. Do not fetch all of them — that is the expensive step and most candidates
 die on the title alone.
@@ -254,7 +267,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-apply/scripts/detect_portal.py "<url>" 
 - `unknown` → fetch the page and look for an account wall (*create an account · sign up to apply ·
   register to apply · log in to apply · set a password*). Treat as walled if found.
 
-The report's top-10 table carries an **Apply** column: `✅ direct form (<ats>)` · `⛔ account wall` ·
+The report's shortlist table carries an **Apply** column: `✅ direct form (<ats>)` · `⛔ account wall` ·
 `✉️ email only` · `? unverified`. **A row must not say `?` in a delivered report** — verify it or
 leave the job out.
 
@@ -267,16 +280,37 @@ likelihood** (would a recruiter put *this* person on a call?), hard disqualifier
 outright. Rank, break ties on the work-mode order in `profile/scoring.md`.
 
 **Only jobs that clear the apply floor are shortlisted** (the floor is in `profile/scoring.md`;
-the rubric's default is total ≥ 75 and shortlist likelihood ≥ 20/30). Cut at 10. On a thin day
-deliver fewer and say so plainly — **never widen the search to pad the list**, and never lower
-the floor to reach a number. At most one role per company, and none at a company applied to in
-the last 30 days (`learn.py pending` / the ledger).
+the rubric's default is total ≥ 75 and shortlist likelihood ≥ 20/30). **Cut at the shortlist
+target** from step 0a, not at a fixed ten. At most one role per company.
+
+**The daily target sets how wide you source, never how low you score.** Below target, widen
+the *sweep* — more ATS boards, a Tier-2 drill-down on every strong company, the full geography
+and every lane the profile allows. Never lower the apply floor, never add a lane, never relax
+an exclusion, never two roles at one company to reach the number. If the list is still short after that, run
+step 7 on every strong company *before* delivering, then deliver what cleared and say plainly how
+far short it is (`14 of 20 — the day will land at ~7 valid`) and the one sourcing change that would
+close it.
+
+**Ledger gate — REQUIRED, on the final list, right before it is written.** Step 4's
+`filter-seen` ran on the raw sweep; everything added after it (the drill-down, the saved
+ATS pool, a carried-over role from an earlier shortlist) never passed through it, and that is
+how a role the user applied to — and was rejected from — came back as #1. So the rows about to
+go into the table go through the ledger one last time:
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py gate < /tmp/scout-final.json > /tmp/scout-shortlist.json
+```
+It drops the same posting (matched by the board's job id, so an embed or mirror URL still
+matches), the same company + title, and any company applied to in the last 30 days, printing
+each drop and its reason to stderr. **A dropped row does not appear in the shortlist at all** —
+not as a ❌ or ⛔ row, not "for context". Refill from the next roles above the floor, gate
+those too, and put the drops in one "left out — already applied" line with the count and the
+earliest eligible date. Never hand-edit the ledger's verdict.
 
 Record each shortlisted job's archetype and likelihood in the report; job-apply logs them to the
 ledger so `learn.py calibrate` can check the score against what comes back.
 
-### 7. Drill down (when it pays)
-If a company looks strong, pull its whole board — the best-fitting role is often not the
+### 7. Drill down (required when below the shortlist target)
+If a company looks strong — and on every strong company when the shortlist is short — pull its whole board — the best-fitting role is often not the
 one that surfaced:
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/ats_fetch.py auto <company-slug> --filter "cto|vp|head of|chief|architect"
@@ -286,7 +320,8 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/ats_fetch.py auto <compan
 
 `$REPORT` already exists — you created it in step 1 and have been updating its status line
 since. Now write the **full ranked list** into it: date, what was searched, counts per source,
-the top 10 with scores, reasoning, red flags and apply links, then a short "also seen / near
+the whole shortlist with scores, reasoning, red flags and apply links, the line
+`Target: <valid today>/<daily target> · shortlist <n> of <shortlist target>`, then a short "also seen / near
 misses" section. Replace the `## Status` line with the final summary.
 
 **The report shows the CURRENT list ONLY.** Never append "Run 2", "Run 3"
@@ -294,7 +329,7 @@ sections — a second sweep the same day **replaces** the list, it does not stac
 the file, carrying forward only the statuses of jobs already actioned. Permanent history lives in
 `outcomes.jsonl`, not in the report.
 
-**The top-10 table MUST have a `Status` column as its second column**, every row starting at
+**The shortlist table MUST have a `Status` column as its second column**, every row starting at
 `⬜ not started`, followed by this legend line:
 
 > **Legend:** ✅ applied · 🟡 filled, awaiting submit · ⬜ not started · ⛔ skipped ·

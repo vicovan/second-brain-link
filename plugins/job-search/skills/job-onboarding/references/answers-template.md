@@ -17,6 +17,7 @@ default is the cautious one — change it deliberately, not by accident.
 ```
 level: supervised          # supervised | autonomous
 max-submits-per-run: 10
+daily-target: 10           # valid applications a day — the pace KPI
 ```
 
 - **`supervised`** — three approval gates: pick the job, approve the CV, approve the submit.
@@ -26,6 +27,10 @@ max-submits-per-run: 10
   in your name without you seeing them first; the audit trail (`answers.json` and
   `ANSWERS.md`, one folder per application) is what you read afterwards instead.
 - `max-submits-per-run` caps a single run so one instruction cannot empty a shortlist.
+- `daily-target` is the pace KPI: valid applications (sent through every gate) per day, counted
+  across all of the day's runs. The scout sizes its shortlist to reach it (`learn.py target`) by
+  sourcing wider — never by lowering the apply floor. Keep it at or below `max-submits-per-run`
+  unless you expect to run more than once a day.
 
 Neither level ever types a password, an identity or passport number, payment details or a
 date of birth, and neither invents a factual answer that is not in this file or the profile.

@@ -222,14 +222,24 @@ rejection worth recording as `--result none` so the statistics stay honest.
 Invoke the **Skill** tool with `job-search:job-scout` and let it run its own workflow. Do not duplicate its sweep here.
 
 ### 3. Choose which jobs
-Present the scout's shortlist (up to 10, every one above the apply floor) in its format. A thin
-day is a correct result — do not ask the scout to widen to fill slots.
+Before anything is presented or taken, re-run the ledger gate on the shortlist
+(`scout_state.py gate`, job-scout step 6) — the report may be from an earlier run, and
+applications logged since then must take their roles off it. Nothing the gate drops is
+offered, chosen or applied to.
 
-- **`supervised` — Gate 1, they pick.** *"Apply to one of these today?"* → *"#N — <company>,
-  <role>"* for the top 3 · *"A different number"* · *"None today"*. On **None today**: log
+Present the scout's shortlist (sized by `learn.py target`, every one above the apply floor) in
+its format, headed by `Target: <valid today>/<daily-target>`. A short list after the scout's wider
+sweep is a correct result — never lower the floor or relax the criteria to fill slots.
+
+- **`supervised` — Gate 1, they pick.** *"Apply to which today? (<remaining> to target)"* →
+  *"Top <remaining + margin> — toward today's target"* (recommended; margin covers the gates that
+  will stop some) · *"#N — <company>, <role>"* for the top 2 · *"None today"*. On **None today**: log
   nothing, say one line, stop. Do not push.
-- **`autonomous`** — take the top N by score, where N is what the user asked for (default 1)
-  capped by `max-submits-per-run`, and say which ones you are taking in one line. Skip
+- **`autonomous`** — take the top N by score, where N is what the user asked for, else **the
+  whole shortlist** (the scout already sized it to the remaining target), capped by
+  `max-submits-per-run` (a cap on *submits*, so building more than it is expected — the gates
+  stop some). Say which ones you are taking in one line, and stop submitting the moment
+  `learn.py target` shows the target met. Skip
   anything the scout marked walled, excluded, disqualified or knock-out, and never two roles at
   the same company.
 
@@ -325,7 +335,10 @@ file as their pipeline; stale status is a bug.
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/learn.py kpi
 ```
-Open with **successful applications**, then shortlist conversion and wasted shortlist. Then the
+Open with **successful applications**, then the **pace line** —
+`learn.py target`: valid today / `daily-target:` — then shortlist conversion and wasted shortlist.
+Below target at the end of a run: name the gate that cost the most (the skip counts), and offer
+one more run for the remainder — the scout's dedupe means it only surfaces roles not yet seen. Then the
 usual six lines. The user tracks this system by the number of applications that actually land — a run
 that shortlisted ten and submitted two is a failed run even if the ten looked good.
 
