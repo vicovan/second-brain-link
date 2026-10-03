@@ -63,6 +63,19 @@ founder and the company. The brain tunes *who to approach*; the profile supplies
 **Use `AskUserQuestion`.** Studio shows the question and its options as buttons and your call
 **waits** for the answer, inside the same turn.
 
+### The approval card — before anything that matters
+
+Right before an `AskUserQuestion` that approves something consequential (the submit gate of a program application), write a fenced `approval` block in the same message. Studio turns it into the approval card above the question: the consequence in one sentence, the real document to open, every field with the note it came from (a blank stays blank — never invent one), and your never-do list. It is hidden from the chat text. Paths are vault-relative; sources are wikilinks.
+
+```approval
+{"consequence": "This submits your application to the Northwind Fellowship.", "irreversible": true,
+ "artifact": "46-fundraising/applications/<date>/<key>/answers.md",
+ "fields": [{"label": "Revenue", "value": "pre-revenue", "source": "[[46-fundraising/profile/company]]"}],
+ "never": ["sending email", "paying fees", "creating accounts"]}
+```
+
+Set `irreversible: true` only when the step truly can't be undone (submit, send) — Studio then needs an explicit Approve, never a single stray click. If the user says no, their reason comes back with the refusal: honour it, and don't ask the same thing again this run.
+
 Fallback only: if `AskUserQuestion` is unavailable or fails, emit one fenced `gate` block and **end
 your turn**; the click arrives as your next message.
 

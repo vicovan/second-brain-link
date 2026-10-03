@@ -40,7 +40,7 @@ Full per-OS guide + troubleshooting: **[INSTALL.md](INSTALL.md)**.
 
 > Your life is scattered across platforms — connections on LinkedIn, friends on Facebook, follows on Instagram, contacts and calendar in Google. Each gives you a data export, and each sits dead in a zip. Second Brain Link pulls them into **one** structured knowledge vault your AI can think with — and the same person across two networks becomes a single, richer note. Give it a goal — **Get Me Hired**, **Get My Startup Funded** — and it works your whole network to get you there.
 
-**Multi-source by design.** **25 sources ship today** — 13 personal (LinkedIn, Facebook, Instagram, Google Takeout, Amazon, X/Twitter, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok) and 12 company (LinkedIn Company, Google Workspace, Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email/mbox, Microsoft 365, Teams) — with export + import steps for each in **[docs/SOURCES.md](docs/SOURCES.md)**. The architecture adds any future network with a data export through a drop-in adapter file or a declarative JSON mapping. One vault, every source — and every note tagged by source so the **graph** shows all of it connected.
+**Multi-source by design.** **27 sources ship today** — 13 personal (LinkedIn, Facebook, Instagram, Google Takeout, Amazon, X/Twitter, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok) and 14 company (LinkedIn Company, Google Workspace, Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email/mbox, Microsoft 365, Teams, a Git docs repo, Google Drive) — with export + import steps for each in **[docs/SOURCES.md](docs/SOURCES.md)**. The architecture adds any future network with a data export through a drop-in adapter file or a declarative JSON mapping. One vault, every source — and every note tagged by source so the **graph** shows all of it connected.
 
 **Then put it to work — agents.** The engine *builds* a brain; an **agent** *uses* one to do a job and writes what it did back into the vault as ordinary notes. Three ship today as plugins (developer previews), each running in Studio's **Agents** tab and in Claude Code / Codex:
 
@@ -186,7 +186,7 @@ Nothing is uploaded. No account, no server, no telemetry. The output is plain Ma
 
 ### Supported sources
 
-**25 sources.** Full per-source detail — what each pulls in, exact export/download
+**27 sources.** Full per-source detail — what each pulls in, exact export/download
 steps at every vendor, and import instructions — lives in **[docs/SOURCES.md](docs/SOURCES.md)**.
 
 **Personal** (build a *digital twin*): LinkedIn *(most complete)* · Facebook *(full
@@ -204,7 +204,7 @@ Google Workspace *(org units, calendars + attendees, groups)* · Slack *(channel
 membership; text never read)* · Notion *(wiki → institutional voice)* · Confluence
 *(pages + authors)* · Jira *(ownership + components)* · Salesforce *(accounts,
 deals, case signal)* · HubSpot · Zendesk · Email/mbox *(headers only)* ·
-Microsoft 365 · Teams *(signal only)*.
+Microsoft 365 · Teams *(signal only)* · Git docs repo · Google Drive *(document stores — linked read-only, sensitive files metadata-only)*.
 
 Give it **one** source or a **combined** archive with several — it detects and merges
 them all. **Personal + company sources in one export build two sibling vaults**
@@ -427,7 +427,7 @@ Both use the same `SKILL.md` (Agent Skills open standard); the OpenAI build also
 
 ### Step 1 — Download your data archive(s)
 Grab one source or several — the tool detects and merges whatever you give it.
-Steps for **all 25 sources** are in **[docs/SOURCES.md](docs/SOURCES.md)**; the four
+Steps for **all 27 sources** are in **[docs/SOURCES.md](docs/SOURCES.md)**; the four
 classics:
 
 **LinkedIn** *(most complete)*

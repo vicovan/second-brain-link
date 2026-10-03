@@ -1,0 +1,643 @@
+{
+  "_comment": "Tiered sensitivity rules for the document-store sources (git_docs, google_drive), read by scripts/docscan.py. DETERMINISTIC + LOCAL: no AI, no network. A file that trips any rule becomes a metadata-only STUB in the brain (its content never enters the vault); a clean file is imported. Reasons are rule ids only - never the matched text. Override per company with a file of the same shape (merged by `id`; {\"id\": \"...\", \"disabled\": true} switches a shipped rule off) passed through the link file's rules.sensitivity or a --mappings <dir>/docs/sensitivity.json.",
+  "version": 1,
+  "exclude": [
+    {
+      "id": "os-litter",
+      "names": [
+        ".DS_Store",
+        "Thumbs.db",
+        "desktop.ini",
+        "Icon\r",
+        ".localized"
+      ]
+    },
+    {
+      "id": "vcs-internals",
+      "segments": [
+        ".git",
+        ".svn",
+        ".hg"
+      ]
+    },
+    {
+      "id": "dependency-dirs",
+      "segments": [
+        "node_modules",
+        "__pycache__",
+        ".venv",
+        "venv",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".tox",
+        ".next",
+        ".turbo",
+        ".cache"
+      ]
+    },
+    {
+      "id": "editor-state",
+      "segments": [
+        ".obsidian",
+        ".trash",
+        ".idea",
+        ".vscode"
+      ]
+    },
+    {
+      "id": "compiled",
+      "exts": [
+        ".pyc",
+        ".pyo",
+        ".class",
+        ".o",
+        ".so",
+        ".dylib",
+        ".dll",
+        ".exe"
+      ]
+    },
+    {
+      "id": "lockfiles",
+      "names": [
+        "package-lock.json",
+        "yarn.lock",
+        "pnpm-lock.yaml",
+        "poetry.lock",
+        "Pipfile.lock",
+        "Cargo.lock",
+        "Gemfile.lock",
+        ".gitignore",
+        ".gitattributes",
+        ".gitmodules",
+        ".gitkeep"
+      ]
+    }
+  ],
+  "sensitive_paths": [
+    {
+      "id": "path-secrets",
+      "segments": [
+        "secret",
+        "secrets",
+        "credential",
+        "credentials",
+        "keys",
+        "certs",
+        "certificates",
+        ".ssh",
+        ".aws",
+        ".gnupg",
+        ".kube",
+        ".docker"
+      ]
+    },
+    {
+      "id": "path-env-vars",
+      "segments": [
+        "env",
+        "envs",
+        "environments",
+        "vars",
+        "gcp-vars",
+        "aws-vars",
+        "env-vars",
+        "dotenv"
+      ],
+      "segment_suffixes": [
+        "-vars",
+        "_vars",
+        "-env",
+        "_env",
+        "-secrets"
+      ]
+    },
+    {
+      "id": "path-security-testing",
+      "segments": [
+        "pen-test",
+        "pen-tests",
+        "pentest",
+        "pentests",
+        "penetration-test",
+        "penetration-tests",
+        "zap",
+        "burp",
+        "nessus",
+        "asv-scan",
+        "asv-scans",
+        "vuln",
+        "vulns",
+        "vulnerabilities",
+        "security-scans"
+      ],
+      "segment_prefixes": [
+        "zap-report",
+        "pentest-",
+        "pen-test-",
+        "vuln-"
+      ]
+    },
+    {
+      "id": "path-people-hr",
+      "segments": [
+        "hr",
+        "payroll",
+        "salaries",
+        "salary",
+        "personnel",
+        "people-ops",
+        "compensation"
+      ]
+    },
+    {
+      "id": "path-backups-dumps",
+      "segments": [
+        "backup",
+        "backups",
+        "dump",
+        "dumps",
+        "db-dumps"
+      ]
+    },
+    {
+      "id": "path-logs",
+      "segments": [
+        "log",
+        "logs"
+      ]
+    },
+    {
+      "id": "path-private",
+      "segments": [
+        "private",
+        "confidential",
+        "restricted"
+      ]
+    }
+  ],
+  "sensitive_names": [
+    {
+      "id": "name-credentials",
+      "tokens": [
+        "credential",
+        "credentials",
+        "creds",
+        "password",
+        "passwords",
+        "passwd",
+        "secret",
+        "secrets",
+        "apikey",
+        "apikeys",
+        "privkey",
+        "kubeconfig",
+        "mnemonic",
+        "2fa",
+        "otp",
+        "totp"
+      ],
+      "phrases": [
+        "access-credentials",
+        "api-key",
+        "api-keys",
+        "private-key",
+        "license-key",
+        "recovery-codes",
+        "backup-codes",
+        "seed-phrase",
+        "client-secret",
+        "service-account",
+        "secret-key",
+        "access-key",
+        "auth-token",
+        "access-token",
+        "refresh-token"
+      ]
+    },
+    {
+      "id": "name-token",
+      "tokens": [
+        "token",
+        "tokens"
+      ]
+    },
+    {
+      "id": "name-ssh-keys",
+      "prefixes": [
+        "id_rsa",
+        "id_dsa",
+        "id_ecdsa",
+        "id_ed25519"
+      ]
+    },
+    {
+      "id": "ext-secret-material",
+      "exts": [
+        ".env",
+        ".pem",
+        ".key",
+        ".p12",
+        ".pfx",
+        ".jks",
+        ".keystore",
+        ".ovpn",
+        ".ppk",
+        ".asc",
+        ".gpg",
+        ".kdbx",
+        ".tfstate",
+        ".tfvars",
+        ".netrc",
+        ".npmrc",
+        ".pypirc",
+        ".pgpass",
+        ".htpasswd",
+        ".git-credentials",
+        ".crt",
+        ".cer",
+        ".der",
+        ".p8",
+        ".mobileprovision",
+        ".jwk"
+      ]
+    },
+    {
+      "id": "name-dotenv",
+      "prefixes": [
+        ".env"
+      ]
+    },
+    {
+      "id": "glob-cloud-credentials",
+      "globs": [
+        "service-account*.json",
+        "*-sa.json",
+        "client_secret*.json",
+        "credentials*.json",
+        "token*.json",
+        "*_environment.json",
+        "*.postman_environment.json",
+        "*secret*.json",
+        "*secrets*.yaml",
+        "*secrets*.yml",
+        "kubeconfig*"
+      ]
+    },
+    {
+      "id": "ext-correspondence",
+      "exts": [
+        ".eml",
+        ".msg",
+        ".mbox",
+        ".pst",
+        ".ost",
+        ".emlx"
+      ],
+      "_why": "message bodies are never read — an e-mail kept in a document store stays metadata-only"
+    }
+  ],
+  "name_allow": [
+    {
+      "id": "allow-password-policy",
+      "applies_to": [
+        "name-credentials"
+      ],
+      "regex": "passw(or)?d[-_ ]?(polic(y|ies)|reset|rotation|requirements?|manager|strength|guidelines?|standard)"
+    },
+    {
+      "id": "allow-payment-tokenization",
+      "applies_to": [
+        "name-token",
+        "name-credentials"
+      ],
+      "regex": "tokeni[sz](ation|ed|er|ing)|network[-_ ]?token|token[-_ ]?(service|vault|provisioning|lifecycle|requestor)|\\btsp\\b|device[-_ ]?token"
+    },
+    {
+      "id": "allow-design-tokens",
+      "applies_to": [
+        "name-token"
+      ],
+      "regex": "design[-_ ]?tokens?|tokens?[-_ ]?(design|theme|colou?r|typograph)"
+    },
+    {
+      "id": "allow-trade-secret-docs",
+      "applies_to": [
+        "name-credentials"
+      ],
+      "regex": "secret[-_ ]?sauce|trade[-_ ]?secrets?"
+    },
+    {
+      "id": "allow-secret-management-docs",
+      "applies_to": [
+        "name-credentials"
+      ],
+      "regex": "secrets?[-_ ]?(management|manager|setup|policy|rotation|guide|handling|tenant[-_ ]guide)"
+    }
+  ],
+  "archive_exts": [
+    ".zip",
+    ".tar",
+    ".gz",
+    ".tgz",
+    ".7z",
+    ".rar",
+    ".jar",
+    ".bz2",
+    ".xz"
+  ],
+  "text_exts": [
+    ".md",
+    ".markdown",
+    ".txt",
+    ".text",
+    ".rst",
+    ".adoc",
+    ".json",
+    ".jsonc",
+    ".yaml",
+    ".yml",
+    ".xml",
+    ".html",
+    ".htm",
+    ".csv",
+    ".tsv",
+    ".ini",
+    ".toml",
+    ".cfg",
+    ".conf",
+    ".properties",
+    ".env",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".fish",
+    ".ps1",
+    ".bat",
+    ".py",
+    ".js",
+    ".mjs",
+    ".cjs",
+    ".ts",
+    ".tsx",
+    ".jsx",
+    ".go",
+    ".java",
+    ".kt",
+    ".rb",
+    ".php",
+    ".rs",
+    ".c",
+    ".h",
+    ".cpp",
+    ".cs",
+    ".swift",
+    ".sql",
+    ".log",
+    ".eml",
+    ".http",
+    ".rest",
+    ".graphql",
+    ".gql",
+    ".tf",
+    ".hcl",
+    ".ipynb",
+    ".canvas",
+    ".puml",
+    ".mmd",
+    ".mermaid",
+    ".drawio",
+    ".svg",
+    ".css",
+    ".scss",
+    ".vue",
+    ".svelte",
+    ".tex",
+    ".bib",
+    ".org",
+    ".vcf",
+    ".ics",
+    ".gdoc",
+    ".gsheet",
+    ".gslides",
+    ".gdraw",
+    ".gform",
+    ".gmap",
+    ".gsite",
+    ".gjam",
+    ".gscript"
+  ],
+  "ooxml_exts": [
+    ".docx",
+    ".docm",
+    ".dotx",
+    ".xlsx",
+    ".xlsm",
+    ".xltx",
+    ".pptx",
+    ".pptm",
+    ".potx"
+  ],
+  "pdf_exts": [
+    ".pdf"
+  ],
+  "media_exts": [
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".bmp",
+    ".tif",
+    ".tiff",
+    ".heic",
+    ".heif",
+    ".ico",
+    ".icns",
+    ".avif",
+    ".mp3",
+    ".wav",
+    ".m4a",
+    ".aac",
+    ".flac",
+    ".ogg",
+    ".mp4",
+    ".mov",
+    ".m4v",
+    ".avi",
+    ".mkv",
+    ".webm",
+    ".ttf",
+    ".otf",
+    ".woff",
+    ".woff2",
+    ".eot"
+  ],
+  "content_rules": [
+    {
+      "id": "private-key-block",
+      "regex": "-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----"
+    },
+    {
+      "id": "aws-access-key",
+      "regex": "\\b(?:AKIA|ASIA|AGPA|AIDA|AROA|ANPA|ANVA|AIPA)[0-9A-Z]{16}\\b"
+    },
+    {
+      "id": "aws-secret-near-key",
+      "regex": "(?i)aws.{0,20}(?:secret|private).{0,20}[:=]\\s*[\"']?[A-Za-z0-9/+=]{40}\\b"
+    },
+    {
+      "id": "gcp-service-account",
+      "regex": "\"type\"\\s*:\\s*\"service_account\"|\"private_key_id\"\\s*:\\s*\"[0-9a-f]{20,}\""
+    },
+    {
+      "id": "gcp-api-key",
+      "regex": "\\bAIza[0-9A-Za-z_\\-]{35}\\b"
+    },
+    {
+      "id": "github-token",
+      "regex": "\\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}\\b|\\bgithub_pat_[A-Za-z0-9_]{60,}\\b"
+    },
+    {
+      "id": "gitlab-token",
+      "regex": "\\bglpat-[A-Za-z0-9_\\-]{20,}\\b"
+    },
+    {
+      "id": "slack-token",
+      "regex": "\\bxox[abposr]-[A-Za-z0-9-]{10,}\\b"
+    },
+    {
+      "id": "slack-webhook",
+      "regex": "hooks\\.slack\\.com/services/T[A-Za-z0-9]+/B[A-Za-z0-9]+/[A-Za-z0-9]{20,}"
+    },
+    {
+      "id": "stripe-key",
+      "regex": "\\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}\\b"
+    },
+    {
+      "id": "anthropic-key",
+      "regex": "\\bsk-ant-[A-Za-z0-9_\\-]{20,}"
+    },
+    {
+      "id": "openai-key",
+      "regex": "\\bsk-(?:proj-)?[A-Za-z0-9_\\-]{20,}"
+    },
+    {
+      "id": "sendgrid-key",
+      "regex": "\\bSG\\.[A-Za-z0-9_\\-]{16,}\\.[A-Za-z0-9_\\-]{16,}"
+    },
+    {
+      "id": "twilio-key",
+      "regex": "\\bSK[0-9a-fA-F]{32}\\b"
+    },
+    {
+      "id": "twilio-auth-pair",
+      "regex": "\\bAC[0-9a-f]{32}\\b[\\s\\S]{0,200}?(?i:auth[_ -]?token)"
+    },
+    {
+      "id": "mailgun-key",
+      "regex": "\\bkey-[0-9a-f]{32}\\b"
+    },
+    {
+      "id": "npm-token",
+      "regex": "\\bnpm_[A-Za-z0-9]{36}\\b"
+    },
+    {
+      "id": "jwt",
+      "regex": "\\beyJ[A-Za-z0-9_\\-]{10,}\\.eyJ[A-Za-z0-9_\\-]{10,}\\.[A-Za-z0-9_\\-]{10,}"
+    },
+    {
+      "id": "basic-auth-url",
+      "regex": "\\b[a-z][a-z0-9+.\\-]{1,15}://[^\\s/:@\"'<>]{1,64}:[^\\s/@\"'<>]{3,128}@[A-Za-z0-9.\\-]+"
+    },
+    {
+      "id": "db-connection-string",
+      "regex": "(?i)\\b(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\\+srv)?|redis|rediss|amqps?|mssql|sqlserver)://[^\\s:@\"'<>]+:[^\\s@\"'<>]{3,}@"
+    },
+    {
+      "id": "bearer-token",
+      "regex": "(?i)\\bauthorization\\s*[:=]\\s*[\"']?bearer\\s+[A-Za-z0-9_\\-.=]{20,}"
+    },
+    {
+      "id": "generic-assignment",
+      "regex": "(?i)(?<![A-Za-z0-9])[\"']?(?:pass(?:word|wd|phrase)?|pwd|secret|client[_\\- ]?secret|api[_\\- ]?key|apikey|access[_\\- ]?key|secret[_\\- ]?key|auth[_\\- ]?token|access[_\\- ]?token|refresh[_\\- ]?token|private[_\\- ]?key|token)[\"']?\\s*[:=]\\s*[\"']?([^\\s\"',;<>`]{6,})",
+      "value_group": 1,
+      "line_guard": "(?i)example|placeholder|redacted|dummy|sample|<your|your[-_ ]|xxxx|\\*\\*\\*|changeme|lorem"
+    },
+    {
+      "id": "env-snapshot",
+      "regex": "(?m)^\\s*(?:export\\s+)?[A-Z][A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASS|PASSWORD|PWD|CRED|CREDENTIALS|AUTH)[A-Z0-9_]*\\s*=\\s*[\"']?[^\\s\"'#]{8,}",
+      "value_guard": true,
+      "min_hits": 2
+    },
+    {
+      "id": "postman-environment",
+      "regex": "\"_postman_variable_scope\"\\s*:\\s*\"(?:environment|globals)\""
+    },
+    {
+      "id": "high-entropy-near-key",
+      "regex": "(?i)(?:secret|api[_\\- ]?key|token|password|passwd|auth|bearer|private[_\\- ]?key|signing[_\\- ]?key)[^\\n]{0,40}?[\"'=:\\s]([A-Za-z0-9+/=_\\-]{32,})",
+      "value_group": 1,
+      "min_entropy": 4.3
+    }
+  ],
+  "placeholder_guard": "(?i)^(?:<.*>|\\{\\{.*\\}\\}|\\$\\{?.*|%.*%|\\*{3,}.*|x{4,}.*|\\.\\.\\..*|your[-_].*|my[-_].*|example.*|sample.*|redacted.*|changeme.*|change[-_]me.*|null|none|nil|undefined|true|false|todo.*|tbd.*|placeholder.*|secret|password|token|string|required|optional|env\\(.*|process\\.env.*|os\\.environ.*|config\\..*|settings\\..*|getenv.*|\\[.*\\]|\\(.*\\)|[-_.]+|0+|1234.*|abc.*|test.*|demo.*|fake.*|dummy.*)$",
+  "value_hash_guard": "^(?:[0-9a-f]{32}|[0-9a-f]{40}|[0-9a-f]{64}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+  "entropy_guard": "(?i)data:image|integrity=|sha256-|sha384-|sha512-|/|\\\\",
+  "card_rule": {
+    "id": "card-luhn",
+    "test_pans": [
+      "4111111111111111",
+      "4242424242424242",
+      "4000056655665556",
+      "5555555555554444",
+      "5200828282828210",
+      "5105105105105100",
+      "378282246310005",
+      "371449635398431",
+      "6011111111111117",
+      "6011000990139424",
+      "3056930009020004",
+      "36227206271667",
+      "3566002020360505",
+      "6200000000000005",
+      "4000000000000002",
+      "4000000000009995",
+      "4000000000000077",
+      "4000000000000093",
+      "4000000000000119",
+      "4000000000003220",
+      "4000002500003155",
+      "4000000000000069",
+      "4000000000000127",
+      "2223003122003222",
+      "4012888888881881",
+      "5454545454545454",
+      "4917610000000000",
+      "4917484589897107",
+      "4444333322221111"
+    ],
+    "min_hits": 1
+  },
+  "iban_rule": {
+    "id": "iban",
+    "regex": "\\b(?:AT|BE|BG|CH|CY|CZ|DE|DK|EE|ES|FI|FR|GB|GR|HR|HU|IE|IS|IT|LI|LT|LU|LV|MC|MT|NL|NO|PL|PT|RO|SE|SI|SK|SM|AE|SA|QA|BH|KW|IL|TR|JO|LB)\\d{2}(?: ?[A-Z0-9]{4}){3,7}(?: ?[A-Z0-9]{1,4})?\\b",
+    "min_hits": 1
+  },
+  "pii_dense": {
+    "emails": 20,
+    "phones": 10
+  },
+  "limits": {
+    "max_scan_bytes": 20971520,
+    "max_body_chars": 60000,
+    "max_hash_bytes": 524288000,
+    "archive_list_cap": 200
+  },
+  "policies": {
+    "archive": "stub",
+    "unscannable": "copy-unverified",
+    "neighbour_flagged": "stub",
+    "pdf_min_chars": 200
+  }
+}

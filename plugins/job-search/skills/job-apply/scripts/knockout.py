@@ -59,7 +59,7 @@ PLACES = {
     "NL": ["netherlands", "amsterdam", "rotterdam", "eindhoven", "utrecht"],
     "IE": ["ireland", "dublin"], "PT": ["portugal", "lisbon", "porto"],
     "IT": ["italy", "milan", "rome"], "PL": ["poland", "warsaw", "krakow", "kraków", "wroclaw"],
-    "RO": ["romania", "bucharest", "cluj", "iasi", "iași"], "SE": ["sweden", "stockholm"],
+    "RO": ["romania", "bucharest", "cluj", "timisoara", "timișoara", "iasi", "iași", "brasov", "brașov", "constanta", "constanța"], "SE": ["sweden", "stockholm"],
     "DK": ["denmark", "copenhagen"], "FI": ["finland", "helsinki", "espoo"],
     "NO": ["norway", "oslo"], "BE": ["belgium", "brussels"], "AT": ["austria", "vienna"],
     "CZ": ["czech", "prague"], "EE": ["estonia", "tallinn"], "LT": ["lithuania", "vilnius"],

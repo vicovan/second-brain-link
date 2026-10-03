@@ -41,8 +41,8 @@ SCHEMA = "sbl-graph/1"
 # plus the analyze-written 95-goals pseudo-layer. Folders resolve per subject
 # through build_vault.layout_for() (never hardcode a layer folder).
 LAYER_ORDER = ["root", "people", "orgs", "reputation", "voice", "shopping",
-               "career", "jobs", "fundraising", "travel", "mirror", "learning", "services", "search", "places",
-               "synthesis", "goals", "uncategorized"]
+               "career", "jobs", "fundraising", "travel", "mirror", "learning", "docs", "services", "search", "places",
+               "synthesis", "goals", "agentwork", "uncategorized"]
 
 # (person label, company label) per layer key — honest short names for HUD cards.
 LAYER_LABELS = {
@@ -54,19 +54,32 @@ LAYER_LABELS = {
     "fundraising": ("Fundraising", "Fundraising"),
     "travel": ("Travel", "Travel"),
     "mirror": ("Mirror", "Market view"), "learning": ("Learning", "Knowledge"),
+    "docs": ("Documents", "Documents"),
     "services": ("Services", "Support"), "search": ("Search", "Signals"),
     "places": ("Places", "Locations"), "synthesis": ("Synthesis", "Synthesis"),
     "goals": ("Goals", "Goals"),
+    "agentwork": ("Agent work", "Agent work"),
     "uncategorized": ("Uncategorized", "Uncategorized"),
 }
 
 # folders never scanned into the graph
 _SKIP_DIRS = {"_quarantine", "_notes", ".obsidian", ".trash", "attachments",
-              "_assets", "_profile", "copilot-prompts", "gbrain"}
+              "_assets", "_profile", "copilot-prompts", "gbrain",
+              "_files", "_index"}   # document copies + document MOCs (hubs, not knowledge)
 
 # edge type → weight used when no better signal exists
 _W_DEFAULT = {"linked": 0.3, "works_at": 0.8, "member_of": 0.5,
-              "attended": 0.4, "purchased_from": 0.4, "correlated": 1.0}
+              "attended": 0.4, "purchased_from": 0.4, "correlated": 1.0,
+              # document-store structure: a document sits IN an area, is ABOUT a
+              # counterparty, MENTIONS people, was AUTHORED by people (weak — authorship
+              # alone should never decide where a document clusters)
+              "in_category": 0.8, "about": 0.7, "mentions": 0.4, "authored": 0.15,
+              "account_of": 0.7, "published_by": 0.5}
+
+# frontmatter fields that carry a typed relation (field → edge type)
+_FM_EDGES = {"area": "in_category", "parent": "in_category", "entity": "about",
+             "people": "mentions", "authors": "authored", "account": "account_of",
+             "org": "published_by"}
 
 _WIKILINK_RE = re.compile(r"\[\[([^\]\|#]+)(?:[\|#][^\]]*)?\]\]")
 
@@ -131,6 +144,42 @@ def _layer_maps(subject):
     lay["goals"] = "95-goals"
     folder_to_key = {v: k for k, v in lay.items()}
     return folder_to_key, lay
+
+
+SUB_LAYER_MIN = 60          # a layer this big with 2+ subfolders is shown as sub-lanes
+
+
+def _sub_label(layer_key, sub):
+    """A sub-layer's display name: the document taxonomy's label for that area
+    (`customers` → "Customers"), else the folder name humanised."""
+    if layer_key == "docs":
+        try:
+            import doctax
+            cats = doctax.load_rules().get("categories", {})
+            if sub in cats:
+                return cats[sub]
+        except Exception:
+            pass
+    return sub.replace("-", " ").replace("_", " ").strip().capitalize()
+
+
+def _sub_layers(layer_key, folder, members):
+    """Second-level folders of a big layer, as their own lanes (Studio's Neural
+    view and cell regions use the same rule — see brain-cells.ts regionKey)."""
+    if not folder or len(members) < SUB_LAYER_MIN:
+        return []
+    by_sub = Counter()
+    for n in members:
+        parts = n["path"].split("/")
+        if len(parts) > 2 and not parts[1].startswith(("_", ".")):
+            by_sub[parts[1]] += 1
+    if len(by_sub) < 2:
+        return []
+    out = []
+    for sub, cnt in sorted(by_sub.items(), key=lambda kv: (-kv[1], kv[0])):
+        out.append({"key": f"{layer_key}/{sub}", "folder": f"{folder}/{sub}",
+                    "label": _sub_label(layer_key, sub), "parent": layer_key, "count": cnt})
+    return out
 
 
 def detect_subject(brain_root):
@@ -240,6 +289,13 @@ def build_graph_json(brain_root, subject=None, entity=""):
         merch = _inner_link(str(fmd.get("merchant") or ""))
         if merch and ntype == "purchase":
             add_edge(nid, resolve(merch), "purchased_from", None, src0)
+        for field, etype in _FM_EDGES.items():
+            vals = fmd.get(field)
+            vals = vals if isinstance(vals, list) else ([vals] if vals else [])
+            for v in vals:
+                tgt = _inner_link(str(v))
+                if tgt and "[[" in str(v):
+                    add_edge(nid, resolve(tgt), etype, None, src0)
 
         # body wikilinks, typed by the note that carries them
         body_type = ("attended" if ntype in ("events", "meetings")
@@ -261,7 +317,13 @@ def build_graph_json(brain_root, subject=None, entity=""):
             else:
                 add_edge(nid, tid, "linked", None, src0)
 
-    edge_list = sorted(edges.values(), key=lambda e: (e["a"], e["b"], e["type"]))
+    # a typed edge supersedes the plain "linked" edge the same pair also gets from
+    # the body (a document's header links its area hub; a deal links its account)
+    typed_pairs = {(e["a"], e["b"]) for e in edges.values() if e["type"] != "linked"}
+    typed_pairs |= {(b, a) for a, b in typed_pairs}
+    edge_list = sorted((e for e in edges.values()
+                        if not (e["type"] == "linked" and (e["a"], e["b"]) in typed_pairs)),
+                       key=lambda e: (e["a"], e["b"], e["type"]))
 
     # ---- degree ------------------------------------------------------------
     deg = Counter()
@@ -286,6 +348,7 @@ def build_graph_json(brain_root, subject=None, entity=""):
                        "label": LAYER_LABELS.get(key, (key, key))[idx],
                        "count": len(members),
                        "sources": dict(sorted(scount.items()))})
+        layers.extend(_sub_layers(key, key_to_folder.get(key, ""), members))
 
     # ---- stats -------------------------------------------------------------
     def _cross(e):

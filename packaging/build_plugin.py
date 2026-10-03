@@ -43,6 +43,15 @@ import sys
 import zipfile
 from pathlib import Path
 
+# Windows consoles default to the ANSI code page (cp1252), where this script's "✓"/"→"
+# output raises UnicodeEncodeError and aborts the build (Studio v1.3.0's Windows CI).
+# Never let progress output crash packaging.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 REPO = Path(__file__).resolve().parent.parent
 PLUGINS = REPO / "plugins"
 DIST = REPO / "dist" / "plugins"
@@ -294,6 +303,11 @@ SHARED_FILES = {
         "fundraising": "skills/raise-apply/references/memory-protocol.md",
         "travel-planner": "skills/flight-search/references/memory-protocol.md",
     },
+    "harness.py": {
+        "job-search": "skills/job-scout/scripts/harness.py",
+        "fundraising": "skills/raise-research/scripts/harness.py",
+        "travel-planner": "skills/trip-planner/scripts/harness.py",
+    },
     "browser-setup.md": {
         "job-search": "skills/job-apply/references/browser-setup.md",
         "fundraising": "skills/raise-apply/references/browser-setup.md",
@@ -309,6 +323,11 @@ def check_shared(names) -> bool:
     ok = True
     for fname, where in SHARED_FILES.items():
         canon = PLUGINS / "job-search" / where["job-search"]
+        # the engine ships memory.py and harness.py too - its copy must not drift either
+        eng = REPO / "engine" / "scripts" / fname
+        if eng.is_file() and canon.is_file() and not filecmp.cmp(canon, eng, shallow=False):
+            print(f"  ! engine/scripts/{fname} differs from the canonical {canon.relative_to(PLUGINS)} — copy it over")
+            ok = False
         for n in names:
             rel = where.get(n)
             if not rel:

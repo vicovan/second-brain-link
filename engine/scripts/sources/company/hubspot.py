@@ -88,7 +88,7 @@ def extract(root, file_index, all_paths, col):
             col.add_event(NAME, f"Deal: {nm}" + (f" ({comp})" if comp else "")
                           + (f" — {stage}" if stage else ""),
                           date=_get(r, "Close Date", "Create Date"), kind="deal",
-                          value=_get(r, "Amount"))
+                          value=_get(r, "Amount"), org=comp)
             n_deal += 1
 
     # tickets → support volume per company + per-contact SIGNAL + owner people

@@ -1,7 +1,7 @@
 # Digital-Twin Vault — LinkedIn Export Blueprint (generic)
 
 > **Scope note:** this blueprint is the deep, file-by-file data model for the
-> **LinkedIn** export (the founding source). The engine now ships **24 sources**;
+> **LinkedIn** export (the founding source). The engine now ships **27 sources**;
 > the authoritative per-source coverage table (what each adapter parses, which
 > layer it feeds, and its privacy posture) lives in the repo-root `CLAUDE.md` §9,
 > and each JSON mapping documents itself in its `_comment` header. The layer

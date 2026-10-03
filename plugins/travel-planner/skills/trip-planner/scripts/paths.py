@@ -45,11 +45,13 @@ _LAYERS = {
     "person":  {"root": "00-me",  "people": "10-people", "orgs": "15-organizations",
                 "voice": "30-voice", "travel": "47-travel", "mirror": "50-mirror",
                 "learning": "60-learning", "places": "85-places",
-                "synthesis": "90-synthesis", "notes": "_notes"},
+                "synthesis": "90-synthesis", "notes": "_notes",
+                "agentwork": "96-agents"},
     "company": {"root": "00-org", "people": "10-people", "orgs": "15-organizations",
                 "voice": "30-content", "travel": "47-travel", "mirror": "50-market-view",
                 "learning": "60-knowledge", "places": "85-locations",
-                "synthesis": "90-synthesis", "notes": "_notes"},
+                "synthesis": "90-synthesis", "notes": "_notes",
+                "agentwork": "96-agents"},
 }
 LAYER = _LAYERS["person"]["travel"]      # default for a working folder that is not a brain
 

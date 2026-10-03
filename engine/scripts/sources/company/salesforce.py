@@ -87,7 +87,7 @@ def extract(root, file_index, all_paths, col):
         col.add_event(NAME, f"Deal: {nm}" + (f" ({comp})" if comp else "")
                       + (f" — {_get(r, 'StageName')}" if _get(r, "StageName") else ""),
                       date=_get(r, "CloseDate", "CreatedDate"), kind="deal",
-                      value=_get(r, "Amount"))
+                      value=_get(r, "Amount"), org=comp)
         n_opp += 1
 
     # tasks/activities → per-contact interaction SIGNAL (never the content)

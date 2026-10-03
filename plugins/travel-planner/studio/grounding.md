@@ -108,6 +108,19 @@ and every note work without it. Never ask the user to paste the key into the cha
 for a free-text answer, and your tool call **waits** until the user answers — the answer
 comes back as the tool result, inside the same turn. A decision asked this way is a **gate**.
 
+### The approval card — before anything that matters
+
+Right before an `AskUserQuestion` that approves something consequential (the flight-journey gate (show the self-transfer risk)), write a fenced `approval` block in the same message. Studio turns it into the approval card above the question: the consequence in one sentence, the real document to open, every field with the note it came from (a blank stays blank — never invent one), and your never-do list. It is hidden from the chat text. Paths are vault-relative; sources are wikilinks.
+
+```approval
+{"consequence": "This picks the Lisbon → Tokyo journey with a self-transfer in Madrid. Nothing is booked.",
+ "irreversible": false,
+ "fields": [{"label": "Self-transfer", "value": "4h in Madrid — you re-check bags", "source": ""}],
+ "never": ["booking", "card details", "passport numbers"]}
+```
+
+Set `irreversible: true` only when the step truly can't be undone (submit, send) — Studio then needs an explicit Approve, never a single stray click. If the user says no, their reason comes back with the refusal: honour it, and don't ask the same thing again this run.
+
 Fallback only: if `AskUserQuestion` is unavailable or its call fails, emit a single fenced
 `gate` block and **end your turn**. The click arrives as your next message and the session is
 still yours.

@@ -12,10 +12,11 @@
 ## 1. What this is, in one paragraph
 
 **Second Brain Link** turns a person's *or* a company's own platform data exports —
-25 sources: LinkedIn, Facebook, Instagram, Google Takeout, Amazon, X/Twitter, WhatsApp, GitHub,
+27 sources: LinkedIn, Facebook, Instagram, Google Takeout, Amazon, X/Twitter, WhatsApp, GitHub,
 YouTube, Strava, Reddit, Spotify, TikTok (personal); LinkedIn Company, Google Workspace,
 Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email/mbox, Microsoft 365,
-Teams (company; see §9 for depth/privacy per source) — into a single, private, local,
+Teams, plus the document stores Git docs repo + Google Drive (company; see §9 for
+depth/privacy per source) — into a single, private, local,
 AI-queryable knowledge
 vault: a **digital twin** or **Company Brain** an agent can reason over. It runs
 **100% locally**, makes **zero network calls** in the core transform, and emits
@@ -301,13 +302,15 @@ second-brain-link/
 │       ├── skills/trip-planner/scripts/   #   the shared library: paths, places, taste, scout,
 │       │                                  #   itinerary, interline, geo, render_brain, learn
 │       └── skills/{travel-onboarding,trip-scout,flight-search,stay-search,ground-search,taste-scout,trip-pipeline}/
+├── sbl                           # one command: demo · build · refresh · ask · query · goals · routines · runs · eval …
+├── integrations/mcp/server.py    # optional stdio MCP server (no port) — outside engine/'s zero-network promise
 ├── packaging/build_skill.py      # assembles engine + a manifest → dist/<provider>/…
 ├── packaging/build_plugin.py     # a plugin → dist/plugins/{claude/<n>.zip, openai/<n>.skill}
 ├── dist/
 │   ├── claude/second-brain-link.skill     # committed installable (unpacked folder git-ignored)
 │   └── openai/second-brain-link.skill
 ├── tests/
-│   ├── run.py                    # stdlib test harness (currently 903 checks)
+│   ├── run.py                    # stdlib test harness (currently 1074 checks)
 │   └── fixtures/{personal,company}/<entity>/<source>/   # synthetic exports
 └── .github/                      # CI + issue/PR templates
 ```
@@ -324,7 +327,9 @@ languages) · `10-people/` (one merged note per person) · `15-organizations/` �
 `35-shopping/` (purchases — one note per order: item, merchant, amount, date) ·
 `40-career/` (applications, preferences, saved-jobs, reusable-answers) · `50-mirror/`
 (inferences, ad-profile) · `60-learning/` · `70-services/` · `80-search/` ·
-**`85-places/`** (saved/reviewed/checked-in locations) · `90-synthesis/` (network-map,
+**`85-places/`** (saved/reviewed/checked-in locations) · **`65-documents/`** (the `docs`
+layer — one note per document from a linked Git docs repo / Google Drive; see §6 and
+`docs/ENTITY-MAP.md`) · `90-synthesis/` (network-map,
 target-companies, positions-i-hold [draft], positioning-gaps [draft]) ·
 `_notes/` (YOURS — never regenerated) · `99-uncategorized/` · `_quarantine/`.
 **`45-jobs/` (person) / `45-hiring/` (company)** is registered as the `jobs` layer key but is
@@ -339,6 +344,19 @@ tree, graph and dashboard render it when present (the same arrangement as analyz
 manifest in the hidden ledger). Place notes carry `kind`/`country`/`city`/`rating` as fields
 (country/city from the offline gazetteer's reverse lookup, `geocode.nearest`), and
 `graph.json` copies them onto place nodes. **Company brains use company-named folders** for the middle layers (20-brand, 30-content, 35-procurement, 40-pipeline w/ one note per deal, 50-market-view, 60-knowledge w/ meetings.md, 70-support, 80-signals, 85-locations) — driven by `mappings/brain/layout.json` `variants` via `VaultWriter.L(key)` (never hardcode a layer folder). Full field reference: `docs/ENTITY-MAP.md`.
+
+**`96-agents/` (both subjects) is the `agentwork` layer key — the Harness** (built 2026-10-02,
+developer preview; spec `engine/references/harness.md`): `Goals/` (sbl-goal/1 — an outcome with a
+finish line, counted from a plugin's outcome counter), `Routines/` (sbl-routine/1 — schedule +
+deterministic "only when" conditions), `Reports/` (sbl-report/1 — each run's Done / Not done yet /
+Next step / Needs you, Done items pass-gated on evidence), `Activity/` (sbl-run/1 — the step log).
+Written by `scripts/harness.py` (byte-identical copies ship in every plugin; `build_plugin.SHARED_FILES`
+checks them against the engine copy), Studio and the phone — never by the builder, so `--refresh`
+leaves it byte-identical. State in `.plugins/harness/`; suggestions for a human in `_REVIEW.json`.
+`analyze.py` seeds one routine per goal workspace; `scripts/retrieval.py` (Personalized PageRank,
+golden-file identical to Studio's `brain-retrieval.ts`), `scripts/query.py` (read-only SQL — the
+numbers a model must not guess) and `scripts/eval.py` (`--harness` = the safety rules, no model)
+are the developer tools.
 
 **`graph.json` (schema `sbl-graph/1`)** is ALWAYS written at each brain root (+
 `_correlations/graph.json`): the machine-readable typed graph — `nodes` (id = note path
@@ -397,6 +415,23 @@ Multiple entities → one brain each under `vault/personal/` + `vault/company/`,
   export, a generated vault, or a secret. Test fixtures are **synthetic only** (placeholder
   emails on `example.com`, reserved phone/IP ranges, public landmarks, historical-figure
   names) — never a real person's data.
+- **Document stores (`git_docs`, `google_drive`) — linked, tiered, read-only.** The
+  store is never copied into `data/` and never symlinked: `data/company/<co>/<source>/`
+  holds only `_SOURCE_LINK.json` (`scripts/doclink.py`, schema `sbl-source-link/1`).
+  `doclink.walk` never follows symlinks and never opens cloud-only placeholders;
+  `doclink.open_ro` is the only read path; `build_vault.write()`/`write_bytes_file()`
+  call `doclink.assert_not_linked()` so no build can write into an original.
+  `scripts/docscan.py` (rules: `mappings/docs/sensitivity.json`) tiers every file —
+  path, name, extension, mode, content regexes (gitleaks-style + Luhn + IBAN), PII
+  density — and **`Collector.add_document` drops the content of every non-importable
+  tier** (stubs keep metadata only; `--full` does NOT lift this). Clean bodies pass
+  `scrub_body()` (emails, phones, card numbers). The brain gets agent deny rules for
+  the original roots (`.claude/settings.json`) and a Documents section in its guide.
+  `scripts/doctax.py` (rules: `mappings/docs/taxonomy.json`) does categories / doc
+  types / entities / versions from paths + names only. Git metadata is a guarded
+  LOCAL `git log`/`ls-files` subprocess (author NAMES only; no fetch, no lock files;
+  optional) — the engine's second subprocess after `--gbrain-import`. `docscan.py
+  audit <brain>` must report 0 hits.
 - **Owner mode — the one exception.** `build_vault.py --full` (`Collector(full=True)`)
   captures emails, phones, every extra column (a `## Details` block + frontmatter),
   and folds the owner's OWN quarantined files into `00-me/` as `my-*.md` tables — no
@@ -503,6 +538,8 @@ field described in other words.
 | Email (mbox) | company | .mbox | Python adapter (`email_archive.py`, NAME `email`), **headers-only**: From/To/Cc display names→people+signal; subjects/bodies never accessed; PST → honest convert-first hint |
 | Microsoft 365 | company | .eml / Purview CSV | Python adapter, **headers-only**, same rule as mbox |
 | Microsoft Teams | company | CSV/JSON (Purview report) | Python adapter, **signal-only**: senders→people, teams/channels→orgs + `channel/<slug>` tags; content columns never read |
+| Git docs repo | company | any files (linked folder) | Python adapter `git_docs.py` over `sources/_docs.py`: one `document` note per file in `65-documents/` (taxonomy, versions, renders, sha dedup, entities → orgs, repository-history authors → people + signal); tiered by `docscan` — sensitive files metadata-only; safe files copied to `_files/` |
+| Google Drive | company | any files (Drive for desktop folder / Takeout) | Python adapter `google_drive.py`, same pipeline; `.gdoc/.gsheet/.gslides` → url + id only (account e-mail never read); cloud-only placeholders never opened |
 
 **Offline geocoder** (`scripts/geocode.py` + `mappings/geo/cities.json`, GeoNames-derived,
 CC-BY — attribution in `references/geonames-attribution.md`): build-time city→lat/lng for
@@ -517,7 +554,7 @@ structure tags adapters emit).
 Real-world validation build (IG + Google Maps + LinkedIn + **Facebook**, `--full`): cross-source
 merge verified, `source/*` tags on every note, `_STRUCTURE.md`/`_DATA_POINTS.md`/`_GRAPH.md`
 present, default-mode PII sweep clean. Both providers package + install + run end-to-end.
-`tests/run.py` → **883 checks, 0 failed** (2026-09-25; was 667 when this list was written) (selector mini-language, mapping-wins,
+`tests/run.py` → **1074 checks, 0 failed** (2026-10-02; was 667 when this list was written) (selector mini-language, mapping-wins,
 IG/Google fixture build, places + review note, harvester rescue, multi-entity 3-brain
 build, cross-person note, `works_at` edge, negative no-merge, multi-vault PII sweep, Codex
 `agents/openai.yaml` + `--install`, two-sibling-vault split, **Facebook full mapping +
@@ -558,6 +595,12 @@ validation (no `bun` here); real FB/IG/Google/company exports beyond the local o
   `fix_mojibake` repairs it.
 - **Education/certs/languages** were read but not marked consumed → showed as
   uncategorized; now folded into identity and marked consumed.
+- **Document stores** — the refresh hasher used to hash text files with
+  `sha256_text` while `write_bytes_file` recorded `sha256_bytes`, so every verbatim text
+  copy looked user-edited on `--refresh`; `_on_disk_shas` now matches either. Hex hashes
+  in paths tripped the test PHONE sweep (11+ digit runs) — content ids are base32.
+  A `.md` copied verbatim into the vault IS a note (every reader parses it), so document
+  notes are generated (frontmatter + body), never raw copies; `_files/` never holds `.md`.
 - **Non-empty output dir** is refused by design (never clobbers); build into a fresh
   dir. **URL enrichment**: member-follows carry no URL in source — enriched from
   Invitations + Endorsements.
@@ -599,7 +642,7 @@ claude --plugin-dir plugins/job-search                   # one CLI session only 
 python3 packaging/build_all.py            # --check → exit 1 when dist/ is older than the sources
 
 # test (stdlib only; must stay green)
-python3 tests/run.py            # → 903 passed, 0 failed
+python3 tests/run.py            # → 1074 passed, 0 failed
 ```
 **Testing approach:** synthetic exports under
 `tests/fixtures/{personal,company}/<entity>/<source>/`; assert valid YAML on every
@@ -611,7 +654,8 @@ rescue. Never commit a real export or vault.
 
 ## 12. Roadmap / open questions
 **Roadmap:**
-- ✓ v1 sources shipped: X, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok + Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email(mbox), Microsoft 365, Teams. Next: Pinterest/Goodreads/Letterboxd/Netflix + Contacts(.vcf)/Calendar(.ics) light seeds (see docs-sources catalog).
+- ✓ v1 sources shipped: X, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok + Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email(mbox), Microsoft 365, Teams.
+- ✓ Document stores (2026-10-02): `git_docs` + `google_drive` (linked, tiered, read-only) → `65-documents/`. The network-declaring `plugins/docs-connector/` (clone/fast-forward a Git remote; Google Drive API v3 read-only with the user's own OAuth client) fills a mirror outside `data/` and links it (mode `connector`); Studio shows **Sync now** on such sources. Next: Pinterest/Goodreads/Letterboxd/Netflix + Contacts(.vcf)/Calendar(.ics) light seeds (see docs-sources catalog).
 - **v1.2 — sharper entity resolution + stable IDs: NOT shipped, still roadmap** (below). This
   line was correct all along; `deck/YC/SBL-Deck-FACTS.md` briefly claimed the opposite and was
   corrected 2026-08-20. Resolution today is **name-only** (`nk()` exact match; orgs merge on bare
@@ -620,6 +664,9 @@ rescue. Never commit a real export or vault.
   dedupe); Studio reseed offers Update vs Rebuild. **Label corrected 2026-08-20: this is v1, not
   v1.5.** The workspace adopts the root `CLAUDE.md` numbering, which reserves **v1.5 for the
   hosted/scheduled managed sync** — still roadmap, and the paid cloud product.
+- v2 — **the Harness (developer preview, 2026-10-02)**: goals · routines · reports · activity ·
+  inbox, the approval card, the desktop scheduler (off by default), phone approvals, the mobile
+  Agents tab — `96-agents/`, `scripts/harness.py`. Status: second-brain-link-docs/docs-harness/.
 - v2 — the brain that acts: **first slice shipped** — `plugins/` + three agents (Jobs, Fundraising, Travel) in Studio's Agents tab, parallel runs, approval gates, layers `45-jobs`/`46-fundraising`/`47-travel`. Next: meeting prep, drafting in voice, relationship-revival nudges.
 - Live `gbrain import` validation once a `gbrain` runtime is available.
 

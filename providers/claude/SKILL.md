@@ -1,11 +1,11 @@
 ---
 name: second-brain-link
-description: Turn a personal OR company data export into a private, local, AI-queryable "digital twin" or Company Brain — an Obsidian vault (optionally a GBrain repo). 25 sources auto-detected — LinkedIn, Facebook, Instagram, Google Takeout, Amazon, X, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok; company-side LinkedIn Page, Google Workspace, Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, mail archives, Microsoft 365, Teams — plus a self-adapting mapper for unknown exports. 100% local, zero network, message text never read. Use whenever the user points at a data export (.zip or folder) or asks to build/map/import their data into a second brain, digital twin, knowledge vault, or company brain — even without those exact words.
+description: Turn a personal OR company data export into a private, local, AI-queryable "digital twin" or Company Brain — an Obsidian vault (optionally a GBrain repo). 27 sources auto-detected — LinkedIn, Facebook, Instagram, Google Takeout, Amazon, X, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok; company-side LinkedIn Page, Google Workspace, Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, mail archives, Microsoft 365, Teams, plus document stores (a Git docs repo, Google Drive) linked read-only with sensitive files kept metadata-only — and a self-adapting mapper for unknown exports. 100% local, zero network, message text never read. Use whenever the user points at a data export (.zip or folder) or asks to build/map/import their data into a second brain, digital twin, knowledge vault, or company brain — even without those exact words.
 ---
 
 # Second Brain Link — multi-source digital-twin second brain
 
-Build ONE unified, private, Obsidian-native vault from any supported data export so the user (and their Claude) can reason over their professional and social history. **25 sources ship** — personal: LinkedIn, Facebook, Instagram, Google Takeout, Amazon, X/Twitter, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok; company: LinkedIn Company, Google Workspace, Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email (mbox), Microsoft 365, Teams (full export + import steps per source: `references/SOURCES.md`) — and unknown files are caught, never dropped. Everything runs locally; nothing is uploaded.
+Build ONE unified, private, Obsidian-native vault from any supported data export so the user (and their Claude) can reason over their professional and social history. **27 sources ship** — personal: LinkedIn, Facebook, Instagram, Google Takeout, Amazon, X/Twitter, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok; company: LinkedIn Company, Google Workspace, Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email (mbox), Microsoft 365, Teams, Git docs repo, Google Drive (full export + import steps per source: `references/SOURCES.md`) — and unknown files are caught, never dropped. Everything runs locally; nothing is uploaded.
 
 ## Architecture (read before running)
 
@@ -18,6 +18,8 @@ The scripts:
 - `scripts/diagrams.py` — renders those visualizations from the catalog (column names only, never cell values). Source-agnostic.
 - `scripts/build_vault.py` — detects source(s), runs adapters, renders the unified vault; `--dry-run` plans without writing; `--structure brain_structure.json` lays the vault out per the designed (pruned-canonical) spec; `--overrides mapping_overrides.json` maps unknown files; writes `_COVERAGE.md`, `_BUILD_REPORT.md`, and **`_SUMMARY.md`** (a seed-counts snapshot: per-layer note counts + the coverage line; a top-level `vault/_SUMMARY.md` indexes all entity brains).
 - `scripts/sources/` — the adapters + shared canonical model. This is what you extend.
+- `scripts/harness.py` — the Harness: goals (an outcome with a finish line), routines (work that repeats), reports (each run's Done / Not done yet / Next step / Needs you handoff) and activity (what each run did), all plain notes under `96-agents/`. `analyze.py` seeds one routine per goal workspace. Spec: `references/harness.md`. Deterministic: `harness.py due` decides what to run with no model call.
+- `scripts/retrieval.py` (graph retrieval — Personalized PageRank, identical to Studio's) · `scripts/query.py` (exact answers by read-only SQL: counting, joins, dates are done here, never guessed) · `scripts/eval.py` (offline benchmarks; `--harness` checks the Harness's safety rules with no model).
 
 ## Workflow
 
@@ -26,9 +28,26 @@ Ask for the path if you don't have it. Accepts a `.zip` or an unzipped folder. I
 
 **Multiple identities / companies (named entities):** organize as `data/personal/<identity>/<source>/…` and `data/company/<company>/<source>/…` — **the folder name is the entity**. Point the builder at the `data/` root (or any dir with `personal/`+`company/` children) and it builds ONE brain per entity into `vault/personal/<id>-brain/` + `vault/company/<co>-brain/`, then (when ≥2 entities) a **`vault/_correlations/`** brain linking the same person across brains, shared orgs, and identity↔company `works_at` edges (`--no-correlate` to skip). A single un-foldered export still builds one brain.
 
-If the user hasn't downloaded it yet, read them the steps from `references/SOURCES.md` (all 25 sources, verified vendor flows). In short: LinkedIn → Settings & Privacy → Data Privacy → Get a copy of your data (larger archive). Facebook → Settings → Your information → Download your information (**format: JSON**). Instagram → Accounts Center → Your information and permissions → Download your information (**JSON**). Google → takeout.google.com (select Contacts, Calendar, YouTube, Profile at minimum).
+If the user hasn't downloaded it yet, read them the steps from `references/SOURCES.md` (all 27 sources, verified vendor flows). In short: LinkedIn → Settings & Privacy → Data Privacy → Get a copy of your data (larger archive). Facebook → Settings → Your information → Download your information (**format: JSON**). Instagram → Accounts Center → Your information and permissions → Download your information (**JSON**). Google → takeout.google.com (select Contacts, Calendar, YouTube, Profile at minimum).
 
 **Company exports** (for a Company Brain — use `--subject company`, auto-detected): LinkedIn **Company Page** export (org profile, employees, followers, posts), **Google Workspace** admin export (directory/users → employees, shared calendars → events), **Slack** workspace export (users + channels; messages → signal only, never bodies). These root the brain on the organization and carry the same privacy guarantees (employee emails/phones stripped by default; HR/payroll/security/admin-log files quarantined).
+
+**Document stores — `git_docs` (a docs repository) and `google_drive` (a Drive for desktop
+folder or a Drive Takeout).** These are LINKED, never copied, and read-only:
+```bash
+python3 scripts/doclink.py init --kind git_docs --root "<local clone>" \
+    --out data/company/<company>/git_docs/          # or --kind google_drive
+python3 scripts/docscan.py scan "<local clone>"    # metadata-only preview of the tiering
+```
+Every file is tiered by a deterministic local scanner (no AI): clean documents come in
+with their content; anything with credentials, keys, env-var snapshots, dense contact
+data, archives or pen-test reports becomes a **metadata-only stub** — never try to read
+the original, and never read anything outside the vault. Output: `65-documents/`
+(Documents.md, `_index/` by category / original folder / customer, `_DOCS_COVERAGE.md`
+with a row for every file). Per-company tuning lives next to the link file in
+`rules/sensitivity.json` / `rules/taxonomy.json` (same shape as `mappings/docs/*.json`:
+entity aliases, re-routes, excludes, false-positive allows) — never in the skill.
+After a build, `python3 scripts/docscan.py audit <brain>` must report 0 hits.
 
 ### 2. (Optional but recommended) Dry-run to confirm detection
 ```bash

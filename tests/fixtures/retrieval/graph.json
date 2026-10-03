@@ -1,0 +1,316 @@
+{
+"notes": [
+{
+"id": "00-org/data-handling",
+"title": "Data handling (company mode)",
+"type": "note",
+"body": "\n# Data handling — company mode\n\nThis brain was built **100% locally** from your organization's own exports. No data left this machine during the build (an optional `--gbrain-import` step is the only thing that can send data onward, and only if you run it). **You are the data controller** for the employee data processed here.\n\n- Third-party & employee **emails/phones are stripped** by default (use `--full` only on data you're authorized to retain in full).\n\n- Message **bodies are never read** — only per-person frequency/recency signal.\n\n- **Quarantined (catalogued, never imported):** loginaudi"
+},
+{
+"id": "00-org/organization",
+"title": "Acme Robotics",
+"type": "organization",
+"body": "\n# Acme Robotics\n\n**Building friendly robots**\n\n## About\n\nWe make collaborative robots for small manufacturers.\n"
+},
+{
+"id": "10-people/Ada Lovelace",
+"title": "Ada Lovelace",
+"type": "person",
+"body": "\n# Ada Lovelace\n\n\n\n## Details\n\n- **Profile:** https://linkedin.com/in/ada\n"
+},
+{
+"id": "10-people/Alan Turing",
+"title": "Alan Turing",
+"type": "person",
+"body": "\n# Alan Turing\n\nPrincipal Scientist at [[Acme Robotics]]\n\n## Details\n\n- **Profile:** https://linkedin.com/in/alan\n"
+},
+{
+"id": "10-people/Charles Babbage",
+"title": "Charles Babbage",
+"type": "person",
+"body": "\n# Charles Babbage\n\n\n\n## Details\n\n- **Profile:** https://linkedin.com/in/charles\n"
+},
+{
+"id": "10-people/Grace Hopper",
+"title": "Grace Hopper",
+"type": "person",
+"body": "\n# Grace Hopper\n\nVP Engineering at [[Acme Robotics]]\n\n## Details\n\n- **Profile:** https://linkedin.com/in/grace\n"
+},
+{
+"id": "10-people/Katherine Johnson",
+"title": "Katherine Johnson",
+"type": "person",
+"body": "\n# Katherine Johnson\n\nHead of Orbital at [[Acme Robotics]]\n\n## Details\n\n- **Profile:** https://linkedin.com/in/katherine\n"
+},
+{
+"id": "15-organizations/Acme Robotics",
+"title": "Acme Robotics",
+"type": "company",
+"body": "\n# Acme Robotics\n\n_self_\n\nRobotics · linkedin.com/company/acme-robotics\n\n## People here (3)\n\n- [[Alan Turing]] — Principal Scientist\n- [[Grace Hopper]] — VP Engineering\n- [[Katherine Johnson]] — Head of Orbital\n\n\n## Details\n\n- **Profile:** https://linkedin.com/company/acme-robotics\n"
+},
+{
+"id": "15-organizations/Engineering",
+"title": "Engineering",
+"type": "company",
+"body": "\n# Engineering\n\n_department_\n"
+},
+{
+"id": "15-organizations/Flight",
+"title": "Flight",
+"type": "company",
+"body": "\n# Flight\n\n_department_\n"
+},
+{
+"id": "15-organizations/Research",
+"title": "Research",
+"type": "company",
+"body": "\n# Research\n\n_department_\n"
+},
+{
+"id": "15-organizations/engineering 2",
+"title": "engineering 2",
+"type": "company",
+"body": "\n# engineering 2\n\n_channel_\n\n> Ship it — Engineering discussion\n"
+},
+{
+"id": "15-organizations/general",
+"title": "general",
+"type": "company",
+"body": "\n# general\n\n_channel_\n\n> Company-wide announcements — The whole team\n"
+},
+{
+"id": "15-organizations/reactor-team",
+"title": "reactor-team",
+"type": "company",
+"body": "\n# reactor-team\n\n_group_\n"
+},
+{
+"id": "15-organizations/slack",
+"title": "slack",
+"type": "company",
+"body": "\n# slack\n\n_workspace_\n"
+},
+{
+"id": "30-content/posts/2024-02-01-bd2c50b3",
+"title": "2024-02-01-bd2c50b3",
+"type": "post",
+"body": "\nWe just shipped Acme Cobot v2 — safer and twice as fast.\n"
+},
+{
+"id": "30-content/posts/2024-03-15-297d9288",
+"title": "2024-03-15-297d9288",
+"type": "post",
+"body": "\nHiring robotics engineers in SF. Come build with us.\n"
+},
+{
+"id": "60-knowledge/meetings",
+"title": "meetings",
+"type": "meetings",
+"body": "\n# Meetings\n\n- Quarterly Planning — 2024-04-02 · 📍 HQ Boardroom\n  - with: [[Grace Hopper]], [[Alan Turing]]\n- Safety Review — 2024-04-09\n  - with: [[Katherine Johnson]]\n"
+},
+{
+"id": "90-synthesis/network-map",
+"title": "Network map",
+"type": "synthesis",
+"body": "\n# Network map\n\nTotal people: **5** across google_workspace, linkedin_company, slack\n\n## People by source\n\n- linkedin_company: 5\n- google_workspace: 3\n- slack: 2\n\n## Strongest company clusters\n\n- [[Acme Robotics]] — 3 people\n\n## Relationship signal\n\n**0** correspondents with sustained contact (5+ messages). People with `status: warm` and an old `last_contact` are your revival candidates. People appearing in multiple `sources` are your strongest multi-context ties.\n"
+},
+{
+"id": "90-synthesis/positioning-gaps",
+"title": "positioning-gaps",
+"type": "synthesis",
+"body": "\n> [!info] Deterministic draft\n> Enrichment will interpret the gap between how you describe yourself and how the algorithms tag you.\n\n# Positioning gaps (draft)\n\n## How I describe myself\n\nrobots, friendly, make, collaborative, small, manufacturers\n\n## How platforms tag me\n\n*(no inference data)*\n"
+},
+{
+"id": "90-synthesis/positions-i-hold",
+"title": "positions-i-hold",
+"type": "synthesis",
+"body": "\n> [!warning] Deterministic draft\n> Run the AI enrichment pass to turn these signals into articulated positions in your voice.\n\n# Positions I hold (draft)\n\nPublic activity analyzed: **2** posts/comments across google_workspace, linkedin_company, slack.\n\n## Recurring themes in what I post & engage with\n\nshipped, acme, cobot, safer, twice, fast, hiring, robotics, engineers, come\n"
+},
+{
+"id": "CLAUDE",
+"title": "CLAUDE",
+"type": "note",
+"body": "# Working in this vault — built by Second Brain Link (secondbrainlink.com)\n\nGuide for Claude (Claude Code) (and any coding agent). A digital-twin vault built from one or\nmore data exports. Each note's `sources` property says where it came from. The\nvalue is in connections, voice, and intent — not raw storage.\n\n## Read order (this keeps you efficient)\n1. `Home.md` is the map of content; `_STRUCTURE.md` maps every folder/file + its\n   role; `_SUMMARY.md` has the seed counts; `_DATA_POINTS.md` (if present) catalogs\n   every node type + relation + which source enriched each field; `Dashboard.md` h"
+},
+{
+"id": "Home",
+"title": "Home",
+"type": "moc",
+"body": "\n# 🧠 Second Brain Link — Home\n\nYour digital twin, built from **google_workspace, linkedin_company, slack** (Acme Robotics). Start here, then ask your AI anything.\n\n> [!tip] Try asking your AI\n> - \"Using my network map, who are my strongest dormant connections, and draft a reconnect message to each in my voice.\"\n> - \"Who shows up across multiple networks — those are my strongest multi-context relationships.\"\n> - \"How do the algorithms categorize me vs how I describe myself, and what should I change?\"\n\n## Your synthesis (start here)\n- [[identity]] — who the twin speaks as\n- [[network-map]] — you"
+},
+{
+"id": "_BUILD_REPORT",
+"title": "_BUILD_REPORT",
+"type": "note",
+"body": "# Build report\n\nBuilt: 2026-10-02\n\nSubject: company · Emitters: obsidian\n\nSources: google_workspace, linkedin_company, slack\n\n## Log\n- [google_workspace] org 'Acme Robotics': 2 users\n- [linkedin_company] org 'Acme Robotics': 3 employees, 2 followers\n- [slack] workspace 'slack': 2 members, 2 channels with membership, 2 message signals (bodies never read) · activity #general: 2\n- vault: 5 person notes (merged across sources)\n"
+},
+{
+"id": "_COVERAGE",
+"title": "_COVERAGE",
+"type": "note",
+"body": "# Coverage report\n\nSources detected: **google_workspace, linkedin_company, slack**\n\n**10/10** importable files leveraged (0 uncategorized, 1 quarantined).\n\n## By file\n\n- `20240401` — mapped\n- `channels` — mapped\n- `employeelist` — mapped\n- `groups` — mapped\n- `loginaudit` — quarantined (not imported)\n- `organizationposts` — mapped\n- `organizationprofile` — mapped\n- `orgunits` — mapped\n- `pagefollowers` — mapped\n- `sharedcalendars` — mapped\n- `users` — mapped\n"
+},
+{
+"id": "_STRUCTURE",
+"title": "Vault structure",
+"type": "structure",
+"body": "\n# 🗺️ Vault structure — what goes where\n\nBuilt by Second Brain Link · sources: **google_workspace, linkedin_company, slack**. Folders generate only if the data exists, so this brain is the subset your exports support. ✅ = present here · ◻️ = empty for this export · ⏳ = written by `analyze.py` (the value/goals step, run after the build).\n\n## Layers (the knowledge graph)\n\n- ✅ **`00-org/`** — THE ORGANIZATION — org identity + the data-handling (data-controller) note.\n- ✅ **`10-people/`** — PEOPLE — employees, customers, vendors and correspondents, merged across sources; `relationship:` classifies"
+},
+{
+"id": "_SUMMARY",
+"title": "_SUMMARY",
+"type": "note",
+"body": "# Brain seed summary — Acme Robotics\n\nBuilt: 2026-10-02 · subject: company · provider: claude · emitters: obsidian\nSources: **google_workspace, linkedin_company, slack**\n\nCoverage: **10/10** importable files leveraged (0 uncategorized, 1 quarantined, 0 need a mapping).\n\n## Notes per layer\n\n| Layer | Notes |\n|---|---|\n| `00-org/` | 2 |\n| `10-people/` | 5 |\n| `15-organizations/` | 8 |\n| `30-content/` | 2 |\n| `60-knowledge/` | 1 |\n| `90-synthesis/` | 3 |\n| `_memory/` | 1 |\n| `_notes/` | 1 |\n| **total** | **28** |\n\nKey buckets — people: **5** · organizations: **8** · places: **0** · interests: **0"
+},
+{
+"id": "_memory/README",
+"title": "README",
+"type": "note",
+"body": "# Memory\n\nWhat this brain and its agents remember — preferences you stated, corrections, and lessons from real outcomes. Plain notes you can read, edit and delete; the engine never touches this folder.\n\n- `brain.md` — the main chat · `shared.md` — facts every agent should know · one note per agent (`job-search.md`, …)\n- lines marked *agent* were inferred by an agent — edit or remove any you disagree with (or switch the brain to review-first: `memory.py policy review`)\n- `.store/` — the machine log the notes are rendered from\n\nTool: `memory.py` (ships with Second Brain Link and every plugin) — "
+}
+],
+"edges": [
+{
+"a": "10-people/Alan Turing",
+"b": "15-organizations/Acme Robotics",
+"type": "linked",
+"w": 0.3,
+"src": "google_workspace"
+},
+{
+"a": "10-people/Alan Turing",
+"b": "15-organizations/Acme Robotics",
+"type": "works_at",
+"w": 0.4,
+"src": "google_workspace"
+},
+{
+"a": "10-people/Alan Turing",
+"b": "15-organizations/Research",
+"type": "member_of",
+"w": 0.6,
+"src": "google_workspace"
+},
+{
+"a": "10-people/Grace Hopper",
+"b": "15-organizations/Acme Robotics",
+"type": "linked",
+"w": 0.3,
+"src": "google_workspace"
+},
+{
+"a": "10-people/Grace Hopper",
+"b": "15-organizations/Acme Robotics",
+"type": "works_at",
+"w": 0.4,
+"src": "google_workspace"
+},
+{
+"a": "10-people/Grace Hopper",
+"b": "15-organizations/Engineering",
+"type": "member_of",
+"w": 0.6,
+"src": "google_workspace"
+},
+{
+"a": "10-people/Katherine Johnson",
+"b": "15-organizations/Acme Robotics",
+"type": "linked",
+"w": 0.3,
+"src": "google_workspace"
+},
+{
+"a": "10-people/Katherine Johnson",
+"b": "15-organizations/Acme Robotics",
+"type": "works_at",
+"w": 0.4,
+"src": "google_workspace"
+},
+{
+"a": "10-people/Katherine Johnson",
+"b": "15-organizations/Flight",
+"type": "member_of",
+"w": 0.6,
+"src": "google_workspace"
+},
+{
+"a": "15-organizations/Acme Robotics",
+"b": "10-people/Alan Turing",
+"type": "member_of",
+"w": 0.5,
+"src": "google_workspace"
+},
+{
+"a": "15-organizations/Acme Robotics",
+"b": "10-people/Grace Hopper",
+"type": "member_of",
+"w": 0.5,
+"src": "google_workspace"
+},
+{
+"a": "15-organizations/Acme Robotics",
+"b": "10-people/Katherine Johnson",
+"type": "member_of",
+"w": 0.5,
+"src": "google_workspace"
+},
+{
+"a": "60-knowledge/meetings",
+"b": "10-people/Alan Turing",
+"type": "attended",
+"w": 0.2,
+"src": "google_workspace"
+},
+{
+"a": "60-knowledge/meetings",
+"b": "10-people/Grace Hopper",
+"type": "attended",
+"w": 0.2,
+"src": "google_workspace"
+},
+{
+"a": "60-knowledge/meetings",
+"b": "10-people/Katherine Johnson",
+"type": "attended",
+"w": 0.2,
+"src": "google_workspace"
+},
+{
+"a": "90-synthesis/network-map",
+"b": "15-organizations/Acme Robotics",
+"type": "linked",
+"w": 0.3,
+"src": null
+},
+{
+"a": "Home",
+"b": "90-synthesis/network-map",
+"type": "linked",
+"w": 0.3,
+"src": "google_workspace"
+},
+{
+"a": "Home",
+"b": "90-synthesis/positioning-gaps",
+"type": "linked",
+"w": 0.3,
+"src": "google_workspace"
+},
+{
+"a": "Home",
+"b": "90-synthesis/positions-i-hold",
+"type": "linked",
+"w": 0.3,
+"src": "google_workspace"
+}
+],
+"queries": [
+"Who works on engineering?",
+"Grace Hopper",
+"research team",
+"flight",
+"what does our company do?",
+"slack channels for launch",
+"Alan"
+]
+}

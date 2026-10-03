@@ -871,6 +871,19 @@ def cmd_remove(a):
     out({"removed": rec["key"], "why": a.why, "archive": str(root() / "removed.jsonl")})
 
 
+def cmd_count(a):
+    """One number for a Harness goal's progress bar - outcomes the founder confirmed (a meeting,
+    a yes, a term sheet), never activity such as applications filed or emails drafted."""
+    recs = list(load().values())
+    meet = ("meeting", "term_sheet", "accepted")
+    replied = ("replied", "meeting", "passed", "accepted", "rejected", "term_sheet")
+    n = {"meetings": sum(1 for r in recs if r["status"] in meet),
+         "replies": sum(1 for r in recs if r["status"] in replied),
+         "accepted": sum(1 for r in recs if r["status"] == "accepted"),
+         "term_sheets": sum(1 for r in recs if r["status"] == "term_sheet")}[a.what]
+    print(n)
+
+
 def cmd_stats(a):
     recs = load()
     out({"targets": len(recs),
@@ -928,6 +941,8 @@ def main():
     g.add_argument("--by", default="agent", choices=["founder", "agent"]); g.set_defaults(f=cmd_remove)
     sub.add_parser("snooze").set_defaults(f=cmd_stamp)
     sub.add_parser("mark-run").set_defaults(f=cmd_stamp)
+    g = sub.add_parser("count"); g.add_argument("what", choices=["meetings", "replies", "accepted", "term_sheets"])
+    g.set_defaults(f=cmd_count)
     a = ap.parse_args()
     a.f(a)
 

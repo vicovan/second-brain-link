@@ -66,5 +66,19 @@
         "id": "mapsKey"
       }
     ]
-  }
+  },
+  "templates": "harness",
+  "outcomes": {
+    "planned": {
+      "label": "trips planned",
+      "cmd": "itinerary.py count planned"
+    },
+    "booked": {
+      "label": "trips booked",
+      "cmd": "itinerary.py count booked"
+    }
+  },
+  "preflight": [
+    "profile_present"
+  ]
 }

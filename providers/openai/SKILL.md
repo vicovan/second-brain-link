@@ -1,6 +1,6 @@
 ---
 name: second-brain-link
-description: Turn a personal OR company data export into a private, local, AI-queryable "digital twin" or Company Brain — an Obsidian vault (optionally a GBrain repo). 25 sources auto-detected — LinkedIn, Facebook, Instagram, Google Takeout, Amazon, X, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok; company-side LinkedIn Page, Google Workspace, Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, mail archives, Microsoft 365, Teams — plus a self-adapting mapper for unknown exports. 100% local, zero network, message text never read. Use whenever the user points at a data export (.zip or folder) or asks to build/map/import their data into a second brain, digital twin, knowledge vault, or company brain — even without those exact words.
+description: Turn a personal OR company data export into a private, local, AI-queryable "digital twin" or Company Brain — an Obsidian vault (optionally a GBrain repo). 27 sources auto-detected — LinkedIn, Facebook, Instagram, Google Takeout, Amazon, X, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok; company-side LinkedIn Page, Google Workspace, Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, mail archives, Microsoft 365, Teams, plus document stores (a Git docs repo, Google Drive) linked read-only with sensitive files kept metadata-only — and a self-adapting mapper for unknown exports. 100% local, zero network, message text never read. Use whenever the user points at a data export (.zip or folder) or asks to build/map/import their data into a second brain, digital twin, knowledge vault, or company brain — even without those exact words.
 ---
 
 # Second Brain Link — multi-source digital-twin / Company Brain (OpenAI)
@@ -20,9 +20,9 @@ nothing is uploaded (the only opt-in networked step is `--gbrain-import`).
 Sources are **drop-in adapters** under `scripts/sources/personal/` (linkedin,
 google, x, whatsapp, github, youtube, strava, …) and `scripts/sources/company/`
 (linkedin_company, google_workspace, slack, notion, confluence, jira, salesforce,
-hubspot, zendesk, email, microsoft365, teams) — or **declarative JSON mappings**
+hubspot, zendesk, email, microsoft365, teams, git_docs, google_drive) — or **declarative JSON mappings**
 under `mappings/sources/` (facebook, instagram, reddit, spotify, tiktok, amazon; a mapping
-wins on a name clash). 25 sources total; per-source export/import steps live in
+wins on a name clash). 27 sources total; per-source export/import steps live in
 `references/SOURCES.md`. Each knows one export's format (CSV/JSON/ICS/JS/TXT/MD/
 XML/MBOX/EML/GPX) and pushes
 records into one canonical `Collector` (`scripts/sources/common.py`). Output
@@ -30,6 +30,23 @@ targets are **drop-in emitters** under `scripts/emitters/` (obsidian = default,
 gbrain = opt-in). The builder (`scripts/build_vault.py`) renders from the
 collector, so multiple sources merge into one graph and **a person seen in more
 than one source becomes one note tagged with each**.
+
+**Document stores — `git_docs` (a docs repository) and `google_drive` (a Drive for desktop
+folder or a Drive Takeout).** These are LINKED, never copied, and read-only:
+```bash
+python3 scripts/doclink.py init --kind git_docs --root "<local clone>" \
+    --out data/company/<company>/git_docs/          # or --kind google_drive
+python3 scripts/docscan.py scan "<local clone>"    # metadata-only preview of the tiering
+```
+Every file is tiered by a deterministic local scanner (no AI): clean documents come in
+with their content; anything with credentials, keys, env-var snapshots, dense contact
+data, archives or pen-test reports becomes a **metadata-only stub** — never try to read
+the original, and never read anything outside the vault. Output: `65-documents/`
+(Documents.md, `_index/` by category / original folder / customer, `_DOCS_COVERAGE.md`
+with a row for every file). Per-company tuning lives next to the link file in
+`rules/sensitivity.json` / `rules/taxonomy.json` (same shape as `mappings/docs/*.json`:
+entity aliases, re-routes, excludes, false-positive allows) — never in the skill.
+After a build, `python3 scripts/docscan.py audit <brain>` must report 0 hits.
 
 **Deterministic core, AI only on the residual:** detection, parsing, the whole
 vault, the mindmap, and entity resolution run with zero API tokens. Spend
@@ -50,6 +67,10 @@ The scripts (run with `python3`):
   `--structure`, `--overrides`, `--subject
   person|company` (default auto), `--emit obsidian|gbrain|both` (default
   obsidian), `--full`, `--doctor`, `--gbrain-import`, `--mappings <dir>`.
+- `scripts/harness.py` — goals, routines, reports and activity under `96-agents/`
+  (spec: `references/harness.md`); `harness.py due` decides what to run with no model call.
+- `scripts/retrieval.py` (graph retrieval, identical to Studio's), `scripts/query.py` (exact
+  answers by read-only SQL), `scripts/eval.py` (offline benchmarks; `--harness`).
 - `scripts/diagrams.py`, `scripts/selfheal.py`, `scripts/new_source.py`,
   `scripts/mapping.py` (JSON-mapping interpreter), `scripts/harvester.py`
   (universal shape recognizer) — support.

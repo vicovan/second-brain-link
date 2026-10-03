@@ -192,6 +192,62 @@ def strip_pii(text: str) -> str:
     text = EMAIL_RE.sub("[email removed]", text)
     return text
 
+_PHONE_SCRUB_RE = re.compile(r"(?<![\w.])\+?\(?\d[\d \t().-]{7,}\d(?!\w)")
+_DATE_TOKEN_RE = re.compile(r"(?<!\d)(?:19|20)\d{2}[-./](?:0[1-9]|1[0-2])[-./](?:[0-2]\d|3[01])(?!\d)"
+                            r"|(?<!\d)(?:19|20)\d{6}[-_T]\d{4,6}(?!\d)"
+                            r"|(?<!\d)\d{1,2}:\d{2}(?::\d{2})?(?!\d)")
+
+
+def _luhn_ok(digits: str) -> bool:
+    total = 0
+    for i, ch in enumerate(reversed(digits)):
+        n = int(ch)
+        if i % 2:
+            n *= 2
+            if n > 9:
+                n -= 9
+        total += n
+    return total % 10 == 0
+
+
+def scrub_body(text: str) -> str:
+    """Redact e-mail addresses AND phone-number-shaped digit runs from a document
+    body before it enters the vault (documents can carry contact sheets in prose).
+    Dates, date ranges, times and short numbers are kept: dates/times are shielded
+    first, then a remaining run counts as a phone when it holds 9–15 digits."""
+    if not text:
+        return text
+    text = EMAIL_RE.sub("[email removed]", text)
+    shields = []
+
+    def _shield(m):
+        shields.append(m.group(0))
+        return f"\x00{len(shields) - 1}\x00"
+    text = _DATE_TOKEN_RE.sub(_shield, text)
+
+    def _phone(m):
+        s = m.group(0)
+        d = re.sub(r"\D", "", s)
+        if 13 <= len(d) <= 19 and _luhn_ok(d):
+            return "[card number removed]"      # even a public test PAN
+        if len(d) < 9 or len(d) > 15:
+            return s
+        # number LISTS are not phones: an SVG viewBox "0 0 1000 700", coordinates,
+        # table rows. A phone's digit groups have 2+ digits (only a "+1" country code
+        # may be shorter) and there are at most 5 of them.
+        groups = re.findall(r"\d+", s)
+        tail = groups[1:] if s.lstrip().startswith("+") else groups
+        if any(len(g) < 2 for g in tail) or len(groups) > 5:
+            return s
+        return "[phone removed]"
+    text = _PHONE_SCRUB_RE.sub(_phone, text)
+    return re.sub(r"\x00(\d+)\x00", lambda m: shields[int(m.group(1))], text)
+
+
+# Document tiers that may carry content into the vault (docscan.IMPORT_TIERS).
+DOC_IMPORT_TIERS = {"clean", "unverified"}
+
+
 def fix_mojibake(s: str) -> str:
     """Facebook/Instagram JSON often double-encodes UTF-8 as latin-1."""
     if not isinstance(s, str):
@@ -340,6 +396,9 @@ class Collector:
         self._comment_keys = set()          # (source, date, sha1(text)) dedupe
         self._msg_keys = set()              # (source, nk(party), ts) dedupe (ts-bearing only)
         self.uncategorized = []             # {source,file,columns,rows}
+        self.documents = []                 # canonical via add_document (docs layer)
+        self.doc_coverage = []              # (source, root_label, rel, status) — every walked path
+        self.linked_sources = []            # {source, id, label, root, files, …} per link
         self.sources = set()
         self.companies = set()
         self.log = []
@@ -627,7 +686,7 @@ class Collector:
             self.searches.append(SearchQuery(q, source=source, date=iso_date(date)))
 
     def add_event(self, source, name, date="", kind="event", location="",
-                  description="", attendees=None, tags=None, url="", value=""):
+                  description="", attendees=None, tags=None, url="", value="", org=""):
         """THE canonical event verb (replaces raw events.append): a dated
         happening — calendar event/meeting, CRM deal or campaign, activity.
         `kind` routes rendering (deal/campaign → pipeline in company brains;
@@ -657,6 +716,9 @@ class Collector:
             ev["url"] = url
         if value:
             ev["value"] = str(value).strip()
+        org = fix_mojibake((org or "").strip())
+        if org:
+            ev["org"] = org            # the account a deal belongs to (links the deal note)
         self.events.append(ev)
 
     # ---- shopping / commerce (35-shopping): what the owner buys & consumes.
@@ -737,6 +799,47 @@ class Collector:
         if d:
             rec["last"] = max(rec["last"], d)
             rec["first"] = min(rec["first"], d) if rec["first"] else d
+
+    # ---- documents (the `docs` layer, fed by git_docs / google_drive)
+    # Content fields: `body` (a clean text document's own text), `excerpt`,
+    # `headings`, `copy_from` (the ORIGINAL file the renderer copies into the
+    # vault) and each render's `copy_from`. They survive ONLY for an importable
+    # tier ("clean", or "unverified" = a binary with no extractable text, which
+    # may be copied but has no body). Every other tier is a metadata-only STUB:
+    # the content fields are dropped HERE, before the record exists, so no
+    # adapter or renderer can leak a sensitive document by accident. `--full`
+    # does NOT lift this — a secret is not "the owner's PII".
+    _DOC_CONTENT_KEYS = ("body", "excerpt", "headings", "copy_from", "word_count",
+                         "mentions", "goals")
+
+    def add_document(self, source, rec):
+        rec = dict(rec or {})
+        tier = str(rec.get("sensitivity") or "").strip() or "unverified"
+        rec["sensitivity"] = tier
+        if tier not in DOC_IMPORT_TIERS:
+            for k in self._DOC_CONTENT_KEYS:
+                rec.pop(k, None)
+            rec["renders"] = [{**r, "copy_from": None, "status": "stub"}
+                              for r in (rec.get("renders") or [])]
+            rec["assets"] = []
+        else:
+            if tier != "clean":                 # unverified: a copy, never a body
+                for k in ("body", "excerpt", "headings", "word_count", "mentions", "goals"):
+                    rec.pop(k, None)
+            if rec.get("body"):
+                rec["body"] = scrub_body(rec["body"])
+            if rec.get("excerpt"):
+                rec["excerpt"] = scrub_body(rec["excerpt"])
+            if rec.get("headings"):
+                rec["headings"] = [scrub_body(h) for h in rec["headings"]]
+            if rec.get("goals"):
+                rec["goals"] = [scrub_body(g) for g in rec["goals"]]
+            rec["renders"] = [r if (r.get("sensitivity") in DOC_IMPORT_TIERS)
+                              else {**r, "copy_from": None, "status": "stub"}
+                              for r in (rec.get("renders") or [])]
+        rec["source"] = source
+        self.sources.add(source)
+        self.documents.append(rec)
 
     def add_uncategorized(self, source, filename, columns, rows):
         """Stash a file no adapter/mapping claimed (columns + sample rows) so the

@@ -33,10 +33,11 @@ target precisely, never invent, verify the PDF the way a machine will read it.
 | `<profile>/profile.md` (in the user's data, resolved at step 0) | ALWAYS. The only allowed source of facts, titles, numbers, contacts. |
 | `references/tailoring-playbook.md` | ALWAYS. Intake, location decision, title mirroring, keyword strategy, human-gate rules, variants by company type. |
 | `references/ats-checklist.md` | Before delivering. QA gates. |
+| `<app dir>/posting.md` | Written at step 1 (or by job-apply). The JD text the gates check vocabulary against. |
 | `<app dir>/fit.md` | ALWAYS when it exists (job-apply writes it). The two-pass requirement table, keywords, reviewer doubts, gaps. Build the CV from its `existing`/`supported` rows only. |
 | `<profile>/archetypes.md` | ALWAYS. The lane this job belongs to decides the headline, summary skeleton, lead proof points and bullet priority. |
 | `scripts/lint_cv.py` | Before building and after every edit. The deterministic gate — chronology, fact gate, de-tell, self-disqualifiers. Its result goes into `gates.json`. |
-| `assets/example-cv.md` | Once, to see the content-JSON shape and the tone that worked. |
+| `assets/example-cv.md` | Once, to see the Markdown shape and the register to write in. It passes every gate; copy its shape, never its (fictional) facts. |
 | `scripts/build_cv.py` | To render JSON → PDF (`--docx` for Word too). Pure Python + reportlab. |
 | `scripts/check_pdf.py` | To verify keyword coverage, page count, extraction order, fonts. |
 
@@ -78,8 +79,13 @@ archetype is not tailored** — say so and stop; that is a targeting problem, no
   location/work mode, must-have keywords, nice-to-haves, domain, culture
   signals, the three silent questions). Write it in your reasoning; do not
   dump it on the user.
+- **Save the JD text as `<outdir>/posting.md`** unless job-apply already did. `lint_cv.py` reads
+  it to allow the posting's own vocabulary; without it every posting-only term fails.
 - **Write `<outdir>/fit.md`** (playbook §1b) unless job-apply already did: pass 1 from the JD
-  alone, pass 2 against the profile, then `## Keywords`, `## Reviewer doubts`, `## Gaps`.
+  alone, pass 2 against the profile, then `## Keywords`, `## Bullet plan`, `## Reviewer doubts`,
+  `## Gaps`. The **bullet plan** maps each `critical`/`high` requirement to the one role and the
+  one profile fact that proves it, and names the three roles that get depth. The CV is written
+  from the plan; a bullet that serves no row is not written.
 
 ### 2. Decide the contact set
 Apply playbook §2. Output exactly one phone + one primary location (dual city
@@ -93,17 +99,17 @@ final message.
 - Read `profile/profile.md` in full.
 - **Title mirroring — playbook §3, the three-rung ladder.** Mirror the target title verbatim in the
   headline AND in the first sentence of the summary; use an allowed title variant for each role
-  where one matches; otherwise keep the true title and add a one-line **scope-equivalence** sentence
-  in the JD's own vocabulary. **Never write a title the user did not hold** — titles are the most
-  verifiable thing on a CV.
+  where one matches; otherwise keep the true title and add a one-line **context line** — team
+  size, who the role reported to, what it covered. **Never write a title the user did not hold** —
+  titles are the most verifiable thing on a CV.
 - **Set the title for EVERY role, not just the headline.** Go through
   `profile/profile.md` **§4.0 Allowed title variants** and pick the closest variant per role using
   the target map there. `§4.0` is a closed list — nothing outside it may appear as a title.
-- **Add a scope-equivalence line under any role whose title still does not match the target's
-  vocabulary** (playbook §3, rung 3): one sentence, using the JD's own noun, describing what they
-  actually did. e.g. target *Engineering Director* → under a CTO role at a scale-up:
-  *"Directed the engineering organisation across two sites, doubling it while running a full
-  platform rebuild."* This is where most of the matching happens and it stays entirely truthful.
+- **Add a context line under any role whose title still reads distant from the target**
+  (playbook §3, rung 3): one plain, factual sentence — *"Led 23 engineers and two managers,
+  reporting to the CTO."* It states the reach in numbers a recruiter can weigh. It **never names
+  the target title or a level** ("VP-level", "director-level scope", "scope equivalent to…"): a
+  candidate describing the level they want reads as tailoring, and `lint_cv.py` fails it.
 - Their titles are often **more senior** than the target — keep them, never downgrade.
 - **Rewrite every past role for this target — playbook §3b.** Four moves: (1) reframe each
   company's descriptor line toward the target's world; (2) **select** 2–5 bullets per recent role
@@ -115,17 +121,18 @@ final message.
 - Build the Core Competencies list: JD must-haves first (both forms), then
   nice-to-haves, then the user's strongest adjacent keywords. 40–60 terms.
 - Apply the company-type variant (playbook §7) and regional convention (§8).
-- Decide the older-roles depth (merge studios unless relevant).
+- Decide the older-roles depth (merge roles more than ten years back unless relevant).
 - For full-time employee targets, decide how the user's own ventures and side
   projects are framed (playbook §6); if unclear, ask the user the one framing
   question and use the default (current venture as the current role) meanwhile.
 
 ### 3b. Write the summary — playbook §3c
-- **Professional Summary, rewritten from scratch every time.** Four sentences, implied subject (no
-  "I"): target title verbatim and bolded + strongest proof · the JD's riskiest `critical`
-  requirement answered with a specific fact · their #2–#3 compressed · a scale credential (team,
-  org, budget, users) from the profile. 90–120 words, the top five `fit.md` keywords inside it.
-  Quote a distinctive line from the JD back at them where one exists.
+- **Professional Summary, rewritten from scratch every time.** Three or four sentences, implied
+  subject (no "I"): target title verbatim and bolded + strongest proof · the JD's riskiest
+  `critical` requirement answered with a specific fact · a scale credential (team, org, users)
+  from the profile. **55–90 words, no sentence over 28 words, at least one under 12.** The top
+  five `fit.md` keywords inside it. Plain words: a recruiter who is not an engineer must
+  understand every sentence.
 - **Never name a gap on the CV** (playbook §3c, "Gaps never go on the CV"). Gaps live in
   `fit.md` for interview prep.
 - **No "Why This Role" section** (playbook §3d). That material goes to the cover letter and the
@@ -165,14 +172,22 @@ title that is not in the profile. Re-run until it prints `RESULT: PASS`; the res
 Then read the Markdown back for the tells the linter cannot count. The short version, in order of
 how loudly each one shouts:
 
-1. **Bold lead-ins on every bullet** — at most half per role, never three in a row. Rewrite the
-   surplus to open with a verb or with the number.
-2. **Core Competencies as one `·` wall** — convert it to a `kv` block, four or five labelled
+1. **The same bullet shape everywhere.** `**Label:** a, b, c` on every bullet (the bold-lead-in
+   tell's replacement) — at most one per role, three per CV. Bold lead-ins on at most half the
+   bullets. Rewrite the rest to open with a verb or with the number.
+2. **Long sentences and jargon.** No bullet sentence over 32 words; no more than three acronyms or
+   product names in one bullet; no system-design vocabulary the posting does not use
+   (*deterministic, orchestration, end to end*, algorithm names). Say what changed for whom.
+3. **The headline** — the posting's title first, then one short differentiator, ≤ 80 characters.
+   The title never reappears in the bullets, and no "-level" phrasing anywhere.
+4. **Core Competencies as one `·` wall** — convert it to a `kv` block, four or five labelled
    groups, ≤ 7 terms each.
-3. **Em-dashes** — two per page, maximum. Count them.
-4. **Even sentence lengths** — put at least one sentence under nine words in the summary.
-5. **Round numbers** (100%, 3x, 50+) — use the real uneven figure.
-6. **Banned phrases** — *proven track record, leveraging, spearheaded, seamless, cutting-edge,
+5. **Em-dashes** — two per page, maximum. Count them.
+6. **Even sentence lengths** — put at least one sentence under twelve words in the summary.
+7. **Round numbers** (100%, 3x, 50+) — use the real uneven figure.
+8. **One date format** — `MM/YYYY` throughout when the profile has months, `YYYY` throughout when
+   it does not. Never both on one CV.
+9. **Banned phrases** — *proven track record, leveraging, spearheaded, seamless, cutting-edge,
    passionate about, at the intersection of, not just X but Y*. Full list in the playbook.
 
 **Rewrite, do not just unbold or swap punctuation** — deleting a lead-in leaves a broken sentence
@@ -208,10 +223,15 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/cv-tailor/scripts/check_pdf.py <outdir>/<fi
    --keywords "must1;must2;..." --nice "nice1;nice2" --title "<target title>"
 ```
 Fix every FAIL and every "missing" keyword (if a keyword is not truthfully
-placeable, leave it out and tell the user). Then render page images if you can
-(`pdftoppm -jpeg -r 70 file.pdf page`) and look at them: no orphaned role
-headers at a page bottom, no overflow, bold lead-ins scan as a checklist.
-Run through `references/ats-checklist.md`.
+placeable, leave it out and tell the user). `check_pdf.py` also fails a bullet whose wrapped
+line fell back to the left margin — a human reads that as a broken document.
+Then render the pages and **look at them**:
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/cv-tailor/scripts/check_pdf.py <outdir>/<file>.pdf --png <outdir>/_pages
+```
+Read each PNG: every bullet whole with a hanging indent, no role header alone at a page bottom,
+no role line wrapping onto a second line (shorten the descriptor), no overflow. Run through
+`references/ats-checklist.md`.
 
 ### 7. Deliver
 - Name the PDF and its folder in one line so the surface can link it. Add DOCX only if
@@ -277,10 +297,10 @@ Four sentences. Target title verbatim and **bolded** in the first one.
 City, Country · what the company does
 <https://northwind.example>
 
-An optional italic scope-equivalence line goes here, after a blank line.
+*An optional italic context line goes here, after a blank line: team, reporting line, reach.*
 
-- **Bold lead-in:** the outcome-first bullet.
-- A bullet with no lead-in — at most half of them should carry one.
+- Opens with a verb, says what changed for whom, then how.
+- **A bold lead-in:** at most one "Label:" bullet per role.
 
 #### Earlier ventures and roles
 
@@ -303,7 +323,8 @@ page, and no recruiter reads past its third line. Same keywords, same ATS value,
 visual noise.
 
 **A role's meta lines are the ones directly under the `###`, with no blank line between them**:
-italic is the dates, `<...>` is the company URL, anything else is the location and descriptor. The
+italic is the dates, `<...>` is a company URL (one line each; an acquired employer may carry both
+the new owner's site and the old one), anything else is the location and descriptor. The
 blank line is what separates them from a following paragraph — keep it.
 
 Section order for ATS: Professional Summary → Core Competencies → Work Experience →
@@ -321,6 +342,9 @@ Section order for ATS: Professional Summary → Core Competencies → Work Exper
   not volunteered on the CV where it only ever costs the user a screen.
 - **One link in the header, and it is LinkedIn**, unless the profile names another. Every extra link
   is a place the reader leaves the page.
+- **A link always shows its URL as the visible text** — `[example.com](https://example.com)`,
+  never `[Project Name](https://…)`. A printed CV, a PDF-to-text parser and an ATS all drop the
+  hidden target, so a linked title leaves the reader with no address at all.
 - **Mark remote roles as remote.** When someone worked for a foreign employer from their own
   country, write `Remote from <country> · <Employer country> company (<city>)`, never just the
   employer's city — otherwise the reader assumes they lived there, and the assumption surfaces
@@ -334,3 +358,10 @@ Section order for ATS: Professional Summary → Core Competencies → Work Exper
 - Strictly reverse-chronological, consistent date format; overlaps framed per the profile's
   framing policy.
 - No "Why …" section, no first person, no named gap — on any employment CV.
+- **Every bullet in the three most recent roles serves a `fit.md` requirement.** A true,
+  impressive bullet that answers nothing in the posting is cut (`lint_cv.py --fit` fails more than
+  one per role).
+- **Employment roles lead.** For an employee-track application the most recent employed role sits
+  on top; the user's own venture or open-source project is framed per the profile's framing
+  policy, normally its own small section, never above the employed role.
+- **The CV agrees with the user's LinkedIn** on titles, employers and dates — a recruiter checks.

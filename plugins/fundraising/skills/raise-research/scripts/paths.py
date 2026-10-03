@@ -34,10 +34,12 @@ ENV_HOME = "FUNDRAISE_HOME"
 _LAYERS = {
     "person":  {"root": "00-me",  "people": "10-people", "orgs": "15-organizations",
                 "career": "40-career", "fundraising": "46-fundraising",
-                "synthesis": "90-synthesis", "goals": "95-goals", "notes": "_notes"},
+                "synthesis": "90-synthesis", "goals": "95-goals", "notes": "_notes",
+                "agentwork": "96-agents"},
     "company": {"root": "00-org", "people": "10-people", "orgs": "15-organizations",
                 "career": "40-pipeline", "fundraising": "46-fundraising",
-                "synthesis": "90-synthesis", "goals": "95-goals", "notes": "_notes"},
+                "synthesis": "90-synthesis", "goals": "95-goals", "notes": "_notes",
+                "agentwork": "96-agents"},
 }
 LAYER = _LAYERS["person"]["fundraising"]
 

@@ -74,3 +74,15 @@ drop the task over a permission prompt; everything else can continue meanwhile.
 If the browser can't be connected, finish every step that doesn't need it and hand over a
 **manual packet**: the form or booking URL, the files to attach (with their paths), and every
 answer or detail ready to copy — then say in one line what was skipped and why.
+
+## While you drive the browser
+
+- **Say what you're about to do, then do it.** One line before each fill or click — what, why,
+  and where the value came from: `Filling "Years of experience": 12 ← [[00-me/identity]]`. A
+  value with no source in the brain is left blank and said so: `Leaving "Salary" blank — no
+  source in your brain`. Watching a cursor move with no reason reads as possession; a stated
+  reason reads as help — and it is the user's own brain filling the form.
+- **When the user takes over** (a login, a code, a CAPTCHA, or they just did something in the
+  tab), **re-read the page before you continue** and say what changed: "You filled the email
+  field — continuing from the cover-letter step." Never resume from a stale plan.
+- **One tab at a time.** Helpers may research in parallel; only one run fills a form.

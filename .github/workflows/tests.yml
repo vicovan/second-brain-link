@@ -10,6 +10,10 @@ jobs:
           python-version: "3.x"
       - name: Run test harness (stdlib only — no install step)
         run: python3 tests/run.py
+      # memory.py ships byte-identical in the engine and every plugin; its own suite also
+      # checks the copies match (the plugin build only compares plugin copies to each other).
+      - name: Memory layer tests
+        run: python3 tests/test_memory.py
       - name: Engine is the single source of truth (provider manifests are thin)
         run: |
           test -f engine/scripts/build_vault.py

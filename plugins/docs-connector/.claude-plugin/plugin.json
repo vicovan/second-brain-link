@@ -1,0 +1,14 @@
+{
+  "name": "docs-connector",
+  "version": "0.1.0",
+  "description": "Pull a company's documents from a remote store — a Git repository by URL, or a Google Drive folder through the Drive API — into a local mirror and link it to a brain, so the engine's git_docs / google_drive sources can seed a Company Brain from it. The engine stays zero-network and read-only; this plugin is the separate surface that fetches. Developer preview.",
+  "author": {"name": "Second Brain Link", "url": "https://secondbrainlink.com"},
+  "homepage": "https://secondbrainlink.com",
+  "license": "MIT",
+  "keywords": ["documents", "google-drive", "git", "company-brain", "connector", "second-brain"],
+  "network": {
+    "required": true,
+    "why": "Clones / fast-forwards a Git repository the user names (with the user's own SSH key or credential helper), and reads Google Drive through the Drive API v3 with a read-only scope and the user's OWN OAuth client. Files land in a local mirror outside the data folder; the Second Brain Link engine then reads that mirror with zero network calls and tiers every file with its local sensitivity scanner. Nothing is uploaded anywhere.",
+    "endpoints": ["the Git remote the user configures", "www.googleapis.com", "oauth2.googleapis.com", "accounts.google.com"]
+  }
+}

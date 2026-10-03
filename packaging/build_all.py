@@ -28,6 +28,15 @@ import sys
 import time
 from pathlib import Path
 
+# Windows consoles default to the ANSI code page (cp1252), where this script's "✓"/"→"
+# output raises UnicodeEncodeError and aborts the build (Studio v1.3.0's Windows CI).
+# Never let progress output crash packaging.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 DIST = REPO / "dist"
@@ -114,7 +123,7 @@ def main() -> int:
         return check()
     print("Building everything installable (engine + plugins, Claude + Codex)")
     ok = True
-    engine_version = (REPO / "engine" / "VERSION").read_text().strip() if (REPO / "engine" / "VERSION").is_file() else "0"
+    engine_version = (REPO / "engine" / "VERSION").read_text(encoding="utf-8").strip() if (REPO / "engine" / "VERSION").is_file() else "0"
     entries = []
     for prov in ("claude", "openai"):
         if not build_skill.build(prov):

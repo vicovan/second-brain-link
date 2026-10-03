@@ -268,8 +268,8 @@ def content_to_md(content):
                     out.append(f"*{b['dates']}*")
                 if b.get("where"):
                     out.append(b["where"])
-                if b.get("url"):
-                    out.append(f"<{b['url']}>")
+                for u in (b.get("url") or "").split():
+                    out.append(f"<{u}>")
                 out.append("")
             elif bt == "spacer":
                 out += [f"<!-- spacer: {b.get('height', 4)} -->", ""]
@@ -329,7 +329,9 @@ def md_to_content(text):
                 if re.match(r"^\*[^*].*\*$", meta):
                     role["dates"] = meta[1:-1]
                 elif re.match(r"^<https?://[^>]+>$", meta):
-                    role["url"] = meta[1:-1]
+                    # a role may carry several sites (an acquired employer: old and new
+                    # owner); they are kept space-separated, one `<url>` line each
+                    role["url"] = (role.get("url", "") + " " + meta[1:-1]).strip()
                 else:
                     role["where"] = meta
                 i += 1
@@ -347,7 +349,14 @@ def md_to_content(text):
             continue
 
         if stripped.startswith("- "):
-            item = stripped[2:].strip()
+            # a list item may wrap onto continuation lines (indented or lazy); join them, or the
+            # wrapped half becomes a stray paragraph and the PDF bullet breaks mid-sentence
+            parts = [stripped[2:].strip()]
+            while i + 1 < len(lines) and lines[i + 1].strip() \
+                    and not re.match(r"^\s*(#|- |<!--)", lines[i + 1]):
+                i += 1
+                parts.append(lines[i].strip())
+            item = " ".join(parts)
             if kind == "kv":
                 m = re.match(r"^\*\*(.+?):\*\*\s+(.*)$", item, re.S)
                 pair = [m.group(1), m.group(2)] if m else [item, ""]

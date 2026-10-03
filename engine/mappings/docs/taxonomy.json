@@ -1,0 +1,1190 @@
+{
+  "_comment": "Generic, company-agnostic taxonomy for the document-store sources (git_docs, google_drive), read by scripts/doctax.py. Every document gets a category (where its note lives under the docs layer), a doc_type, and optionally an entity (customer/vendor/partner/investor/counterparty) - inferred from PATH SEGMENTS and FILENAME TOKENS only, never from content. Rules are evaluated in order; the first match wins. Per-company overrides use the same shape (rules are PREPENDED so they win; `entities` aliases map a token to a canonical name; an `exclude` rule drops a folder from the brain) and live in the user's data dir, never in this repo.",
+  "version": 1,
+  "categories": {
+    "company/strategy": "Strategy",
+    "company/brand": "Brand",
+    "product": "Product",
+    "engineering": "Engineering",
+    "engineering/runbooks": "Runbooks",
+    "engineering/vendors": "Vendors",
+    "engineering/agent-tooling": "Agent tooling",
+    "customers": "Customers",
+    "sales/rfps": "RFPs & proposals",
+    "sales": "Sales",
+    "finance": "Finance",
+    "fundraising": "Fundraising",
+    "legal-ip": "Legal & IP",
+    "compliance-security": "Compliance & security",
+    "marketing": "Marketing",
+    "research": "Research",
+    "people-hr": "People & HR",
+    "ops": "Operations",
+    "inbox": "Inbox"
+  },
+  "topic_tokens": [
+    "docs",
+    "doc",
+    "documents",
+    "documentation",
+    "notes",
+    "files",
+    "drive",
+    "shared",
+    "my-drive",
+    "general",
+    "misc",
+    "other",
+    "archive",
+    "old",
+    "new",
+    "updated",
+    "final",
+    "draft",
+    "drafts",
+    "v1",
+    "v2",
+    "v3",
+    "v4",
+    "external",
+    "internal",
+    "public",
+    "private",
+    "web",
+    "website",
+    "site",
+    "app",
+    "api",
+    "mobile",
+    "desktop",
+    "platform",
+    "product",
+    "products",
+    "strategy",
+    "plan",
+    "plans",
+    "roadmap",
+    "design",
+    "designs",
+    "ops",
+    "security",
+    "legal",
+    "finance",
+    "marketing",
+    "sales",
+    "research",
+    "reports",
+    "report",
+    "assets",
+    "images",
+    "media",
+    "templates",
+    "scripts",
+    "tools",
+    "data",
+    "deploy",
+    "deployment",
+    "infra",
+    "infrastructure",
+    "release",
+    "releases",
+    "install",
+    "tutorial",
+    "tutorials",
+    "guides",
+    "guide",
+    "use-cases",
+    "seo",
+    "social",
+    "deck",
+    "decks",
+    "fundraise",
+    "fundraising",
+    "costs",
+    "cost",
+    "risk",
+    "dns",
+    "ai",
+    "patent",
+    "patents",
+    "updates",
+    "update",
+    "roadmaps",
+    "webhooks",
+    "load-test",
+    "testing",
+    "tests",
+    "architecture",
+    "competitor-analysis",
+    "core",
+    "common",
+    "src",
+    "_src",
+    "out",
+    "response",
+    "response-final",
+    "more-info",
+    "attachments",
+    "uploads",
+    "scraps",
+    "design-system",
+    "branding",
+    "brand",
+    "pci",
+    "compliance",
+    "policies",
+    "procedures",
+    "operational-guides",
+    "technical-specs",
+    "requirement-mappings",
+    "evidence",
+    "tpsp",
+    "certification"
+  ],
+  "entity_prefix_markers": [
+    "-Access-Credentials",
+    "-Access-",
+    "-Demo-Script",
+    "-Demo-",
+    "-Onboarding",
+    "-Feature-Update",
+    "-RFP",
+    "-Proposal",
+    "-Platform-Presentation",
+    "-Solution-Overview",
+    "-Integration",
+    "-Presentation"
+  ],
+  "rules": [
+    {
+      "id": "agent-tooling",
+      "when": {
+        "segment_any": [
+          ".claude",
+          ".cursor",
+          ".github",
+          ".codex",
+          ".agents",
+          ".windsurf",
+          ".continue"
+        ]
+      },
+      "category": "engineering/agent-tooling",
+      "doc_type": "agent-config"
+    },
+    {
+      "id": "generators",
+      "when": {
+        "segment_any": [
+          "_src",
+          "src-gen",
+          "generators"
+        ]
+      },
+      "category": "engineering/agent-tooling",
+      "doc_type": "generator"
+    },
+    {
+      "id": "ops-config",
+      "when": {
+        "segment_any": [
+          "gcp-vars",
+          "aws-vars",
+          "env-vars",
+          "vars",
+          "env",
+          "envs",
+          "environments",
+          "secrets",
+          "postman",
+          "postman-external",
+          "scripts",
+          "bin",
+          "ops",
+          "devops",
+          "terraform",
+          "k8s",
+          "kubernetes",
+          "helm",
+          "ansible",
+          "config",
+          "configs",
+          "settings"
+        ]
+      },
+      "category": "ops"
+    },
+    {
+      "id": "people-hr",
+      "when": {
+        "segment_any": [
+          "hr",
+          "people-ops",
+          "payroll",
+          "hiring",
+          "recruiting",
+          "candidates",
+          "personnel",
+          "founder",
+          "founders",
+          "team"
+        ],
+        "name_token_any": [
+          "cv",
+          "resume",
+          "résumé",
+          "payroll",
+          "salary",
+          "offer-letter",
+          "contractor-agreement"
+        ]
+      },
+      "category": "people-hr"
+    },
+    {
+      "id": "rfp",
+      "when": {
+        "segment_prefix_any": [
+          "rfp-",
+          "rfi-",
+          "rfq-",
+          "tender-",
+          "bid-"
+        ],
+        "segment_any": [
+          "rfp",
+          "rfps",
+          "rfi",
+          "rfq",
+          "tenders",
+          "tender",
+          "bids",
+          "proposals"
+        ]
+      },
+      "category": "sales/rfps",
+      "entity_from": "segment_after_prefix:rfp-|rfi-|rfq-|tender-|bid-",
+      "entity_kind": "customer"
+    },
+    {
+      "id": "rfp-names",
+      "when": {
+        "name_token_any": [
+          "rfp",
+          "rfi",
+          "rfq",
+          "tender"
+        ]
+      },
+      "category": "sales/rfps",
+      "entity_from": "name_prefix",
+      "entity_kind": "customer"
+    },
+    {
+      "id": "compliance-security",
+      "when": {
+        "segment_any": [
+          "pci",
+          "pci-dss",
+          "soc2",
+          "soc-2",
+          "iso27001",
+          "iso-27001",
+          "gdpr",
+          "hipaa",
+          "compliance",
+          "security",
+          "pen-tests",
+          "pen-test",
+          "pentest",
+          "pentests",
+          "risk",
+          "audit",
+          "audits",
+          "asv-scan",
+          "policies",
+          "procedures"
+        ],
+        "segment_prefix_any": [
+          "pci-",
+          "docs-security",
+          "soc2-",
+          "zap-report",
+          "iso27001-",
+          "pen-test"
+        ],
+        "name_token_any": [
+          "pci",
+          "dss",
+          "saq",
+          "aoc",
+          "soc2",
+          "iso27001",
+          "gdpr",
+          "pentest",
+          "pen-test",
+          "vulnerability",
+          "vuln",
+          "asv",
+          "attestation",
+          "dpia",
+          "risk-register",
+          "incident-response",
+          "business-continuity",
+          "disaster-recovery",
+          "security-policy",
+          "acceptable-use"
+        ]
+      },
+      "category": "compliance-security"
+    },
+    {
+      "id": "legal-ip",
+      "when": {
+        "segment_any": [
+          "legal",
+          "contracts",
+          "contract",
+          "agreements",
+          "patent",
+          "patents",
+          "ip",
+          "trademarks",
+          "nda",
+          "ndas"
+        ],
+        "segment_prefix_any": [
+          "docs-patent",
+          "patent"
+        ],
+        "name_token_any": [
+          "nda",
+          "msa",
+          "sla",
+          "dpa",
+          "patent",
+          "trademark",
+          "contract",
+          "agreement",
+          "terms",
+          "privacy-policy",
+          "eula",
+          "license",
+          "licence",
+          "incorporation",
+          "bylaws",
+          "provisional",
+          "uspto"
+        ]
+      },
+      "category": "legal-ip"
+    },
+    {
+      "id": "fundraising",
+      "when": {
+        "segment_any": [
+          "fundraise",
+          "fundraising",
+          "investors",
+          "investor",
+          "pitch",
+          "pitches",
+          "deck",
+          "decks",
+          "accelerators",
+          "accelerator",
+          "funding",
+          "yc",
+          "seed"
+        ],
+        "segment_prefix_any": [
+          "docs-fundraise",
+          "fundrais"
+        ],
+        "name_token_any": [
+          "pitch",
+          "deck",
+          "investor",
+          "investors",
+          "fundraise",
+          "fundraising",
+          "funding",
+          "accelerator",
+          "cap-table",
+          "captable",
+          "term-sheet",
+          "safe",
+          "valuation",
+          "data-room"
+        ]
+      },
+      "category": "fundraising"
+    },
+    {
+      "id": "finance",
+      "when": {
+        "segment_any": [
+          "finance",
+          "costs",
+          "cost",
+          "budget",
+          "budgets",
+          "accounting",
+          "invoices",
+          "billing",
+          "tax",
+          "taxes"
+        ],
+        "segment_prefix_any": [
+          "docs-costs",
+          "docs-finance"
+        ],
+        "name_token_any": [
+          "budget",
+          "invoice",
+          "invoices",
+          "opex",
+          "capex",
+          "p&l",
+          "pnl",
+          "forecast",
+          "financials",
+          "pricing",
+          "pricingsheet",
+          "cost",
+          "costs",
+          "revenue",
+          "expenses",
+          "investment"
+        ]
+      },
+      "category": "finance"
+    },
+    {
+      "id": "customers-folder",
+      "when": {
+        "segment_any": [
+          "customers",
+          "customer",
+          "clients",
+          "client",
+          "tenants",
+          "accounts",
+          "partners",
+          "docs-external"
+        ]
+      },
+      "category": "customers",
+      "entity_from": "name_prefix",
+      "entity_kind": "customer"
+    },
+    {
+      "id": "customer-names",
+      "when": {
+        "name_marker_any": [
+          "-Access-Credentials",
+          "-Demo-Script",
+          "-Onboarding",
+          "-Feature-Update",
+          "-Platform-Presentation",
+          "-Solution-Overview"
+        ]
+      },
+      "category": "customers",
+      "entity_from": "name_prefix",
+      "entity_kind": "customer"
+    },
+    {
+      "id": "vendors",
+      "when": {
+        "segment_any": [
+          "vendors",
+          "vendor",
+          "third-party",
+          "thirdparty",
+          "suppliers",
+          "reference",
+          "references",
+          "integrations"
+        ]
+      },
+      "category": "engineering/vendors",
+      "entity_from": "segment_after:vendors|vendor|integrations|suppliers",
+      "entity_kind": "vendor",
+      "authored_by": "third-party"
+    },
+    {
+      "id": "marketing",
+      "when": {
+        "segment_any": [
+          "marketing",
+          "website",
+          "web",
+          "site",
+          "seo",
+          "social",
+          "brand",
+          "branding",
+          "launch",
+          "growth",
+          "producthunt",
+          "press",
+          "pr",
+          "newsletter",
+          "campaigns",
+          "content"
+        ],
+        "segment_prefix_any": [
+          "docs-website",
+          "docs-seo",
+          "docs-producthunt",
+          "docs-github-stars",
+          "docs-social",
+          "website-",
+          "site-"
+        ],
+        "segment_suffix_any": [
+          ".com",
+          ".io",
+          ".ai",
+          ".co",
+          "-web",
+          "-website",
+          "-claude-design"
+        ],
+        "name_token_any": [
+          "seo",
+          "landing",
+          "website",
+          "marketing",
+          "launch",
+          "newsletter",
+          "press-release",
+          "social",
+          "og-image",
+          "brand-guide",
+          "copy"
+        ]
+      },
+      "category": "marketing"
+    },
+    {
+      "id": "research",
+      "when": {
+        "segment_any": [
+          "research",
+          "competitors",
+          "competition",
+          "market",
+          "analysis",
+          "whitepapers"
+        ],
+        "segment_prefix_any": [
+          "docs-competitor",
+          "docs-research",
+          "docs-market"
+        ],
+        "name_token_any": [
+          "competitor",
+          "competitors",
+          "competitive",
+          "market-research",
+          "whitepaper",
+          "benchmark",
+          "survey"
+        ]
+      },
+      "category": "research"
+    },
+    {
+      "id": "strategy",
+      "when": {
+        "segment_any": [
+          "strategy",
+          "plan",
+          "plans",
+          "roadmap",
+          "roadmaps",
+          "board",
+          "okrs",
+          "okr",
+          "vision"
+        ],
+        "segment_prefix_any": [
+          "docs-plan",
+          "docs-roadmap",
+          "docs-strategy"
+        ],
+        "name_token_any": [
+          "strategy",
+          "roadmap",
+          "okr",
+          "okrs",
+          "vision",
+          "mission",
+          "master-plan",
+          "board",
+          "positioning",
+          "executive-summary",
+          "work-summary",
+          "why-we-win",
+          "north-star"
+        ]
+      },
+      "category": "company/strategy"
+    },
+    {
+      "id": "runbooks",
+      "when": {
+        "segment_prefix_any": [
+          "docs-gcp",
+          "docs-aws",
+          "docs-deploy",
+          "docs-install",
+          "docs-release",
+          "docs-dns",
+          "docs-load-test",
+          "docs-mobile-publish"
+        ],
+        "segment_suffix_any": [
+          "-gcp",
+          "-aws",
+          "-git",
+          "-publish"
+        ],
+        "name_token_any": [
+          "runbook",
+          "deploy",
+          "deployment",
+          "install",
+          "installation",
+          "setup",
+          "release",
+          "releasing",
+          "rollout",
+          "migration",
+          "troubleshooting",
+          "playbook",
+          "how-to",
+          "howto",
+          "onboard",
+          "provisioning",
+          "dns",
+          "ssl",
+          "vpn",
+          "load-test",
+          "operations",
+          "operational"
+        ]
+      },
+      "category": "engineering/runbooks"
+    },
+    {
+      "id": "engineering",
+      "when": {
+        "segment_any": [
+          "engineering",
+          "architecture",
+          "api",
+          "apis",
+          "webhooks",
+          "backend",
+          "frontend",
+          "mobile",
+          "infra",
+          "infrastructure",
+          "specs",
+          "spec",
+          "design-docs",
+          "adr",
+          "adrs",
+          "rfcs",
+          "testing",
+          "tests",
+          "diagrams"
+        ],
+        "name_token_any": [
+          "architecture",
+          "api",
+          "spec",
+          "specification",
+          "design",
+          "adr",
+          "rfc",
+          "schema",
+          "data-model",
+          "routes",
+          "webhook",
+          "webhooks",
+          "integration",
+          "flow",
+          "flows",
+          "sequence",
+          "erd",
+          "endpoint",
+          "endpoints",
+          "sdk",
+          "unit-tests",
+          "test-plan",
+          "technical",
+          "implementation",
+          "build-status"
+        ]
+      },
+      "category": "engineering"
+    },
+    {
+      "id": "product",
+      "when": {
+        "segment_any": [
+          "product",
+          "products",
+          "features",
+          "prd",
+          "prds",
+          "use-cases",
+          "ux",
+          "ui"
+        ],
+        "name_token_any": [
+          "prd",
+          "feature",
+          "features",
+          "use-case",
+          "use-cases",
+          "requirements",
+          "user-stories",
+          "user-model",
+          "scenarios",
+          "plan",
+          "implementation-plan"
+        ]
+      },
+      "category": "product"
+    },
+    {
+      "id": "fallback-feature-docs",
+      "fallback": true,
+      "when": {
+        "segment_prefix_any": [
+          "docs-",
+          "doc-"
+        ]
+      },
+      "category": "product"
+    },
+    {
+      "id": "fallback-docs-folder",
+      "fallback": true,
+      "when": {
+        "segment_any": [
+          "docs",
+          "doc",
+          "documentation",
+          "wiki",
+          "handbook"
+        ]
+      },
+      "category": "engineering"
+    },
+    {
+      "id": "fallback-guides",
+      "fallback": true,
+      "when": {
+        "name_token_any": [
+          "guide",
+          "tutorial",
+          "manual",
+          "handbook",
+          "readme"
+        ]
+      },
+      "category": "product"
+    }
+  ],
+  "doc_types": {
+    "by_ext": {
+      ".pptx": "deck",
+      ".pptm": "deck",
+      ".potx": "deck",
+      ".key": "deck",
+      ".odp": "deck",
+      ".gslides": "google-slides",
+      ".xlsx": "spreadsheet",
+      ".xlsm": "spreadsheet",
+      ".xls": "spreadsheet",
+      ".csv": "spreadsheet",
+      ".tsv": "spreadsheet",
+      ".ods": "spreadsheet",
+      ".numbers": "spreadsheet",
+      ".gsheet": "google-sheet",
+      ".gdoc": "google-doc",
+      ".gdraw": "diagram",
+      ".gform": "form",
+      ".gmap": "map",
+      ".gsite": "webpage",
+      ".eml": "email",
+      ".msg": "email",
+      ".mbox": "email",
+      ".png": "image",
+      ".jpg": "image",
+      ".jpeg": "image",
+      ".gif": "image",
+      ".webp": "image",
+      ".bmp": "image",
+      ".tif": "image",
+      ".tiff": "image",
+      ".heic": "image",
+      ".avif": "image",
+      ".ico": "image",
+      ".svg": "diagram",
+      ".drawio": "diagram",
+      ".puml": "diagram",
+      ".mmd": "diagram",
+      ".mermaid": "diagram",
+      ".canvas": "diagram",
+      ".excalidraw": "diagram",
+      ".vsdx": "diagram",
+      ".py": "code",
+      ".js": "code",
+      ".mjs": "code",
+      ".ts": "code",
+      ".tsx": "code",
+      ".jsx": "code",
+      ".sh": "code",
+      ".bash": "code",
+      ".zsh": "code",
+      ".ps1": "code",
+      ".go": "code",
+      ".java": "code",
+      ".rb": "code",
+      ".php": "code",
+      ".rs": "code",
+      ".c": "code",
+      ".cpp": "code",
+      ".h": "code",
+      ".cs": "code",
+      ".swift": "code",
+      ".kt": "code",
+      ".sql": "code",
+      ".css": "code",
+      ".scss": "code",
+      ".json": "config",
+      ".yaml": "config",
+      ".yml": "config",
+      ".toml": "config",
+      ".ini": "config",
+      ".cfg": "config",
+      ".conf": "config",
+      ".properties": "config",
+      ".xml": "config",
+      ".tf": "config",
+      ".hcl": "config",
+      ".ipynb": "notebook",
+      ".zip": "archive",
+      ".tar": "archive",
+      ".gz": "archive",
+      ".tgz": "archive",
+      ".7z": "archive",
+      ".rar": "archive",
+      ".bz2": "archive",
+      ".xz": "archive",
+      ".jar": "archive",
+      ".log": "log",
+      ".mp4": "video",
+      ".mov": "video",
+      ".m4v": "video",
+      ".webm": "video",
+      ".avi": "video",
+      ".mkv": "video",
+      ".mp3": "audio",
+      ".wav": "audio",
+      ".m4a": "audio",
+      ".flac": "audio",
+      ".ogg": "audio",
+      ".ttf": "font",
+      ".otf": "font",
+      ".woff": "font",
+      ".woff2": "font",
+      ".html": "webpage",
+      ".htm": "webpage"
+    },
+    "by_token": [
+      {
+        "tokens": [
+          "runbook",
+          "playbook",
+          "deploy",
+          "deployment",
+          "setup",
+          "install",
+          "installation",
+          "guide",
+          "how-to",
+          "howto",
+          "manual",
+          "tutorial",
+          "troubleshooting",
+          "checklist"
+        ],
+        "doc_type": "runbook"
+      },
+      {
+        "tokens": [
+          "spec",
+          "specification",
+          "prd",
+          "design",
+          "adr",
+          "rfc",
+          "architecture",
+          "schema",
+          "data-model"
+        ],
+        "doc_type": "spec"
+      },
+      {
+        "tokens": [
+          "plan",
+          "roadmap",
+          "strategy",
+          "okr",
+          "okrs"
+        ],
+        "doc_type": "plan"
+      },
+      {
+        "tokens": [
+          "policy",
+          "policies",
+          "standard"
+        ],
+        "doc_type": "policy"
+      },
+      {
+        "tokens": [
+          "procedure",
+          "procedures",
+          "sop"
+        ],
+        "doc_type": "procedure"
+      },
+      {
+        "tokens": [
+          "deck",
+          "pitch",
+          "presentation",
+          "slides"
+        ],
+        "doc_type": "deck"
+      },
+      {
+        "tokens": [
+          "cv",
+          "resume"
+        ],
+        "doc_type": "cv"
+      },
+      {
+        "tokens": [
+          "proposal",
+          "response",
+          "answers",
+          "questionnaire"
+        ],
+        "doc_type": "proposal"
+      },
+      {
+        "tokens": [
+          "rfp",
+          "rfi",
+          "rfq",
+          "tender"
+        ],
+        "doc_type": "rfp"
+      },
+      {
+        "tokens": [
+          "contract",
+          "agreement",
+          "nda",
+          "msa",
+          "sla",
+          "dpa",
+          "terms"
+        ],
+        "doc_type": "contract"
+      },
+      {
+        "tokens": [
+          "report",
+          "summary",
+          "analysis",
+          "review",
+          "assessment",
+          "audit",
+          "findings",
+          "results"
+        ],
+        "doc_type": "report"
+      },
+      {
+        "tokens": [
+          "application"
+        ],
+        "doc_type": "application"
+      },
+      {
+        "tokens": [
+          "minutes",
+          "meeting",
+          "standup",
+          "retro",
+          "retrospective"
+        ],
+        "doc_type": "meeting-notes"
+      },
+      {
+        "tokens": [
+          "readme"
+        ],
+        "doc_type": "readme"
+      },
+      {
+        "tokens": [
+          "faq",
+          "qa",
+          "q&a"
+        ],
+        "doc_type": "faq"
+      },
+      {
+        "tokens": [
+          "changelog",
+          "release-notes"
+        ],
+        "doc_type": "changelog"
+      },
+      {
+        "tokens": [
+          "credentials",
+          "access-credentials"
+        ],
+        "doc_type": "credentials"
+      },
+      {
+        "tokens": [
+          "invoice",
+          "receipt"
+        ],
+        "doc_type": "invoice"
+      },
+      {
+        "tokens": [
+          "budget",
+          "forecast",
+          "opex",
+          "capex"
+        ],
+        "doc_type": "budget"
+      },
+      {
+        "tokens": [
+          "diagram",
+          "flow",
+          "flows",
+          "sequence"
+        ],
+        "doc_type": "diagram"
+      }
+    ],
+    "by_segment": [
+      {
+        "segments": [
+          "response",
+          "response-final",
+          "responses",
+          "answers"
+        ],
+        "doc_type": "proposal"
+      },
+      {
+        "segments": [
+          "policies"
+        ],
+        "doc_type": "policy"
+      },
+      {
+        "segments": [
+          "procedures"
+        ],
+        "doc_type": "procedure"
+      },
+      {
+        "segments": [
+          "diagrams",
+          "patent_drawings",
+          "drawings"
+        ],
+        "doc_type": "diagram"
+      }
+    ],
+    "default": "document"
+  },
+  "asset_dirs": [
+    "assets",
+    "asset",
+    "images",
+    "image",
+    "img",
+    "imgs",
+    "media",
+    "uploads",
+    "upload",
+    "scraps",
+    "shots",
+    "screenshots",
+    "out",
+    "output",
+    "static",
+    "public",
+    "attachments",
+    "_assets",
+    "icons",
+    "logos",
+    "fonts",
+    "store-assets"
+  ],
+  "render_priority": [
+    ".md",
+    ".markdown",
+    ".gdoc",
+    ".docx",
+    ".doc",
+    ".odt",
+    ".rtf",
+    ".txt",
+    ".html",
+    ".htm",
+    ".gslides",
+    ".pptx",
+    ".key",
+    ".gsheet",
+    ".xlsx",
+    ".pdf"
+  ],
+  "version_hint_rank": {
+    "original": 0,
+    "draft": 1,
+    "old": 1,
+    "v": 2,
+    "updated": 3,
+    "new": 3,
+    "revised": 3,
+    "final": 4,
+    "response-final": 4,
+    "corrected": 5,
+    "latest": 6
+  },
+  "copy_unreferenced_assets": true
+}

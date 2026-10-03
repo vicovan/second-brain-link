@@ -22,6 +22,15 @@ import json
 import sys
 from pathlib import Path
 
+# Windows consoles default to the ANSI code page (cp1252), where this script's "✓"/"→"
+# output raises UnicodeEncodeError and aborts the build (Studio v1.3.0's Windows CI).
+# Never let progress output crash packaging.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 MIN_POP = 15000
 
 

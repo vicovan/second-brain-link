@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+"""sbl — one command for Second Brain Link. Stdlib only, no install step: run it from the repo.
+
+  sbl demo [OUT]                       build the demo brains (synthetic people) and analyze them
+  sbl build EXPORT -o BRAIN [...]      turn an export into a brain   (build_vault.py)
+  sbl refresh EXPORT -o BRAIN          update a brain in place, keeping your notes and edits
+  sbl doctor EXPORT                    check an export before building
+  sbl analyze BRAIN --goals a,b        goal workspaces, dashboard, catalog (analyze.py)
+  sbl health BRAIN                     the health report (+ suggestions to review)
+  sbl graph BRAIN                      (re)write graph.json
+  sbl ask BRAIN "question" [--as ROLE] graph retrieval — what the brain would hand a model
+  sbl query BRAIN --ask counts|...     exact answers by SQL (read-only)
+  sbl goals BRAIN                      Harness goals and their progress
+  sbl routines BRAIN                   Harness routines and when they run
+  sbl runs BRAIN                       Harness activity, newest first
+  sbl run BRAIN ROUTINE                a routine's dry run (no model): checks, conditions, handoff
+  sbl inbox BRAIN                      what needs you
+  sbl plugins                          the agents in this repo
+  sbl eval [--harness]                 benchmarks (retrieval, or the Harness's safety rules)
+
+Everything runs locally and offline; the brain builder makes zero network calls.
+"""
+import os
+import pathlib
+import subprocess
+import sys
+
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
+ROOT = pathlib.Path(__file__).resolve().parent
+S = ROOT / "engine" / "scripts"
+
+
+def py(script, *args):
+    return subprocess.call([sys.executable, str(S / script), *args])
+
+
+def harness(brain, *args):
+    return py("harness.py", "--brain", brain, *args)
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help", "help"):
+        print(__doc__.strip())
+        return 0
+    cmd, rest = argv[0], argv[1:]
+    if cmd == "demo":
+        out = pathlib.Path(rest[0] if rest else ROOT / "vault" / "demo").expanduser()
+        data = out.parent / (out.name + "-data")
+        rc = subprocess.call([sys.executable, str(ROOT / "tools" / "gen_demo_fixtures.py"), "--out", str(data), "--force"])
+        if rc:
+            return rc
+        rc = py("build_vault.py", str(data), "-o", str(out))
+        if rc:
+            return rc
+        for brain in sorted(out.glob("*/*-brain")):
+            kind = brain.parent.name
+            py("analyze.py", str(brain), "--goals", "onboarding,whoknows,continuity" if kind == "company" else "jobsearch,datamining,fundraising")
+        print(f"\n✓ demo brains in {out}\n  next: sbl ask {next(iter(sorted(out.glob('*/*-brain'))), out)} \"who should I talk to?\"")
+        return 0
+    if cmd == "build":
+        return py("build_vault.py", *rest)
+    if cmd == "refresh":
+        return py("build_vault.py", *rest, "--refresh")
+    if cmd == "doctor":
+        return py("build_vault.py", *rest, "--doctor")
+    if cmd == "analyze":
+        return py("analyze.py", *rest)
+    if cmd == "health":
+        return py("health.py", *rest)
+    if cmd == "graph":
+        return py("graphdata.py", *rest)
+    if cmd == "ask":
+        return py("retrieval.py", *rest)
+    if cmd == "query":
+        return py("query.py", *rest)
+    if cmd in ("goals", "routines", "runs", "inbox") and rest:
+        brain, extra = rest[0], rest[1:]
+        if cmd == "goals":
+            return harness(brain, "goal-progress", *extra)
+        if cmd == "routines":
+            return harness(brain, "due", *extra)
+        if cmd == "runs":
+            return harness(brain, "list", "activity", "--limit", "30", *extra)
+        return harness(brain, "inbox", *extra)
+    if cmd == "run" and len(rest) >= 2:
+        return harness(rest[0], "run", rest[1], "--provider", "none")
+    if cmd == "plugins":
+        import json
+        for d in sorted((ROOT / "plugins").glob("*/.claude-plugin/plugin.json")):
+            m = json.loads(d.read_text(encoding="utf-8"))
+            sj = d.parent.parent / "studio.json"
+            label = json.loads(sj.read_text(encoding="utf-8")).get("label", "") if sj.is_file() else ""
+            print(f"{m.get('name', ''):16} v{m.get('version', '?'):8} {label}")
+        return 0
+    if cmd == "eval":
+        return py("eval.py", *rest)
+    print(f"sbl: unknown command '{cmd}' — run `sbl help`", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

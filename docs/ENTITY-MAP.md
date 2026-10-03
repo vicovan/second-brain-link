@@ -1,7 +1,7 @@
 # Entity Map — every brain entity, every source, every field
 
 > The complete reference for what a Second Brain Link vault contains: each note
-> type's frontmatter fields, which of the 25 sources fills them, how content
+> type's frontmatter fields, which of the 27 sources fills them, how content
 > routes into folders per subject (personal vs company), and how incremental
 > updates (`--refresh`) treat every file. Companion: [`SOURCES.md`](SOURCES.md)
 > (export/download + import steps per source). Kept in sync with
@@ -28,6 +28,7 @@ email, microsoft365, teams`.
 | career | `40-career/` | `40-pipeline/` | applications/prefs/saved-jobs · **one note per deal/campaign** |
 | mirror | `50-mirror/` | `50-market-view/` | algorithmic inferences + ad/audience segments |
 | learning | `60-learning/` | `60-knowledge/` | events.md, meetings.md (company), coaching |
+| docs | `65-documents/` | `65-documents/` | **one note per document** from linked document stores (Git docs repo, Google Drive) in a generic taxonomy; `_files/` = safe copies (one per content hash); `_index/` = MOCs (by category, original folder, entity, versions, duplicates, sensitive); `_DOCS_COVERAGE.md` = every walked path |
 | services | `70-services/` | `70-support/` | service/ticket counts |
 | search | `80-search/` | `80-signals/` | search-log.md (source+date per query) |
 | places | `85-places/` | `85-locations/` | one note per place (lat/lng → map) |
@@ -112,6 +113,28 @@ name, headline, location (+lat/lng), industry, about, positions (title/company/
 start/end **+ description**), skills, education, certifications, languages,
 handles. Mappings can set name/headline/location/industry/about/skills.
 
+### document (`65-documents/<category>/<group>/<kebab-name>.md`) — one note per logical document
+Fed by `git_docs` / `google_drive` through `Collector.add_document` (the privacy
+boundary: content fields are dropped for every tier except `clean` / `unverified`).
+Frontmatter: type `document`, title (the original filename stem), doc_id (stable:
+sha1 of root id + path), source, tags (`document/<doc_type>`, `docs/<category>`,
+`sensitivity/<tier>`, `entity/<slug>`, `source/<name>`), category, doc_type, entity
+(`"[[Org]]"` — a customer/vendor/counterparty org note), entity_kind, authored_by
+(internal | third-party), original_root_id, original_root_label, original_path
+(relative — never absolute), original_ext, mime, size_bytes, content_id (base32 of the
+sha256), created/updated (repository history → connector manifest → file times),
+date_in_name, vcs_status (tracked | untracked | ignored | unknown), first_commit,
+last_commit, commit_count, authors (`"[[Name]]"`, names only), renamed_from,
+version_group, version, is_latest, supersedes/superseded_by (`"[[note]]"`), also_at
+(byte-identical copies), renders (`ext:path`), file (in-vault copy under `_files/`),
+file_status (copied | too-large | not-copied | stub | cloud-only | native-google |
+note), url (Drive), sensitivity (clean | unverified | sensitive-path | sensitive-name |
+secret-detected | pii-dense | archive | encrypted | too-large | cloud-only |
+neighbour-flagged), sensitivity_reasons (rule ids only — never the matched text),
+scan_method, scan_chars, word_count, headings, excerpt (clean only). Body: clean
+documents carry their text (Markdown with links rewritten to notes/copies; code in a
+fence; Office text extracted); stubs carry only a warning callout + metadata table.
+
 ### message signal (never a note — woven into people)
 `{n, first, last, by-source}` per person; idempotent on (source, party, ts) so
 re-imported archives can't inflate strength. **Bodies are never read** — this is
@@ -124,6 +147,10 @@ guide) · `_STRUCTURE.md` (per-subject role map) · `_SUMMARY.md` · `_COVERAGE.
 · `_GENERATED.json` (**the manifest: every engine-generated file + sha256**) ·
 after analyze: `Dashboard.md`, `_DATA_POINTS.md`, `_GRAPH.md`, `95-goals/`,
 `copilot-prompts/` · after refresh: `_UPDATE_REPORT.md`.
+With linked document stores the brain also carries `<brain>/.claude/settings.json`
+(agent deny rules for the original folders, merged non-destructively) and the docs
+layer's `Documents.md` + `_DOCS_COVERAGE.md`; `_correlations/documents.md` lists
+byte-identical documents found in more than one brain.
 
 ## 4. Update semantics (`--refresh` vs `--rebuild`)
 File classes and what an update does:

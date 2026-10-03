@@ -56,7 +56,7 @@ if HAVE_REPORTLAB:
 
 # ---------------------------------------------------------------- fonts
 FONT_CANDIDATES = [
-    # (regular, bold) — first pair found wins. Unicode coverage matters (Zürich, Kraków, Iaşi).
+    # (regular, bold) — first pair found wins. Unicode coverage matters (Zürich, Kraków, São Paulo).
     ("Carlito-Regular.ttf", "Carlito-Bold.ttf"),
     ("LiberationSans-Regular.ttf", "LiberationSans-Bold.ttf"),
     ("Arial.ttf", "Arial Bold.ttf"),
@@ -80,6 +80,16 @@ def _find(name):
             return hits[0]
     return None
 
+# The italic face of each candidate. Without it `*text*` silently renders upright, and the role
+# context line reads as one more paragraph of body text.
+ITALIC = {
+    "Carlito-Regular.ttf": "Carlito-Italic.ttf",
+    "LiberationSans-Regular.ttf": "LiberationSans-Italic.ttf",
+    "Arial.ttf": "Arial Italic.ttf",
+    "arial.ttf": "ariali.ttf",
+    "DejaVuSans.ttf": "DejaVuSans-Oblique.ttf",
+}
+
 def register_fonts():
     for reg, bold in FONT_CANDIDATES:
         r = _find(reg)
@@ -88,8 +98,12 @@ def register_fonts():
             try:
                 pdfmetrics.registerFont(TTFont("CV", r))
                 pdfmetrics.registerFont(TTFont("CV-Bold", b or r))
+                it = _find(ITALIC[reg]) if reg in ITALIC else None
+                if it:
+                    pdfmetrics.registerFont(TTFont("CV-Italic", it))
                 pdfmetrics.registerFontFamily("CV", normal="CV", bold="CV-Bold",
-                                              italic="CV", boldItalic="CV-Bold")
+                                              italic="CV-Italic" if it else "CV",
+                                              boldItalic="CV-Bold")
                 return "CV", "CV-Bold", os.path.basename(r)
             except Exception:
                 continue
@@ -140,6 +154,8 @@ def build(content, out_pdf, scale=1.0, font=("Helvetica", "Helvetica-Bold"), uni
                               spaceBefore=5 * scale, spaceAfter=1, keepWithNext=1),
         "p": ParagraphStyle("p", fontName=REG, fontSize=base, leading=lead, textColor=INK,
                             spaceAfter=3.5 * scale),
+        "ctx": ParagraphStyle("ctx", fontName=REG, fontSize=base * 0.95, leading=lead,
+                              textColor=MUTED, spaceAfter=2.5 * scale),
         "role": ParagraphStyle("role", fontName=REG, fontSize=base * 1.06, leading=lead * 1.02,
                                textColor=INK),
         "meta": ParagraphStyle("meta", fontName=REG, fontSize=base * 0.9, leading=lead * 0.92,
@@ -147,7 +163,7 @@ def build(content, out_pdf, scale=1.0, font=("Helvetica", "Helvetica-Bold"), uni
         "dates": ParagraphStyle("dates", fontName=REG, fontSize=base * 0.93, leading=lead * 1.05,
                                 textColor=MUTED, alignment=TA_RIGHT),
         "b": ParagraphStyle("b", fontName=REG, fontSize=base, leading=lead, textColor=INK,
-                            leftIndent=10, bulletIndent=0, spaceAfter=2.8 * scale,
+                            leftIndent=11, bulletIndent=1.5, spaceAfter=2.8 * scale,
                             bulletFontName=REG, bulletFontSize=base * 0.85, bulletColor=MUTED),
         "kvk": ParagraphStyle("kvk", fontName=BOLD, fontSize=base * 0.95, leading=lead * 0.97,
                               textColor=MUTED),
@@ -166,7 +182,13 @@ def build(content, out_pdf, scale=1.0, font=("Helvetica", "Helvetica-Bold"), uni
 
     def bullet(b):
         txt = (f"<b>{M(b['lead'])}</b> " if b.get("lead") else "") + M(b["text"])
-        return Paragraph(txt, styles["b"], bulletText="\u2013")
+        return Paragraph(txt, styles["b"], bulletText="\u2022")
+
+    def para(text):
+        # A paragraph that is wholly *italic* is a role's context line: muted, so it reads as
+        # framing under the header rather than one more claim.
+        ctx = re.fullmatch(r"\*[^*].*\*", text.strip()) is not None
+        return Paragraph(M(text), styles["ctx" if ctx else "p"])
 
     # ---- header
     story.append(Paragraph(M(content["name"]), styles["name"]))
@@ -195,7 +217,7 @@ def build(content, out_pdf, scale=1.0, font=("Helvetica", "Helvetica-Bold"), uni
             b = blocks[i]
             t = b.get("type", "paragraph")
             if t == "paragraph":
-                story.append(Paragraph(M(b["text"]), styles["p"]))
+                story.append(para(b["text"]))
             elif t == "subheading":
                 story.append(Paragraph(M(b["text"]), styles["sub"]))
             elif t == "bullet":
@@ -260,9 +282,9 @@ def build(content, out_pdf, scale=1.0, font=("Helvetica", "Helvetica-Bold"), uni
                 meta = []
                 if b.get("where"):
                     meta.append(M(b["where"]))
-                if b.get("url"):
-                    disp = re.sub(r"^https?://(www\.)?", "", b["url"]).rstrip("/")
-                    meta.append(f'<link href="{b["url"]}" color="#1F4E8C">{disp}</link>')
+                for u in (b.get("url") or "").split():
+                    disp = re.sub(r"^https?://(www\.)?", "", u).rstrip("/")
+                    meta.append(f'<link href="{u}" color="#1F4E8C">{disp}</link>')
                 keep = [row]
                 if meta:
                     keep.append(Paragraph(" · ".join(meta), styles["meta"]))
@@ -270,7 +292,7 @@ def build(content, out_pdf, scale=1.0, font=("Helvetica", "Helvetica-Bold"), uni
                 if i + 1 < len(blocks) and blocks[i + 1].get("type") in ("bullet", "paragraph"):
                     nb = blocks[i + 1]
                     keep.append(bullet(nb) if nb["type"] == "bullet"
-                                else Paragraph(M(nb["text"]), styles["p"]))
+                                else para(nb["text"]))
                     i += 1
                 story.append(KeepTogether(keep))
             elif t == "spacer":
@@ -326,8 +348,8 @@ def build_docx(content, out_docx):
                 p = d.add_paragraph()
                 r = p.add_run(b["title"]); r.bold = True
                 if b.get("org"): p.add_run(f" · {b['org']}")
-                if b.get("url"):
-                    disp = re.sub(r"^https?://(www\.)?", "", b["url"]).rstrip("/")
+                for u in (b.get("url") or "").split():
+                    disp = re.sub(r"^https?://(www\.)?", "", u).rstrip("/")
                     p.add_run(f"  {disp}")
                 if b.get("where"): p.add_run(f" · {b['where']}")
                 if b.get("dates"): p.add_run(f"    {b['dates']}")

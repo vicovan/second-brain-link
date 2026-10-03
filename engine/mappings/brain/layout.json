@@ -217,6 +217,19 @@
    ]
   },
   {
+   "folder": "65-documents",
+   "title": "65-documents",
+   "buckets": [
+    "documents"
+   ],
+   "purpose": "Documents from your linked document stores (Git docs repo, Google Drive): one note per document; sensitive files metadata-only",
+   "purpose_company": "Documents: the company's linked document stores (Git docs repo, Google Drive) in a generic taxonomy; sensitive files metadata-only",
+   "route_keys": [
+    "sourcelink",
+    "sourcemanifest"
+   ]
+  },
+  {
    "folder": "70-services",
    "title": "70-services",
    "buckets": [
@@ -300,6 +313,7 @@
    "services": "70-services",
    "search": "80-search",
    "places": "85-places",
+   "docs": "65-documents",
    "synthesis": "90-synthesis",
    "uncategorized": "99-uncategorized",
    "quarantine": "_quarantine",
@@ -321,6 +335,7 @@
    "services": "70-support",
    "search": "80-signals",
    "places": "85-locations",
+   "docs": "65-documents",
    "synthesis": "90-synthesis",
    "uncategorized": "99-uncategorized",
    "quarantine": "_quarantine",

@@ -539,6 +539,19 @@ def pace():
             "tried": len(tried), "ok": len(ok), "shortlist": need}
 
 
+def cmd_count(a):
+    """One number for a Harness goal's progress bar - REAL outcomes only (what an employer did,
+    recorded with set-result), never activity: applications sent is the means, not the goal."""
+    recs = [r for r in rows(OUT) if r.get("status") != "prior_external"]
+    applied = [r for r in recs if r.get("status") == "applied"]
+    res = [r.get("result") for r in applied if r.get("result")]
+    n = {"interviews": sum(1 for x in res if x in ("interview", "offer")),
+         "screens": sum(1 for x in res if x in POSITIVE),
+         "offers": sum(1 for x in res if x == "offer"),
+         "applied": len(applied)}[a.what]
+    print(n)
+
+
 def cmd_target(a):
     """Today's valid applications against the daily target, and the shortlist size to aim for."""
     p = pace()
@@ -684,6 +697,8 @@ def main():
     g.add_argument("--threshold", type=int, default=3)
 
     sub.add_parser("kpi").set_defaults(f=cmd_kpi)
+    g = sub.add_parser("count"); g.set_defaults(f=cmd_count)
+    g.add_argument("what", choices=["interviews", "screens", "offers", "applied"])
     g = sub.add_parser("target"); g.set_defaults(f=cmd_target)
     g.add_argument("--json", action="store_true", help="machine-readable, for the pipeline")
     sub.add_parser("calibrate").set_defaults(f=cmd_calibrate)

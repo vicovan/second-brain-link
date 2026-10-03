@@ -21,6 +21,15 @@ import sys
 import zipfile
 from pathlib import Path
 
+# Windows consoles default to the ANSI code page (cp1252), where this script's "✓"/"→"
+# output raises UnicodeEncodeError and aborts the build (Studio v1.3.0's Windows CI).
+# Never let progress output crash packaging.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 REPO = Path(__file__).resolve().parent.parent
 ENGINE = REPO / "engine"
 PROVIDERS = REPO / "providers"
@@ -56,7 +65,7 @@ def build(provider: str):
                             ignore=shutil.ignore_patterns(*SKIP))
     # ship the user-facing export/import guide inside the skill (as
     # references/SOURCES.md — SKILL.md points the agent at it) so the installed
-    # agent can answer "how do I export X" offline for all 24 sources.
+    # agent can answer "how do I export X" offline for all 27 sources.
     for doc in ("SOURCES.md", "ENTITY-MAP.md"):
         src_doc = REPO / "docs" / doc
         if src_doc.exists():

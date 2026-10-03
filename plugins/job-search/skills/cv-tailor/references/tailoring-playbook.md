@@ -117,18 +117,20 @@ has to *look* like the role they are hiring for — without ever stating a title
 Work down this ladder and stop at the first rung that fits. **Never skip to inventing.**
 
 ### Rung 1 — Headline mirrors the target title verbatim (always do this)
-Line 1 of the CV is the target title exactly as the JD writes it, plus one differentiator. This is
-the strongest single lever and it costs nothing in accuracy, because a headline states what they are
-applying *as*, not a role they held.
+Line 1 of the CV is the target title exactly as the JD writes it, plus **one** short
+differentiator — a fact, not a list. This is the strongest single lever and it costs nothing in
+accuracy, because a headline states what they are applying *as*, not a role they held.
 
 | JD title | Headline |
 |---|---|
-| Chief Technology Officer | `Chief Technology Officer (CTO) · 8× founder · AI, FinTech, Identity` |
-| VP of Engineering | `VP Engineering / CTO · scaled teams to 30+ across four countries` |
-| Principal AI Architect | `Principal AI Architect · agents, MCP, knowledge graphs, IAM` |
-| Chief Architect | `Chief Architect · cloud-native platforms, AI integration, data at scale` |
-| Head of ML | `Head of ML · production LLM systems, evaluation, agentic orchestration` |
-| Engineering Director | `Engineering Director · leading multi-team AI product organisations` |
+| Chief Technology Officer | `Chief Technology Officer · three platforms taken from seed to Series B` |
+| VP of Engineering | `VP of Engineering · grew teams from 9 to 23 across three time zones` |
+| Principal AI Architect | `Principal AI Architect · LLM systems in regulated production` |
+| Head of ML | `Head of ML · recommendation models serving 40M users` |
+| Engineering Director | `Engineering Director · multi-team product organisations` |
+
+**Rules the gate enforces:** the title comes first, nothing in front of it; ≤ 80 characters; no
+second title (`VP Engineering / CTO`), no "-level" phrasing, no keyword list after the dot.
 
 Also mirror the title **verbatim in the first sentence of the Professional Summary** — ATS parsers
 weight the summary heavily, and a human reads it in the same glance.
@@ -149,28 +151,29 @@ the target. Examples already sanctioned there:
 If the target is "Head of Engineering" and the allowed list has "CTO", **use CTO** — do not
 downgrade or invent. Seniority above the target is fine; a fabricated title is not.
 
-### Rung 3 — Keep the real title, add a SCOPE-EQUIVALENCE line
-When no allowed variant matches the target vocabulary, leave the title truthful and add one line
-directly under the role header that restates the scope **in the JD's own words**. This is where most
-of the matching actually happens, and it is completely honest — it describes what they did.
+### Rung 3 — Keep the real title, add a plain CONTEXT line
+When no allowed variant matches the target vocabulary, leave the title truthful and add one italic
+line directly under the role header that states the **reach in facts**: team size, managers,
+reporting line, sites, what the role covered. The facts do the matching; the reader draws the
+equivalence themselves.
 
 ```
-Co-Founder & CTO · Northwind Data · Dallas, US                    04/2022 – 12/2024
-Scope equivalent to VP Engineering: owned architecture, delivery and hiring for a
-multi-tenant B2B platform, leading the engineering team end to end.
+Co-Founder & CTO · Northwind Data · Lisbon, Portugal              04/2022 – 12/2024
+Led 14 engineers in two teams, reporting to the board; owned architecture, delivery and hiring.
 ```
 
 More patterns:
 - Target **Engineering Director**, role was CTO at a scale-up →
   *"Directed four engineering teams and their managers across two sites."*
 - Target **Principal Architect**, role was Founder/CTO →
-  *"Principal-architect scope: owned every architectural decision on the platform personally,
-  end to end."*
+  *"Made every architecture decision on the platform, from data model to deployment."*
 - Target **Head of AI**, role was Staff Software Architect →
-  *"Head-of-AI scope: set the AI technical direction for the platform and its model roadmap."*
+  *"Set the AI technical direction and model roadmap for a platform team of eleven."*
 
-Use the target's exact noun. If they say "Director", the line says "Directed". If they say
-"Principal Architect", the line says "Principal-architect scope".
+**Never write the target's title or a level into this line** — not "scope equivalent to VP
+Engineering", not "Principal-architect scope", not "VP-level ownership". A candidate describing the
+level they want reads to a recruiter as tailoring, and to an AI screener as keyword stuffing.
+`lint_cv.py` fails it.
 
 ### THE LINE — what must never happen
 **Never write a title the user did not hold.** Not "VP Engineering" when the profile says CTO, not
@@ -256,24 +259,42 @@ Re-read the JD's must-haves. The **first bullet of the most recent relevant role
 requirement #1 directly. Then #2, and so on. Six seconds of human attention lands on the top-left of
 page 1 — the ordering *is* the argument.
 
+### Move 5 — Business before mechanism
+A hiring manager asks *what changed, for whom*; an engineer's instinct is to say *how it was
+built*. Lead with the first:
+
+| Mechanism-first (cut) | Business-first (write) |
+|---|---|
+| *"Built a streaming pipeline on Kafka with exactly-once semantics and schema contracts."* | *"Moved 400 customers from nightly batches to data under 4 minutes old, on Kafka."* |
+| *"Designed a rules engine with real-time event detection and eligibility checks."* | *"Cut claim handling from days to seconds for travellers on delayed flights."* |
+
+Internal algorithm names, protocol names and vendor plumbing appear only when the posting asks
+for them. Three or more acronyms in one bullet is a bullet nobody outside the team can read.
+
+### Move 6 — Every bullet answers a row of the bullet plan
+`fit.md`'s `## Bullet plan` maps each `critical`/`high` requirement to one role and one fact.
+Write those bullets first. A bullet that answers no row — however true and impressive — is not
+written; the space goes to depth on a row that matters. `lint_cv.py --fit` fails a role in the
+three most recent with more than one bullet that shares nothing with the fit keywords.
+
 ### The boundary
 Rewriting means **restating a real fact in different words**, never adding scope, scale, numbers or
 responsibility that did not exist. Every number stays exactly as `profile/profile.md` §7 has it. If a
 target needs a fact that is not in the bank, it goes in as a question to the user — not as a bullet.
 
-## 3c. The Professional Summary — the 90 words that decide the six-second read
+## 3c. The Professional Summary — the 70 words that decide the six-second read
 
 More attention lands here than anywhere else on the CV. It is rewritten from scratch for every
 target. **Never reuse a summary between applications.**
 
-### The formula — four sentences, in this order
+### The formula — three or four sentences, in this order
 
 1. **Target title verbatim + the single strongest proof.** Open with the exact title they wrote,
    bolded, then the one credential that most makes it believable.
 2. **Their #1 requirement, answered with a specific fact.** Not a claim — evidence, with a number
    or a named thing from `profile/profile.md`.
-3. **Their #2 and #3 requirements, compressed.** Usually a domain proof and a delivery proof.
-4. **Scale / leadership credential** — team size, org size, budget or users, from the profile.
+3. **Scale / leadership credential** — team size, org size or users, from the profile. Short.
+4. *(Optional)* their #2 requirement, compressed — only if it fits under 90 words.
 
 ### Worked openings — same person, four targets
 
@@ -293,7 +314,10 @@ that the CV was written for them, and it costs nothing in truth.
 - **Every claim carries evidence.** "Deep AI experience" is noise; a version, a count and a
   timing — "v0 to v1.4, one maintainer, 12 connectors" — is a fact. Take every number from
   `profile/profile.md` §6; never invent one to make the sentence land.
-- **90–120 words.** Longer and the six-second read is lost.
+- **55–90 words; no sentence over 28 words; at least one under 12.** Longer and the six-second
+  read is lost. A summary sentence carrying a colon and a list of five things is two sentences.
+- **Plain words.** A recruiter who is not an engineer must understand every sentence; system
+  internals belong in an interview.
 - Use **their** vocabulary throughout — this is where §3b Move 3 matters most.
 - **No first person.** CVs use the implied subject: *"Ran engineering across two countries…"*,
   never *"I ran…"*. First person reads as a cover letter pasted into the wrong box.
@@ -329,7 +353,7 @@ A CV that looks generated gets read as *effort not spent*, and at CTO/architect 
 disqualifying on its own. The tells are not exotic — they are **uniformity**. Real writing is
 uneven. Break the pattern deliberately:
 
-### The eight tells, and the rule for each
+### The tells, and the rule for each
 
 | # | Tell | Rule |
 |---|---|---|
@@ -341,6 +365,14 @@ uneven. Break the pattern deliberately:
 | 6 | **Round marketing numbers** (100%, 3x, 50+) | Use the real, uneven number from the profile — *v0 → v1.4*, *12 source integrations*, *~1 minute per build*. Specificity is the credibility; a rounded number reads as an estimate. |
 | 7 | **Bold used as emphasis-by-default** | One bold span per bullet, and not on every bullet. Bold is for the thing a skimmer must not miss, not for decoration. |
 | 8 | **The rhetorical contrast frame** — "not just X, but Y", "it's not about X — it's about Y" | Never. It is the single most recognisable LLM cadence in prose. |
+| 9 | **`Label: a, b, c` bullets** — what bold lead-ins turn into when they are banned: a noun phrase, a colon, a list | **One per role, three per CV.** Open with a verb that says what changed. |
+| 10 | **Level and title echo** — "VP-level ownership", "director-level scope", the posting's title repeated in the bullets | Never. The title lives in the headline and the summary's first sentence; the bullets carry facts. |
+| 11 | **Long, jargon-dense sentences** — 35+ words, four acronyms, an algorithm name | Bullet sentences ≤ 32 words, summary sentences ≤ 28, at most three acronyms or product names per bullet, no system-design vocabulary the posting does not use. |
+| 12 | **Stylised one-liners** — "X is the normal case", "ships Y as product substance", "owned in one seat" | Never. Abstract self-description in place of a fact. Replace with the fact. |
+| 13 | **Two date formats** (`01/2025 – 2026` next to `2024 – 2025`) | One format, everywhere. `MM/YYYY` when the profile has months, `YYYY` when it does not. |
+
+`lint_cv.py` counts tells 1, 3, 8–13 and fails the build on them; the rest are read by eye and by
+the recruiter review.
 
 ### Words and phrases that do not appear on the user's CV
 
@@ -408,10 +440,17 @@ The recruiter sees: name, headline, first two lines of summary, the first
 role's title+company+dates, and maybe the first bullet. Make each of those
 answer "is this person exactly what we asked for?"
 
-- Summary = 3–5 lines, dense, no adjectives without numbers. Pattern:
-  [target title] with [years] across [their domain words]. [Two or three
-  proof points with numbers]. [Current role framed as relevant to them].
-  [One line on why this company/role — only if it is specific and true].
+- Summary = 3–4 lines (§3c), no adjectives without numbers. Never a line on why this company —
+  that belongs in the cover letter and the form answers.
+- **The first role a recruiter sees is the most recent employed role**, framed per §6. An own
+  venture or open-source project goes in its own small section below the work history.
+- **Company URLs on the meta line** (`<https://…>` under the role; the builder prints the bare
+  domain) for small or little-known employers, so the reader can check the company exists in one
+  glance instead of searching for it. Only a live site: check it responds before using it — a dead
+  or parked domain is worse than none. Leave them off household names and off companies with no
+  site; never a URL the profile does not record.
+- Role lines fit on one line: title | employer · a descriptor of four to six words. A descriptor
+  that wraps the role line onto two lines is too long.
 - Bullets = outcome-first, "Verb + what + scale/number + why it mattered".
   A bold lead-in on at most half the bullets of a role, used for the ones that answer a
   `critical` row of `fit.md`.
@@ -420,8 +459,8 @@ answer "is this person exactly what we asked for?"
 - **Roles appear in strict reverse-chronological order, always.** Relevance is shown by how many
   bullets a role gets, never by moving it up. A timeline that jumps (2021 above 2025) reads as
   something being hidden, and parsers compute tenure from order.
-- Most recent 2–3 roles get 3–5 bullets; older roles 1–2; studios (2003–2017)
-  get one merged entry unless the JD is about agencies/services.
+- Most recent 2–3 roles get 3–5 bullets; older roles 1–2; roles more than ten years back get
+  one merged entry unless the JD is about that work.
 - Never more than 2 pages. Page 1 must stand alone.
 - Remove anything that raises a question you can't answer in the CV (e.g.
   concurrent ventures for a full-time employer target — collapse or frame as
@@ -435,10 +474,19 @@ short tenures ask "will this one be short too?". Both are settled by the **frami
 per application, and not improvised:
 
 - **Current own venture or open-source project.** The policy says, per archetype, whether it is
-  shown as the current role, or as a line under the employed role it runs alongside
-  (*"Open-source: <Project> — maintainer"*). For employee-track archetypes the default is the
-  second: a founder title as the current full-time role, directly above a job application, is the
-  loudest "will leave" signal a CV can send.
+  shown as the current role, or in its own small `## Open Source` (or `## Projects`) section
+  below the work history: one line naming the project and the licence, one or two bullets. For
+  employee-track archetypes the default is the second: a founder title as the current full-time
+  role, directly above a job application, is the loudest "will leave" signal a CV can send.
+- **An employer that was acquired** is one continuous entry, with the start date of the original
+  employment: `Title | New Owner (formerly Old Name) · short descriptor`, and the meta line says
+  `<Old Name> acquired by <New Owner> in MM/YYYY`. Both names on the role line, because the
+  recruiter matches it against LinkedIn, where the old name usually has its own entry; the date
+  goes on the meta line so the role line stays on one line. Two CV entries for one job read as a
+  job change.
+- **The CV agrees with LinkedIn.** Titles, employers and dates must match the user's public
+  profile, because the recruiter opens it next. When they differ, the profile is fixed first,
+  never the CV improvised.
 - **Overlapping roles** (`lint_cv.py` reports them). Never hide one; make the relationship
   visible: an advisory or part-time role says so in its descriptor, and concurrent ventures can be
   grouped under one `### Founder ventures` entry with the individual companies as bullets. The

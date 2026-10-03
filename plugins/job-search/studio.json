@@ -71,5 +71,24 @@
         "multiple": true
       }
     ]
-  }
+  },
+  "templates": "harness",
+  "outcomes": {
+    "interviews": {
+      "label": "interviews",
+      "cmd": "learn.py count interviews"
+    },
+    "screens": {
+      "label": "screens or better",
+      "cmd": "learn.py count screens"
+    },
+    "offers": {
+      "label": "offers",
+      "cmd": "learn.py count offers"
+    }
+  },
+  "preflight": [
+    "profile_present",
+    "chrome_connected"
+  ]
 }

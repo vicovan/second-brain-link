@@ -26,14 +26,19 @@ the check's trigger word and leaving a broken sentence.
 - [ ] Strictly reverse-chronological by start date (lint_cv.py checks), no unexplained gaps
       > 1 month. Overlaps framed per the profile's framing policy.
 - [ ] ≤ 2 pages. Page 1 stands alone.
+- [ ] **One date format** throughout (lint_cv.py checks).
+- [ ] **No orphaned bullet lines** — every wrapped line keeps the hanging indent (check_pdf.py
+      checks). Look at the `--png` page images too.
+- [ ] Each role line fits on one line.
+- [ ] Every link shows its URL as text (`example.com`-style), never a linked title.
 
 ## Text & fonts
 - [ ] Real embedded TrueType text (pdffonts shows emb=yes); no text-as-image.
 - [ ] No text in white/tiny/hidden; no keyword blocks disguised as design.
 - [ ] Bullets are real characters ("•") rendered by the builder, not glyph
       fonts (Wingdings) that parse as garbage.
-- [ ] Diacritics render (e.g. Zürich, Kraków, Iaşi) — the builder embeds a Unicode font; if the
-      keyword check shows "Ia?i", the font fallback failed — fix, don't ship.
+- [ ] Diacritics render (e.g. Zürich, Kraków, São Paulo) — the builder embeds a Unicode font; if the
+      keyword check shows "Kraków" as "Krak?w", the font fallback failed — fix, don't ship.
 - [ ] Hyphens/dashes: en dash between dates is fine; avoid exotic symbols.
 
 ## Keywords
@@ -55,4 +60,7 @@ the check's trigger word and leaving a broken sentence.
       row of fit.md.
 - [ ] No claim outside profile/profile.md (lint_cv.py `--profile` fact gate is green).
 - [ ] No first person, no gap named, no banned phrase (lint_cv.py is green).
+- [ ] Every bullet in the three most recent roles answers a row of fit.md's `## Bullet plan`.
+- [ ] Headline = the posting's title + one short differentiator; no "-level" phrasing anywhere.
+- [ ] Titles, employers and dates match the user's LinkedIn.
 - [ ] Contact set matches the location decision; DOB absent unless required.

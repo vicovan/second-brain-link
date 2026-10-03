@@ -11,9 +11,9 @@ unless `gates.json` says they passed.
 Zero network, zero tokens, stdlib only.
 
 Usage:
-    lint_cv.py cv <cv.md> [--profile profile.md] [--keywords "a;b;c"] [--fit fit.md]
+    lint_cv.py cv <cv.md> [--profile profile.md] [--keywords "a;b;c"] [--fit fit.md] [--posting posting.md]
     lint_cv.py answers <answers.json> [--profile profile.md]
-    lint_cv.py review <app dir> --verdict shortlist|maybe|reject [--reason "..."]
+    lint_cv.py review <app dir> --verdict shortlist|maybe|reject [--reads-generated] [--reason "..."]
     lint_cv.py status <app dir>
 
 Every mode writes its result into `<app dir>/gates.json` (the folder the file lives in) under
@@ -45,7 +45,35 @@ BANNED = [
     "i am excited", "i'm excited", "thrilled to", "perfect fit", "ideal candidate",
     "dream job", "look no further", "wealth of experience", "extensive experience",
     "responsible for", "helped to", "various", "stakeholder alignment",
+    # abstract self-description standing in for a fact — seen in generated CVs that drew
+    # "reads generated" from reviewers
+    "first-class", "first class", "in one seat", "the normal case", "product substance",
+    "single mandate", "as a matter of course", "-level ownership",
 ]
+
+# Words that are a tell when the CV uses them and the posting does not: system-design jargon a
+# hiring manager has to translate. Allowed when the posting itself says them.
+POSTING_ONLY = ["deterministic", "orchestrat", "end to end", "end-to-end", "paradigm",
+                "spreading activation", "pagerank", "idempoten", "synergis"]
+# Fine once, a tic when repeated.
+CAPPED = {"end to end": 1, "end-to-end": 1}
+
+# A bullet whose first clause is a label followed by a colon and a list — the `**Lead:** a, b,
+# c` shape. Once is a rhythm; on every bullet it is the template.
+COLON_BULLET = re.compile(r"^[^:.;]{3,90}:\s")
+COLON_PER_ROLE, COLON_PER_CV = 1, 3
+
+# Sentence length caps. A recruiter reads in short bursts; a 45-word sentence is skipped.
+SUMMARY_SENT_MAX, BULLET_SENT_MAX = 28, 32
+SUMMARY_WORDS = (55, 90)
+
+# "VP-level", "director-level scope" — a candidate describing a level instead of a title they
+# held. It echoes the posting and reads as tailoring.
+LEVEL_ECHO = re.compile(r"\b(?:vp|svp|evp|director|head|principal|staff|executive|exec|c-suite|"
+                        r"cto|cpo|cio|chief|senior|lead|manager)[- ]level\b|\bscope equivalent\b|"
+                        r"\b[\w-]+-scope\b", re.I)
+HEADLINE_MAX = 80
+JARGON_PER_BULLET = 3
 # A banned stem inside a proper noun the user's OWN profile names — an employer, a product,
 # a title ("Empower…", "Elevate…") — is a fact, not a cliché. Exemptions therefore come from
 # the profile at run time, never from a list in this file: a hardcoded name here would be
@@ -207,7 +235,55 @@ def _fit_keywords(fit):
     return kws
 
 
-def lint_cv(md_path, profile=None, keywords=None, fit=None):
+_STOP = set("""the and for with from into over that this their your our are was were has have had
+will would can could about across while within without under using used other more most than
+then also such only each both very team teams work working role roles years year experience""".split())
+
+
+def _sentences(text):
+    text = re.sub(r"\*\*|\*", "", text)
+    return [x for x in re.split(r"(?<=[.!?])\s+(?=[A-Z0-9(\"'])", text.strip()) if x.strip()]
+
+
+def _date_style(dates):
+    """'m' for MM/YYYY tokens, 'y' for bare years, per token; empty when undated."""
+    out = set()
+    for tok in re.split(r"\s*[–—-]\s*", dates or ""):
+        tok = tok.strip()
+        if re.fullmatch(r"\d{1,2}/\d{4}", tok):
+            out.add("m")
+        elif re.fullmatch(r"\d{4}", tok):
+            out.add("y")
+        elif re.fullmatch(r"[A-Za-z]{3,9}\.? \d{4}", tok):
+            out.add("mon")
+    return out
+
+
+def _core_title(role):
+    """The title without a team qualifier: 'VP Product - Back of House' -> 'VP Product'."""
+    return re.split(r"\s*,\s*|\s+[-–—(|]\s*", (role or "").strip())[0].strip()
+
+
+def _jargon(text):
+    """Acronyms (MDES, DASP) and inner-capital product names (ConnexPay) in a bullet."""
+    toks = re.findall(r"\b[A-Z][A-Z0-9]{1,}s?\b|\b[A-Z][a-z]+[A-Z][A-Za-z]+\b", text)
+    return [t for t in toks if t not in ("AI", "API", "APIs", "US", "UK", "EU", "UAE", "CTO",
+                                         "CEO", "VP", "ML", "SaaS")]
+
+
+def _has_kw(k, text):
+    """Whole-word keyword match: 'AI' must not match inside 'air-gapped'."""
+    return re.search(r"(?<![a-z0-9])" + re.escape(k.lower()) + r"(?![a-z0-9])", text) is not None
+
+
+def _sibling(fit, name):
+    if not fit:
+        return None
+    p = pathlib.Path(fit).parent / name
+    return p if p.exists() else None
+
+
+def lint_cv(md_path, profile=None, keywords=None, fit=None, posting=None):
     text = pathlib.Path(md_path).read_text(encoding="utf-8")
     c = cv_md.md_to_content(text)
     fails, warns = [], []
@@ -264,6 +340,12 @@ def lint_cv(md_path, profile=None, keywords=None, fit=None):
     ov = []
     for i, (a, (sa, ea)) in enumerate(rng):
         for b, (sb, eb) in rng[i + 1:]:
+            # year-only ranges ("2021 – 2022", "2022 – 2025") share a boundary year without
+            # overlapping; only count it when the overlap is more than that one year
+            yearly = re.fullmatch(r"\s*\d{4}\s*[–—-]\s*(\d{4}|present|now)\s*", a["dates"] or "", re.I) \
+                and re.fullmatch(r"\s*\d{4}\s*[–—-]\s*(\d{4}|present|now)\s*", b["dates"] or "", re.I)
+            if yearly and sa and ea and sb and eb and (sa[0] == eb[0] or sb[0] == ea[0]):
+                continue
             if sa and ea and sb and eb and sa < eb and sb < ea:
                 ov.append(f"{a['org'] or a['title']} ∩ {b['org'] or b['title']}")
     if ov:
@@ -297,8 +379,89 @@ def lint_cv(md_path, profile=None, keywords=None, fit=None):
                 fails.append(f"{r['org'] or r['title']}: {lead}/{len(bs)} bullets have bold lead-ins "
                              f"(max half)")
     sw = len(summary.split())
-    if summary and not (60 <= sw <= 130):
-        warns.append(f"summary is {sw} words (aim 90–120)")
+    if summary and sw > SUMMARY_WORDS[1] + 10:
+        fails.append(f"summary is {sw} words (max {SUMMARY_WORDS[1]}) — cut it; the six-second "
+                     f"read stops at the third line")
+    elif summary and not (SUMMARY_WORDS[0] <= sw <= SUMMARY_WORDS[1]):
+        warns.append(f"summary is {sw} words (aim {SUMMARY_WORDS[0]}–{SUMMARY_WORDS[1]})")
+
+    # 3b. Rhythm — the tells that are about shape, not vocabulary.
+    ss = _sentences(summary)
+    long_s = [x for x in ss if len(x.split()) > SUMMARY_SENT_MAX]
+    if long_s:
+        fails.append(f"summary sentence of {len(long_s[0].split())} words (max {SUMMARY_SENT_MAX}): "
+                     f"{long_s[0][:70]!r}…")
+    if len(ss) >= 2 and not any(len(x.split()) < 12 for x in ss):
+        warns.append("no summary sentence under 12 words — even lengths read as generated")
+    colon_total = 0
+    for r in roles:
+        n = 0
+        for b in r["bullets"]:
+            full = ((b.get("lead") or "") + " " + (b.get("text") or "")).strip()
+            plain = re.sub(r"\*\*|\*", "", full)
+            if (b.get("lead") or "").rstrip().endswith(":") or COLON_BULLET.match(plain):
+                n += 1
+            for x in _sentences(full):
+                if len(x.split()) > BULLET_SENT_MAX:
+                    fails.append(f"{r['org'] or r['title']}: a {len(x.split())}-word sentence "
+                                 f"(max {BULLET_SENT_MAX}): {x[:60]!r}…")
+                    break
+        colon_total += n
+        if n > COLON_PER_ROLE:
+            fails.append(f"{r['org'] or r['title']}: {n} 'Label: a, b, c' bullets (max "
+                         f"{COLON_PER_ROLE} per role) — open with a verb instead")
+    if colon_total > COLON_PER_CV:
+        fails.append(f"{colon_total} 'Label: a, b, c' bullets on the CV (max {COLON_PER_CV})")
+
+    # 3c. Vocabulary the posting did not ask for, and repeated tics.
+    ppath = posting or _sibling(fit, "posting.md")
+    ptext = _profile_text(ppath).lower() if ppath else ""
+    blow = body.lower()
+    pj = [w for w in POSTING_ONLY if w in blow and w not in ptext]
+    if pj:
+        fails.append(f"jargon the posting does not use: {', '.join(pj)} — say what it did for "
+                     f"the business instead")
+    for w, cap in CAPPED.items():
+        k = blow.count(w)
+        if k > cap and w in ptext:
+            fails.append(f"'{w}' used {k}× (max {cap})")
+    for r in roles[:3]:
+        for b in r["bullets"]:
+            full = (b.get("lead") or "") + " " + (b.get("text") or "")
+            j = [t for t in _jargon(full) if t.lower() not in ptext]
+            if len(j) > JARGON_PER_BULLET:
+                warns.append(f"{r['org'] or r['title']}: {len(j)} acronyms/product names in one "
+                             f"bullet ({', '.join(j[:5])}) — a recruiter cannot read it")
+                break
+
+    # 3d. Headline and title echo.
+    target = (c.get("target") or {}).get("role", "")
+    head = c.get("headline", "") or ""
+    core = _core_title(target)
+    if core and head:
+        hl = head.lower()
+        if core.lower() not in hl and target.lower() not in hl:
+            fails.append(f"headline does not carry the target title '{core}'")
+        elif hl.find(core.lower()) > 0 and hl.find(target.lower()) != 0:
+            fails.append(f"headline puts something in front of the target title '{core}'")
+        if len(head) > max(HEADLINE_MAX, len(target) + 30):
+            fails.append(f"headline is {len(head)} characters (max {HEADLINE_MAX}) — title plus one "
+                         f"short differentiator")
+    rest = "\n".join(p for p in prose if p not in summary)
+    le = LEVEL_ECHO.search(rest + "\n" + head)
+    if le:
+        fails.append(f"level/scope echo {le.group(0)!r} — state the team, the reach or the result "
+                     f"instead of a level")
+    if core and len(core.split()) >= 2 and core.lower() in rest.lower():
+        fails.append(f"target title '{core}' repeated in the body — headline and summary only")
+
+    # 3e. Dates: one format throughout.
+    styles = set()
+    for r in roles:
+        styles |= _date_style(r["dates"])
+    if len(styles) > 1:
+        fails.append("dates mix formats (" + ", ".join(sorted({'m': 'MM/YYYY', 'y': 'YYYY',
+                     'mon': 'Mon YYYY'}[x] for x in styles)) + ") — use one throughout")
 
     # 4. Fact gate — numbers, employers, titles must exist in the profile.
     ptxt = _profile_text(profile)
@@ -337,6 +500,30 @@ def lint_cv(md_path, profile=None, keywords=None, fit=None):
                 first = ((r["bullets"][0].get("lead") or "") + " " + r["bullets"][0].get("text", "")).lower()
                 if not any(k.lower() in first for k in kws):
                     warns.append(f"{r['org'] or r['title']}: first bullet carries no fit keyword")
+
+        # 6. Relevance — every bullet in the three most recent roles must serve the posting.
+        # A bullet sharing no word with the fit keywords answers a question nobody asked.
+        vocab = {w for k in kws for w in re.findall(r"[a-z][a-z0-9+#/-]{3,}", k.lower())} - _STOP
+        vocab |= {k.lower() for k in kws}
+        for r in roles[:3]:
+            off = []
+            for b in r["bullets"]:
+                full = ((b.get("lead") or "") + " " + (b.get("text") or "")).lower()
+                words = set(re.findall(r"[a-z][a-z0-9+#/-]{3,}", full))
+                if not (words & vocab) and not any(_has_kw(k, full) for k in kws):
+                    off.append(full[:50])
+            if len(off) > 1:
+                fails.append(f"{r['org'] or r['title']}: {len(off)} bullets share nothing with the "
+                             f"fit keywords (max 1) — cut or re-point: {off[0]!r}…")
+    if fit and pathlib.Path(fit).exists() and not re.search(
+            r"^#+ [^\n]*bullet plan", pathlib.Path(fit).read_text(encoding="utf-8"), re.I | re.M):
+        warns.append("fit.md has no '## Bullet plan' — map each critical requirement to one proof first")
+
+    # 7. Countable scope — a recent role with no figure at all gives a recruiter nothing to weigh.
+    for r in roles[:3]:
+        if r["bullets"] and not any(re.search(r"\d", (b.get("lead") or "") + (b.get("text") or ""))
+                                    for b in r["bullets"]):
+            warns.append(f"{r['org'] or r['title']}: no countable scope (team, sites, users, volume)")
 
     return fails, warns
 
@@ -425,26 +612,31 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     g = sub.add_parser("cv")
     g.add_argument("md"); g.add_argument("--profile"); g.add_argument("--keywords")
-    g.add_argument("--fit")
+    g.add_argument("--fit"); g.add_argument("--posting", help="posting.md (default: beside --fit)")
     g = sub.add_parser("answers")
     g.add_argument("json"); g.add_argument("--profile")
     g = sub.add_parser("review")
     g.add_argument("appdir"); g.add_argument("--verdict", required=True,
                                              choices=["shortlist", "maybe", "reject"])
     g.add_argument("--reason", default="")
+    g.add_argument("--reads-generated", action="store_true",
+                   help="the reviewer said it reads as AI-written — blocks like a maybe")
     g = sub.add_parser("status")
     g.add_argument("appdir")
     a = ap.parse_args()
 
     if a.cmd == "cv":
-        f, w = lint_cv(a.md, a.profile, a.keywords, a.fit)
+        f, w = lint_cv(a.md, a.profile, a.keywords, a.fit, a.posting)
         sys.exit(_report("cv", a.md, f, w))
     if a.cmd == "answers":
         f, w = lint_answers(a.json, a.profile)
         sys.exit(_report("answers", a.json, f, w))
     if a.cmd == "review":
         gp = _gates_path(a.appdir)
-        _write_gate(gp, "review", {"pass": a.verdict == "shortlist", "verdict": a.verdict,
+        ok = a.verdict == "shortlist" and not a.reads_generated
+        _write_gate(gp, "review", {"pass": ok, "verdict": a.verdict
+                                   + (" (reads generated)" if a.reads_generated else ""),
+                                   "reads_generated": a.reads_generated,
                                    "reason": a.reason, "at": _now()})
         print(f"review '{a.verdict}' recorded in {gp}")
         sys.exit(0)

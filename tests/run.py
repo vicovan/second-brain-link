@@ -929,6 +929,7 @@ def _job_search_gates(js):
 type: cv
 name: Ada Example
 headline: "VP Engineering · platform teams"
+role: VP Engineering
 email: ada@example.com
 phone: "+00 000 000 000"
 ---
@@ -967,6 +968,15 @@ Porto, Portugal
         "banned phrase": good.replace("Rebuilt the release process.", "Spearheaded a seamless release process."),
         "number not in profile": good.replace("37%", "61%"),
         "negative parallelism": good.replace("Rebuilt the release process.", "Not just shipped features but rebuilt the release process."),
+        "colon-list bullets": good.replace("- Grew the platform team to 42 engineers across two sites.\n- Rebuilt the release process.",
+                                           "- Platform: grew the team to 42 engineers, two sites.\n- Release: rebuilt the process, the tooling and the cadence."),
+        "summary sentence too long": good.replace("Short proof here.", "Ran the platform organisation through a "
+                                                  "complete rebuild of the release process while the team kept shipping weekly "
+                                                  "and grew across two sites and three product lines at the same time."),
+        "headline without the target title": good.replace('headline: "VP Engineering · platform teams"',
+                                                           'headline: "Engineering leader · platform teams"'),
+        "level echo": good.replace("Rebuilt the release process.", "Director-level scope over the release process."),
+        "mixed date formats": good.replace("*01/2016 – 12/2020*", "*2016 – 2020*"),
     }
     for label, text in bad_cases.items():
         cv.write_text(text, encoding="utf-8")
@@ -974,6 +984,17 @@ Porto, Portugal
         check(f"lint_cv: {label} FAILs", r.returncode == 1, r.stdout[-300:])
     cv.write_text(good, encoding="utf-8")
     run(lint, "cv", cv, "--profile", prof)
+
+    # A bullet wrapped over several source lines is ONE bullet — a split one renders its second
+    # half at the left margin as a stray paragraph.
+    sys.path.insert(0, str(lint.parent))
+    import cv_md as _cvmd
+    wrapped = good.replace("- Rebuilt the release process.",
+                           "- Rebuilt the release process\n  for the data platform and\n  its two sister teams.")
+    blocks = [b for sec in _cvmd.md_to_content(wrapped)["sections"] for b in sec["blocks"]]
+    tail = [b for b in blocks if "sister teams" in (b.get("text") or "")]
+    check("cv_md: a wrapped bullet stays one bullet",
+          len(tail) == 1 and tail[0]["type"] == "bullet" and "Rebuilt" in tail[0]["text"], str(tail))
 
     # --- answers lint + learn.py refusal ------------------------------------------------
     env = dict(_os.environ, JOB_SEARCH_HOME=str(tmp / "state"))
@@ -997,6 +1018,9 @@ Porto, Portugal
     r = run(learn, "log-outcome", "--company", "Acme", "--role", "VP", "--job-key", "acme-vp",
             "--status", "applied", env=env)
     check("learn: applied refused without a recruiter review", r.returncode != 0)
+    run(lint, "review", appdir, "--verdict", "shortlist", "--reads-generated")
+    r = run(lint, "status", appdir)
+    check("lint_cv: a shortlist that reads generated still blocks", r.returncode == 1, r.stdout)
     run(lint, "review", appdir, "--verdict", "shortlist")
     r = run(learn, "log-outcome", "--company", "Acme", "--role", "VP", "--job-key", "acme-vp",
             "--status", "applied", env=env)
@@ -1689,6 +1713,339 @@ def test_travel_plugin():
               rr.returncode == 0 and before == after, rr.stderr[-300:])
         check("travel: --refresh leaves the plugin manifest intact",
               (brain / ".plugins" / "travel-planner" / "_TRAVEL_GENERATED.json").is_file())
+
+
+def test_harness():
+    """The Harness (engine/scripts/harness.py): goals, routines, reports and activity under the
+    `agentwork` layer — the five steps every run follows (check before starting, pick up from the
+    last report, work within limits, verified Done, clean handoff), deterministic and offline."""
+    import json as _json
+    import filecmp as _fc
+    import importlib.util as _iu
+    print("\n[harness]")
+    sys.path.insert(0, str(SCRIPTS))
+    import build_vault as _bv
+    check("harness: agentwork layer in both subjects",
+          _bv.layout_for("person").get("agentwork") == "96-agents"
+          and _bv.layout_for("company").get("agentwork") == "96-agents")
+    hsrc = (SCRIPTS / "harness.py").read_text(encoding="utf-8")
+    check("harness: no non-portable strftime (Windows)", "%-d" not in hsrc and "%-H" not in hsrc)
+    copies = [REPO / "plugins" / n / rel for n, rel in (
+        ("job-search", "skills/job-scout/scripts/harness.py"),
+        ("fundraising", "skills/raise-research/scripts/harness.py"),
+        ("travel-planner", "skills/trip-planner/scripts/harness.py"))]
+    check("harness: plugin copies are byte-identical to the engine's",
+          all(c.is_file() and _fc.cmp(SCRIPTS / "harness.py", c, shallow=False) for c in copies))
+    spec = _iu.spec_from_file_location("harness_t", SCRIPTS / "harness.py")
+    H = _iu.module_from_spec(spec)
+    spec.loader.exec_module(H)
+    import datetime as _d
+    # schedules
+    ps = H.parse_schedule
+    check("harness: schedule grammar", ps("WEEKDAYS 07:00") and ps("MON,THU 08:30") and ps("MONTHLY 1 07:00")
+          and ps("EVERY 6h") and ps("manual")["kind"] == "manual" and ps("NOPE 7") is None and ps("DAILY 25:00") is None)
+    mon9 = _d.datetime(2026, 10, 5, 9, 0)        # a Monday
+    check("harness: last slot of a weekday schedule",
+          H.last_slot(ps("WEEKDAYS 07:00"), mon9) == _d.datetime(2026, 10, 5, 7, 0)
+          and H.last_slot(ps("WEEKDAYS 07:00"), _d.datetime(2026, 10, 4, 9, 0)) == _d.datetime(2026, 10, 2, 7, 0))
+    check("harness: plain-English schedule", H.describe_schedule("WEEKDAYS 07:00") == "Weekdays at 07:00")
+    # flat frontmatter round-trip (Obsidian Properties + the engine reader only take flat keys)
+    fm, body = H.parse_note(H.render_fm({"a": "[[X]]", "b": True, "c": 3, "d": ["x: y", "[[Z]]"], "e": None})
+                            + "\nbody")
+    check("harness: frontmatter round-trips", fm == {"a": "[[X]]", "b": True, "c": 3, "d": ["x: y", "[[Z]]"], "e": None}
+          and body == "body", str(fm))
+    ada = FIXTURES / "personal" / "ada" / "linkedin"
+    if not ada.is_dir():
+        return
+    with tempfile.TemporaryDirectory() as d:
+        brain = Path(d) / "ada-brain"
+        r = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"), str(ada), "-o", str(brain)],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            check("harness: fixture brain builds", False, r.stderr[-300:])
+            return
+
+        def hx(*args, now=None):
+            cmd = [sys.executable, str(SCRIPTS / "harness.py"), "--brain", str(brain), "--json"]
+            if now:
+                cmd += ["--now", now]
+            rr = subprocess.run(cmd + list(args), capture_output=True, text=True)
+            try:
+                return rr.returncode, _json.loads(rr.stdout) if rr.stdout.strip() else None
+            except _json.JSONDecodeError:
+                return rr.returncode, rr.stdout
+
+        rc, w = hx("where")
+        check("harness: resolves the agentwork folder", rc == 0 and w and w.get("folder") == "96-agents", str(w))
+        rc, made = hx("routine-new", "--agent", "brain", "--title", "Weekly network review",
+                      "--schedule", "MON 08:00", "--body", "Find three strong ties gone quiet.")
+        check("harness: creates a routine note", rc == 0 and (brain / made["path"]).is_file(), str(made))
+        hx("set", "Weekly network review", "enabled", "true")
+        rc, due = hx("due", now="2026-10-05T09:00:00")
+        row = next((x for x in due if x["routine"] == "Weekly network review"), {})
+        check("harness: an enabled routine past its slot is due", row.get("action") == "run", str(row))
+        hx("fired", "Weekly network review", "--slot", row.get("slot", ""))
+        rc, due = hx("due", now="2026-10-05T09:30:00")
+        row = next((x for x in due if x["routine"] == "Weekly network review"), {})
+        check("harness: once fired, it waits for the next slot", row.get("action") == "wait", str(row))
+        # dry run: the whole lifecycle with no model
+        rc, res = hx("run", "Weekly network review")
+        check("harness: --provider none writes an Activity note and a report",
+              rc == 0 and (brain / res["run"]).is_file() and (brain / res["report"]).is_file(), str(res))
+        check("harness: a run with nothing new is quiet (not in the inbox)", res.get("news") is False)
+        rc, block = hx("last-report", "--routine", "Weekly network review", "--block")
+        check("harness: the next run gets a LAST REPORT handoff block",
+              isinstance(block, str) and "LAST REPORT" in block and "Next step" in block, str(block)[:200])
+        # a real run: handoff fence + an open question -> news, Needs you, Inbox
+        rc, op = hx("run-open", "--agent", "brain", "--routine", "Weekly network review", "--trigger", "schedule")
+        runp = brain / op["run"]
+        H2 = subprocess.run([sys.executable, str(SCRIPTS / "harness.py"), "--brain", str(brain), "run-append",
+                             op["run"], "--line", "read 10-people"], capture_output=True, text=True)
+        final = Path(d) / "final.txt"
+        final.write_text("Done.\n```report\n" + _json.dumps({
+            "done": [{"text": "Drafted 2 notes", "evidence": "`" + made["path"] + "`"}, {"text": "Claimed with no evidence"}],
+            "not_done": ["One tie has no recent context"], "next": ["Send the drafts Thursday"],
+            "needs_you": [], "news": True}) + "\n```\n", encoding="utf-8")
+        asks = Path(d) / "asks.json"
+        asks.write_text(_json.dumps([{"question": "Send the note to the first tie?", "answered": True,
+                                       "answer": "No", "reason": "wrong timing"},
+                                      {"question": "Which tie first?", "answered": False}]), encoding="utf-8")
+        rc, cl = hx("run-close", op["run"], "--status", "awaiting", "--final-file", str(final),
+                    "--asks-file", str(asks), "--wrote", made["path"])
+        rep = (brain / cl["report"]).read_text(encoding="utf-8") if cl and cl.get("report") else ""
+        check("harness: run-close writes Done / Not done yet / Next step / Needs you",
+              all(h in rep for h in ("## Done", "## Not done yet", "## Next step", "## Needs you"))
+              and "Which tie first?" in rep and "Send the drafts Thursday" in rep, rep[:300])
+        check("harness: the pass-gate marks Done items verified or not, in the report itself",
+              "Drafted 2 notes ✓" in rep and "Claimed with no evidence (couldn't verify)" in rep
+              and "verified: 1 of 2" in rep, rep[:400])
+        runtxt = runp.read_text(encoding="utf-8")
+        check("harness: the Activity note records steps, the answer and the deny reason",
+              "read 10-people" in runtxt and "wrong timing" in runtxt and "status: awaiting" in runtxt)
+        rc, inbox = hx("inbox")
+        kinds = {i["kind"] for i in inbox}
+        waiting = [i for i in inbox if i["kind"] == "needs-you"]
+        check("harness: inbox shows the waiting run ONCE, carrying its report's Needs you",
+              len(waiting) == 1 and waiting[0].get("report") == cl["report"]
+              and "Which tie first?" in waiting[0].get("needs_you", "")
+              and not any(i["kind"] == "report" and i["path"] == cl["report"] for i in inbox), str(inbox)[:400])
+        rid = waiting[0]["id"]
+        rc, inbox2 = hx("inbox", "--dismiss", rid)
+        check("harness: a dismissed inbox item stays dismissed", all(i["id"] != rid for i in inbox2))
+        # pass-gate: Done needs evidence
+        rc, ver = hx("verify", cl["report"])
+        vmap = {v["text"]: v["verified"] for v in ver} if isinstance(ver, list) else {}
+        check("harness: verify passes evidence-backed Done and fails evidence-free Done",
+              vmap.get("Drafted 2 notes") is True and vmap.get("Claimed with no evidence") is False, str(vmap))
+        # the write block's double-check: a routine run that changed a knowledge note is flagged
+        rc, op2 = hx("run-open", "--agent", "brain", "--routine", "Weekly network review", "--trigger", "schedule")
+        import time as _t
+        _t.sleep(1.1)
+        people = sorted((brain / "10-people").glob("*.md"))
+        if people:
+            people[0].write_text(people[0].read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        rc, cl2 = hx("run-close", op2["run"], "--status", "done")
+        rep2 = (brain / cl2["report"]).read_text(encoding="utf-8") if cl2 and cl2.get("report") else ""
+        rc, rv = hx("review", "list")
+        check("harness: a routine that wrote outside its folder is flagged and queued for review",
+              bool(people) and "outside its own folder" in rep2 and cl2.get("news") is True
+              and any(x.get("kind") == "unexpected" for x in (rv or [])), rep2[:300])
+        rc, wh = hx("where", "--agent", "job-search")
+        check("harness: a job-search routine may not write people, orgs or another agent's folder",
+              isinstance(wh, dict) and "10-people" in wh.get("protected", []) and "46-fundraising" in wh.get("protected", [])
+              and "45-jobs" not in wh.get("protected", []), str(wh))
+        # conditions are the agent's OWN scripts only
+        ok, why = H.eval_condition(H.Brain(str(brain)), "job-search", "cmd: build_vault.py --help | exit 0")
+        check("harness: a condition can't run a script outside its own plugin", ok is False, why)
+        ok, why = H.eval_condition(H.Brain(str(brain)), "job-search", "cmd: ../../evil.py | exit 0")
+        check("harness: a condition rejects path tricks", ok is False, why)
+        sd = brain / ".plugins" / "job-search"
+        sd.mkdir(parents=True, exist_ok=True)
+        (sd / "last-run.txt").write_text(H.now().date().isoformat(), encoding="utf-8")
+        ok, why = H.eval_condition(H.Brain(str(brain)), "job-search", "stamp_not_today: last-run.txt")
+        check("harness: stamp_not_today honours the plugin's own stamp", ok is False, why)
+        # check before starting: a missing agent fails with a plain reason, zero tokens
+        rc, made2 = hx("routine-new", "--agent", "no-such-agent", "--title", "Ghost routine")
+        rc, res2 = hx("run", "Ghost routine")
+        check("harness: a failed check becomes a preflight-failed run that needs you",
+              res2.get("status") == "preflight-failed" and res2.get("news") is True, str(res2))
+        # seeding never overwrites an edit
+        tpl = Path(d) / "tpl"
+        (tpl / "routines").mkdir(parents=True)
+        (tpl / "routines" / "Seeded one.md").write_text(H.render_fm({"schema": "sbl-routine/1", "type": "routine",
+            "tags": ["routine"], "agent": "brain", "schedule": "manual", "enabled": True}) + "\n# Seeded one\n\nv1\n",
+            encoding="utf-8")
+        rc, sd1 = hx("seed", "--from", str(tpl), "--agent", "brain")
+        seeded = brain / "96-agents" / "Routines" / "Seeded one.md"
+        check("harness: seeded templates are created OFF", rc == 0 and "enabled: false" in seeded.read_text())
+        seeded.write_text(seeded.read_text().replace("v1", "MY EDIT"), encoding="utf-8")
+        (tpl / "routines" / "Seeded one.md").write_text((tpl / "routines" / "Seeded one.md").read_text()
+                                                        .replace("v1", "v2"), encoding="utf-8")
+        rc, sd2 = hx("seed", "--from", str(tpl), "--agent", "brain")
+        check("harness: a user-edited routine is never overwritten (new version beside it)",
+              "MY EDIT" in seeded.read_text() and (seeded.parent / "Seeded one.new.md").is_file(), str(sd2))
+        (seeded.parent / "Seeded one.new.md").unlink()
+        # goals: met only from the counter, and the goal's routines switch off
+        rc, g = hx("goal-new", "--agent", "brain", "--title", "Reconnect", "--metric", "manual", "--target", "2",
+                   "--routine", "Weekly network review")
+        gp = brain / g["path"]
+        rc, pr = hx("goal-progress", "Reconnect", "--check")
+        check("harness: a goal below target stays active", pr.get("status") == "active", str(pr))
+        txt = gp.read_text(encoding="utf-8")
+        gp.write_text(txt.replace("status: active", "status: active\nprogress: 2"), encoding="utf-8")
+        rc, pr = hx("goal-progress", "Reconnect", "--check")
+        rfm = H.read_note(brain / "96-agents" / "Routines" / "Weekly network review.md")[0]
+        check("harness: reaching the target marks the goal met and pauses its routines",
+              pr.get("status") == "met" and rfm.get("enabled") is False, str(pr))
+        rc, inbox_g = hx("inbox")
+        check("harness: a met goal leaves one report in the inbox",
+              len([i for i in inbox_g if i["kind"] == "report" and i["title"].startswith("Goal met")]) == 1,
+              str([i["title"] for i in inbox_g]))
+        # a goal whose routine runs without the counter moving stops itself — checked at run close
+        hx("routine-new", "--agent", "brain", "--title", "Quiet routine", "--schedule", "manual")
+        rc, g2 = hx("goal-new", "--agent", "brain", "--title", "Quiet goal", "--metric", "manual", "--target", "5",
+                    "--routine", "Quiet routine")
+        hx("set", "Quiet goal", "stop_after_runs", "2")
+        hx("set", "Quiet routine", "goal", "[[Quiet goal]]")
+        qfm = H.read_note(brain / "96-agents" / "Routines" / "Quiet routine.md")[0]
+        check("harness: setting a goal link keeps it a link (the Studio editor sends [[Goal]])",
+              qfm.get("goal") == "[[Quiet goal]]" and H._unscalar("[[A]]") == "[[A]]"
+              and H._unscalar("[a, b]") == ["a", "b"], repr(qfm.get("goal")))
+        hx("goal-progress", "Quiet goal", "--check")
+        closes = []
+        for _ in range(2):
+            rc, o = hx("run-open", "--agent", "brain", "--routine", "Quiet routine", "--goal", "Quiet goal")
+            rc, c = hx("run-close", o["run"], "--status", "done")
+            closes.append(c)
+        g2fm = H.read_note(brain / g2["path"])[0]
+        check("harness: a goal with no progress in N runs stops, with the reason, and says so at run close",
+              g2fm.get("status") == "stopped" and "No progress" in str(g2fm.get("stopped_why"))
+              and (closes[-1] or {}).get("goal", {}).get("status") == "stopped"
+              and (closes[0] or {}).get("goal") is None, str(closes))
+        # the `changed:` condition compares against the routine's last real run
+        HB = H.Brain(str(brain))
+        ok0, _w = H.eval_condition(HB, "brain", "changed: 10-people/*.md", "Never ran")
+        ok1, _w1 = H.eval_condition(HB, "brain", "changed: 10-people/*.md", "Quiet routine")
+        people = sorted((brain / "10-people").glob("*.md"))
+        if people:
+            later = _d.datetime.now().timestamp() + 5
+            __import__("os").utime(people[0], (later, later))
+        ok2, _w2 = H.eval_condition(HB, "brain", "changed: 10-people/*.md", "Quiet routine")
+        bad, _w3 = H.eval_condition(HB, "brain", "changed: ../*.md", "Quiet routine")
+        check("harness: `changed:` runs on the first run, waits when nothing changed, fires on a change",
+              ok0 and not ok1 and ok2 and not bad, f"{_w} | {_w1} | {_w2} | {_w3}")
+        # review queue
+        rc, it = hx("review", "add", "--kind", "duplicate", "--title", "Two Ada notes?", "--note", "10-people/Ada Lovelace.md")
+        rc, inbox3 = hx("inbox")
+        check("harness: a suggestion reaches the inbox", any(i["kind"] == "suggestion" for i in inbox3))
+        # the health check's suspicions become suggestions — once, and never again once decided
+        import health as _health
+        fake_h = {"duplicate_suspicions": [["Ada Lovelace", "Ada King"]], "conflicts": []}
+        fake_g = {"nodes": [{"type": "person", "title": "Ada Lovelace", "path": "10-people/Ada Lovelace.md"},
+                            {"type": "person", "title": "Ada King", "path": "10-people/Ada King.md"}]}
+        _health.queue_suggestions(brain, fake_h, fake_g)
+        _health.queue_suggestions(brain, fake_h, fake_g)
+        rc, rv = hx("review", "list")
+        dups = [x for x in (rv or []) if x.get("kind") == "duplicate" and "Ada King" in x.get("title", "")]
+        check("harness: health suspicions reach the review queue once", len(dups) == 1, str(rv))
+        if dups:
+            hx("review", "resolve", dups[0]["id"], "--resolution", "Kept them separate")
+            _health.queue_suggestions(brain, fake_h, fake_g)
+            rc, rv2 = hx("review", "list")
+            check("harness: a suggestion you decided is never asked again",
+                  not [x for x in (rv2 or []) if x.get("kind") == "duplicate" and "Ada King" in x.get("title", "")], str(rv2))
+        # everything the harness wrote is a valid, link-clean, PII-clean note
+        vault_invariants(brain, "harness brain", [])
+        # an engine --refresh leaves the agentwork layer byte-identical
+        layer = brain / "96-agents"
+        before = {q.relative_to(layer).as_posix(): q.read_bytes() for q in layer.rglob("*") if q.is_file()}
+        rr = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"), str(ada), "-o", str(brain), "--refresh"],
+                            capture_output=True, text=True)
+        after = {q.relative_to(layer).as_posix(): q.read_bytes() for q in layer.rglob("*") if q.is_file()}
+        check("harness: build_vault --refresh leaves 96-agents byte-identical", rr.returncode == 0 and before == after,
+              rr.stderr[-300:])
+        # analyze seeds the goal prompts as routines, idempotently
+        a1 = subprocess.run([sys.executable, str(SCRIPTS / "analyze.py"), str(brain), "--goals", "jobsearch,datamining"],
+                            capture_output=True, text=True)
+        a2 = subprocess.run([sys.executable, str(SCRIPTS / "analyze.py"), str(brain), "--goals", "jobsearch,datamining"],
+                            capture_output=True, text=True)
+        check("harness: analyze turns goal prompts into routines (once)",
+              (layer / "Routines" / "Find warm intros at my target companies.md").is_file()
+              and "routine:" in a1.stdout and "routine:" not in a2.stdout, a1.stdout[-300:])
+    # continuity (company): who is the ONLY link to a team / channel / organisation
+    acme = FIXTURES / "company" / "acme"
+    if acme.is_dir():
+        with tempfile.TemporaryDirectory() as d2:
+            cb = Path(d2) / "acme"
+            subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"), str(acme), "-o", str(cb)], capture_output=True, text=True)
+            subprocess.run([sys.executable, str(SCRIPTS / "analyze.py"), str(cb), "--goals", "continuity"], capture_output=True, text=True)
+            cf = cb / "95-goals" / "continuity.md"
+            txt = cf.read_text(encoding="utf-8") if cf.is_file() else ""
+            check("harness: the continuity report names single points of failure",
+                  "| Person | Only link to | What |" in txt and "[[" in txt, txt[:200])
+            check("harness: the continuity prompt becomes a handover routine",
+                  (cb / "96-agents" / "Routines" / "Draft handovers for single points of failure.md").is_file())
+    # every plugin's templates parse and carry valid schedules + known outcome counters
+    for name in ("job-search", "fundraising", "travel-planner"):
+        root = REPO / "plugins" / name
+        sj = _json.loads((root / "studio.json").read_text(encoding="utf-8"))
+        tdir = root / sj.get("templates", "harness")
+        rts = sorted((tdir / "routines").glob("*.md"))
+        gls = sorted((tdir / "goals").glob("*.md"))
+        okr = all(H.parse_schedule(H.read_note(p)[0].get("schedule")) is not None
+                  and H.read_note(p)[0].get("enabled") is False for p in rts)
+        okg = all(str(H.read_note(p)[0].get("metric")) in (sj.get("outcomes") or {}) for p in gls)
+        check(f"harness: {name} ships routine + goal templates (valid, off, counted)", rts and gls and okr and okg)
+
+
+
+def test_dev_tools():
+    """Step 9 (for developers): retrieval.py matches Studio's brain-retrieval.ts exactly (golden
+    file generated by the TypeScript), query.py is read-only, `sbl eval --harness` passes with no
+    model, the `sbl` dispatcher and the stdio MCP server answer."""
+    import json as _json
+    print("\n[dev tools]")
+    sys.path.insert(0, str(SCRIPTS))
+    import retrieval as _r
+    gdir = FIXTURES / "retrieval"
+    if (gdir / "golden.json").is_file():
+        g = _json.loads((gdir / "graph.json").read_text(encoding="utf-8"))
+        gold = _json.loads((gdir / "golden.json").read_text(encoding="utf-8"))["packs"]
+        bad = []
+        for gp in gold:
+            pk = _r.build_pack(gp["query"], g["notes"], g["edges"])
+            diff = max([abs(pk["activations"][k] - gp["activations"][k]) for k in gp["activations"]] or [0])
+            if (list(pk["activations"]) != list(gp["activations"]) or diff > 1e-12 or pk["seeds"] != gp["seeds"]
+                    or pk["waves"] != gp["waves"] or pk["triples"] != gp["triples"]):
+                bad.append(gp["query"])
+        check("retrieval.py reproduces brain-retrieval.ts exactly (golden file)", not bad, str(bad))
+    acme = FIXTURES / "company" / "acme"
+    with tempfile.TemporaryDirectory() as d:
+        brain = Path(d) / "acme"
+        subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"), str(acme), "-o", str(brain)], capture_output=True, text=True)
+        q = subprocess.run([sys.executable, str(SCRIPTS / "query.py"), str(brain), "--ask", "counts", "--json"], capture_output=True, text=True)
+        rows = _json.loads(q.stdout or "[]")
+        check("query.py counts notes by layer and type", any(r.get("type") == "person" for r in rows), q.stderr[-200:])
+        w = subprocess.run([sys.executable, str(SCRIPTS / "query.py"), str(brain), "--sql", "DELETE FROM notes"], capture_output=True, text=True)
+        check("query.py refuses anything but a SELECT", w.returncode != 0)
+        a = subprocess.run([sys.executable, str(SCRIPTS / "retrieval.py"), str(brain), "Grace Hopper", "--json"], capture_output=True, text=True)
+        pack = _json.loads(a.stdout or "{}")
+        check("retrieval.py answers from a built brain", any("Grace" in k for k in pack.get("activations", {})), a.stderr[-200:])
+        sbl = subprocess.run([sys.executable, str(REPO / "sbl"), "query", str(brain), "--ask", "counts"], capture_output=True, text=True)
+        check("sbl dispatches to the engine scripts", sbl.returncode == 0 and "person" in sbl.stdout)
+        msgs = "\n".join(_json.dumps(m) for m in [
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}},
+            {"jsonrpc": "2.0", "method": "notifications/initialized"},
+            {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+            {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "sbl_query", "arguments": {"brain": str(brain), "ask": "counts"}}}]) + "\n"
+        mcp = subprocess.run([sys.executable, str(REPO / "integrations" / "mcp" / "server.py")], input=msgs, capture_output=True, text=True, timeout=120)
+        out = [_json.loads(l) for l in mcp.stdout.splitlines() if l.strip()]
+        ok = (len(out) == 3 and out[0]["result"]["serverInfo"]["name"] == "second-brain-link"
+              and len(out[1]["result"]["tools"]) >= 5 and "person" in out[2]["result"]["content"][0]["text"])
+        check("the MCP server initializes, lists its tools and answers a call (stdio, no port)", ok, mcp.stderr[-300:])
+    ev = subprocess.run([sys.executable, str(SCRIPTS / "eval.py"), "--harness"], capture_output=True, text=True, timeout=600)
+    check("sbl eval --harness: every safety rule holds with no model", ev.returncode == 0, ev.stdout[-600:])
+
 
 def test_refresh_v2():
     """M3 incremental updates: --refresh preserves user notes and edits, updates
@@ -2478,6 +2835,457 @@ def test_final_sweep():
           'apply_layout(_mapping.load_brain_layout(), "company")' in psrc)
 
 
+def _tree_snapshot(root: Path):
+    """(rel, size, mtime_ns, sha256) of every file under root — incl. .git/."""
+    import hashlib
+    import os as _os
+    snap = {}
+    for dp, dn, fn in _os.walk(root, followlinks=False):
+        for f in fn:
+            p = Path(dp) / f
+            if p.is_symlink():
+                snap[str(p.relative_to(root))] = ("link", _os.readlink(p))
+                continue
+            st = p.stat()
+            snap[str(p.relative_to(root))] = (st.st_size, st.st_mtime_ns,
+                                              hashlib.sha256(p.read_bytes()).hexdigest())
+    return snap
+
+
+def test_docs_sources():
+    """Document-store sources (git_docs / google_drive): linked read-only through
+    _SOURCE_LINK.json, tiered by the local scanner, rendered into the docs layer.
+    Sensitive content never reaches the vault; every walked path is accounted
+    for; originals (and .git/) stay byte-identical; --refresh is a no-op."""
+    import os as _os
+    sys.path.insert(0, str(REPO / "tools"))
+    import gen_docs_fixture as gdf
+    import docscan
+    import doctax
+    import doclink
+    from sources.common import scrub_body
+
+    # ---- scanner units: positive + guarded negative per rule family ----
+    r = docscan.load_rules()
+    pos = {"aws-access-key": f"k {gdf.FAKE_AWS}", "private-key-block": gdf.FAKE_PEM,
+           "generic-assignment": gdf.FAKE_PASSWORD_LINE,
+           "jwt": "eyJhbGciOiJIUzI1NiJ9a.eyJzdWIiOiIxMjM0NTY3ODkwIn0a.dozjgNryP4J3jVmNHl0w5N",
+           "postman-environment": '{"_postman_variable_scope": "environment"}',
+           "db-connection-string": "postgres://app:" + "s3cretPw@db.internal:5432/x"}
+    for rid, text in pos.items():
+        check(f"docscan: {rid} fires", rid in docscan.content_reasons(text, r))
+    check("docscan: placeholder value is not a secret",
+          not docscan.content_reasons("password = <your-password>", r))
+    check("docscan: public test PAN is not a card leak",
+          "card-luhn" not in docscan.content_reasons("test card 4111 1111 1111 1111", r))
+    check("docscan: tokenization prose is clean",
+          not docscan.content_reasons("The TSP issues a network token per device.", r))
+    nm = lambda n: docscan.name_reasons({"name": n, "rel": n, "ext": ""}, r)
+    check("docscan: credentials sheet flagged by name", "name-credentials" in nm("Acme-Access-Credentials.md"))
+    check("docscan: password-policy doc allowed", not nm("password-policy-technical-specification.md"))
+    check("docscan: tokenization doc allowed", not nm("Device Tokenization Guide.md"))
+    check("docscan: .env flagged", bool(nm(".env.production")))
+    t, m, enc, _ = docscan.extract_ooxml(gdf._ooxml("docx", ["hello agreement"]), 10 ** 6)
+    check("docscan: OOXML text extracted (stdlib)", "hello agreement" in t and m == "ooxml")
+    t, m, enc = docscan.extract_pdf(gdf._pdf("Quarterly plan"), 10 ** 6)
+    check("docscan: PDF Tj text extracted (best effort)", "Quarterly plan" in t)
+    check("scrub_body: phone + email masked, dates kept",
+          scrub_body(f"call {gdf.PLANTED_PHONE}, {gdf.PLANTED_EMAIL}, 2025-03-01 - 2025-04-01")
+          == "call [phone removed], [email removed], 2025-03-01 - 2025-04-01")
+    # ---- taxonomy units ----
+    tr = doctax.load_rules()
+    c = doctax.classify("customers/Northwind-Data-Access-Credentials.md", tr)
+    check("doctax: customer entity from filename prefix",
+          c["category"] == "customers" and c["entity"] == "Northwind Data", str(c))
+    check("doctax: folder outranks filename token",
+          doctax.classify("product/Launch-Plan.md", tr)["category"] == "product")
+    ka = doctax.version_info("Deck-v2", [], tr)
+    kb = doctax.version_info("Deck-final", [], tr)
+    kc = doctax.version_info("Deck-v1", [], tr)
+    check("doctax: version ordering v1 < v2 < final",
+          ka[0] == kb[0] == kc[0] and kc[2] < ka[2] < kb[2])
+
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        store = gdf.generate(d / "store")
+        drive = gdf.generate_drive(d / "drive")
+        data = d / "data"
+        for kind, root in (("git_docs", store), ("google_drive", drive)):
+            r_ = subprocess.run([sys.executable, str(SCRIPTS / "doclink.py"), "init", "--kind", kind,
+                                 "--root", str(root), "--out", str(data / "company" / "initech" / kind),
+                                 "--label", f"Initech {kind}"], capture_output=True, text=True)
+            check(f"doclink: init {kind}", r_.returncode == 0, r_.stdout + r_.stderr)
+        # refuse a dangerous root
+        r_ = subprocess.run([sys.executable, str(SCRIPTS / "doclink.py"), "init", "--kind", "git_docs",
+                             "--root", str(Path.home()), "--out", str(d / "x" / "git_docs")],
+                            capture_output=True, text=True)
+        check("doclink: refuses to link the home folder", r_.returncode != 0)
+        # a git history (temp repo, local only) for the git metadata path
+        git_ok = shutil.which("git") is not None
+        if git_ok:
+            env = dict(_os.environ, GIT_AUTHOR_NAME="Grace Hopper", GIT_AUTHOR_EMAIL="g" + "@example.com",
+                       GIT_COMMITTER_NAME="Grace Hopper", GIT_COMMITTER_EMAIL="g" + "@example.com",
+                       GIT_AUTHOR_DATE="2024-02-01T10:00:00", GIT_COMMITTER_DATE="2024-02-01T10:00:00")
+            for args in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "docs"]):
+                subprocess.run(["git", "-C", str(store), *args], env=env, capture_output=True)
+            (store / "untracked-note.md").write_text("# Untracked\n\nnot committed yet\n", encoding="utf-8")
+        before = _tree_snapshot(store)
+        before_drive = _tree_snapshot(drive)
+        out = d / "vault"
+        _os.chmod(store, 0o555)
+        try:
+            r_ = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"), str(data), "-o", str(out)],
+                                capture_output=True, text=True)
+        finally:
+            _os.chmod(store, 0o755)
+        check("docs: build with a read-only store succeeds", r_.returncode == 0, (r_.stdout + r_.stderr)[-600:])
+        brain = out / "company" / "initech-brain"
+        docs = brain / "65-documents"
+        check("docs: documents layer written", (docs / "Documents.md").exists())
+        check("docs: originals byte-identical after build (incl. .git/)", _tree_snapshot(store) == before)
+        check("docs: drive folder byte-identical after build", _tree_snapshot(drive) == before_drive)
+
+        alltext = "\n".join(p.read_text(encoding="utf-8", errors="replace")
+                            for p in brain.rglob("*") if p.is_file() and p.suffix in (".md", ".json"))
+        allbytes = b"".join(p.read_bytes() for p in brain.rglob("*") if p.is_file())
+        for needle in (gdf.NEEDLE_BODY, gdf.FAKE_AWS, gdf.FAKE_PEM, "Tr0ub4dor", gdf.PLANTED_EMAIL,
+                       "zq81Lr0PAm2Nx7Kd", "lead3@example.org"):
+            check(f"docs: planted secret never reaches the vault ({needle[:12]}…)",
+                  needle not in alltext and needle.encode() not in allbytes)
+        check("docs: docscan audit of the brain is clean", not docscan.audit(brain))
+
+        def note(rel):
+            p = docs / rel
+            return p.read_text(encoding="utf-8") if p.exists() else ""
+        cred = note("customers/northwind-data/northwind-data-access-credentials.md")
+        check("docs: credentials sheet is a metadata-only stub",
+              "sensitivity: sensitive-name" in cred and "content not imported" in cred
+              and 'entity: "[[Northwind Data]]"' in cred, cred[:300])
+        for rel, tier in (("ops/config/env.md", "sensitive-name"),
+                          ("ops/postman/initech-postman-environment.md", "sensitive-name"),
+                          ("compliance-security/pen-tests/q1-scan-report.md", "sensitive-path"),
+                          ("engineering/notes-on-setup.md", "secret-detected"),
+                          ("inbox/sales/contacts.md", "pii-dense"),
+                          ("inbox/sales/intro-call.md", "sensitive-name"),
+                          ("inbox/exports/bundle.md", "archive")):
+            check(f"docs: {rel} → {tier} stub", f"sensitivity: {tier}" in note(rel), note(rel)[:200])
+        lp = note("product/launch-plan.md")
+        check("docs: clean md imported with body, links rewritten, pdf render copied",
+              "# Launch plan" in lp and "[[pricing-model|" in lp and "[[deployment-guide|" in lp
+              and "_files/" in lp and "[phone removed]" in lp and "[email removed]" in lp, lp[-700:])
+        check("docs: version chain (v2 is latest)",
+              "superseded_by: \"[[launch-plan-v2]]\"" in lp
+              and 'is_latest: "true"' in note("product/launch-plan-v2.md"))
+        check("docs: password policy stays clean", "sensitivity: clean" in note("compliance-security/password-policy.md"))
+        check("docs: test PAN doc stays clean (number masked in body)",
+              "sensitivity: clean" in note("product/device-tokenization.md")
+              and "[card number removed]" in note("product/device-tokenization.md"))
+        check("docs: office files imported with extracted text + copy",
+              "Initech seed round" in note("fundraising/seed-deck.md")
+              and "file_status: copied" in note("fundraising/seed-deck.md"))
+        dg = note("engineering/deployment-guide.md")
+        check("docs: byte-identical duplicate kept once (non-archive path wins)",
+              "archive-old/Deployment-Guide.md" in dg, dg[:600])
+        sv = note("engineering/system-architecture.md")
+        check("docs: SVG document renders as an image (no XML source, viewBox intact in the copy)",
+              "![System-Architecture](" in sv and "<svg" not in sv
+              and any("0 0 1000 700" in f.read_text() for f in (docs / "_files").rglob("*.svg")), sv[-400:])
+        check("docs: people named with a role in clean docs become people notes",
+              (brain / "10-people" / "Bill Lumbergh.md").exists() and (brain / "10-people" / "Milton Waddams.md").exists()
+              and (brain / "10-people" / "Samir Nagheenanajar.md").exists()
+              and "relationship: founder" in (brain / "10-people" / "Bill Lumbergh.md").read_text()
+              and "relationship: advisor" in (brain / "10-people" / "Milton Waddams.md").read_text())
+        check("docs: nobody is mined from a metadata-only document",
+              not any((brain / "10-people").glob("Lead*.md")))
+        org = (brain / "00-org" / "organization.md")
+        check("docs: doc-only company brain gets its organization note + logo",
+              org.exists() and "avatar:" in org.read_text() and (brain / "_assets" / "logo.svg").exists())
+        abrain = d / "analyzed-brain"
+        shutil.copytree(brain, abrain)
+        r_ = subprocess.run([sys.executable, str(SCRIPTS / "analyze.py"), str(abrain), "--goals", "onboarding"],
+                            capture_output=True, text=True)
+        cg = (abrain / "95-goals" / "company-goals.md")
+        vault_invariants(abrain, "analyzed docs brain", [gdf.NEEDLE_BODY, gdf.PLANTED_EMAIL])
+        sys.path.insert(0, str(SCRIPTS))
+        import build_vault as _bv
+        st_ = _bv.refresh_sync(brain, abrain)
+        check("analyze's own rewrites (Home, _SUMMARY, graph.json) never show up as refresh conflicts",
+              not st_["conflicts"] and not list(abrain.glob("*.new.*")), str(st_["conflicts"]))
+        check("docs: analyze derives company goals from the documents",
+              r_.returncode == 0 and cg.exists() and "Reach 10 paying customers by Q4 2025" in cg.read_text()
+              and "not a goal" not in cg.read_text(), (r_.stdout + r_.stderr)[-300:])
+        gl = note("engineering/glyph.md")
+        gcopy = next(iter((docs / "_files").rglob("Glyph.svg")), None)
+        check("docs: an SVG without xmlns is namespaced in the vault copy (original untouched)",
+              gcopy is not None and b"http://www.w3.org/2000/svg" in gcopy.read_bytes()
+              and b"xmlns" not in (store / "engineering" / "Glyph.svg").read_bytes() and "![Glyph](" in gl)
+        ri = note("product/remote-image.md")
+        check("docs: a remote image with a local twin renders from the local copy",
+              "](https://example.com" not in ri and "![flow](65-documents/_files/" in ri, ri[-300:])
+        # ---- graph structure: areas, root, no author star ----
+        gjs = json.loads((brain / "graph.json").read_text(encoding="utf-8"))
+        gnodes = {n["id"]: n for n in gjs["nodes"]}
+        gdeg = {}
+        for e_ in gjs["edges"]:
+            gdeg[e_["a"]] = gdeg.get(e_["a"], 0) + 1
+            gdeg[e_["b"]] = gdeg.get(e_["b"], 0) + 1
+        doc_ids = [i for i, n in gnodes.items() if n.get("type") == "document"]
+        in_cat = {e_["a"] for e_ in gjs["edges"] if e_["type"] == "in_category"}
+        check("graph: every document sits in an area (in_category edge)",
+              doc_ids and all(i in in_cat for i in doc_ids),
+              str([i for i in doc_ids if i not in in_cat][:3]))
+        check("graph: category hub notes exist and hang under Documents",
+              any(n.get("type") == "document-category" for n in gnodes.values())
+              and "[[Documents]]" in (docs / "product" / "Product.md").read_text(encoding="utf-8"))
+        check("graph: the company root is connected",
+              gdeg.get("00-org/organization", 0) > 0, str(gdeg.get("00-org/organization")))
+        if git_ok:
+            check("graph: a dominant author is not linked from every document",
+                  not any(e_["type"] == "authored" for e_ in gjs["edges"])
+                  and "documents_authored:" in (brain / "10-people" / "Grace Hopper.md").read_text(encoding="utf-8"))
+        check("graph: document sub-layers are listed for Studio's lanes",
+              any(l.get("parent") == "docs" for l in gjs["layers"]) or len(doc_ids) < 60)
+        check("graph: no plain 'linked' edge duplicates a typed one",
+              not any(e_["type"] == "linked" and e_["a"] in doc_ids and gnodes.get(e_["b"], {}).get("type") == "document-category"
+                      for e_ in gjs["edges"]))
+        check("docs: agent tooling categorised", (docs / "engineering" / "agent-tooling").is_dir())
+        gd = note("company/strategy/vision-2025.md")
+        check("docs: .gdoc → url + id only, account email never read",
+              "docs.google.com/document/d/abc123" in gd and gdf.PLANTED_EMAIL not in gd, gd[:400])
+        check("docs: no .md under _files/", not list((docs / "_files").rglob("*.md")))
+        check("docs: no absolute path in any note", str(d) not in alltext.replace(
+            (brain / ".claude" / "settings.json").read_text(encoding="utf-8") if (brain / ".claude" / "settings.json").exists() else "", ""))
+        st = json.loads((brain / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        check("docs: agent deny rules cover the original roots",
+              any(str(store.resolve()).lstrip("/") in x and x.startswith("Read(//") for x in st["permissions"]["deny"]),
+              str(st)[:300])
+        cov = note("_DOCS_COVERAGE.md")
+        walked = sum(1 for x in doclink.walk({"root_path": store.resolve(), "include": ["**"], "exclude": []}))
+        walked += sum(1 for x in doclink.walk({"root_path": drive.resolve(), "include": ["**"], "exclude": []}))
+        rows = [ln for ln in cov.splitlines() if ln.startswith("- `")]
+        git_rows = [x for x in rows if x.startswith("- `.git/")]
+        check("docs: coverage has one row per walked path", len(rows) == walked, f"{len(rows)} vs {walked}")
+        check("docs: .git/ not walked (one summary row), symlink not followed",
+              (not git_ok or (len(git_rows) == 1 and "folder not walked" in git_rows[0]))
+              and any("link-outside` — symlink (not followed)" in x for x in rows), str(git_rows[:3]))
+        guide = (brain / "CLAUDE.md").read_text(encoding="utf-8")
+        check("docs: in-vault guide carries the Documents rules", "65-documents/Documents.md" in guide
+              and "NEVER read, open, grep or list anything OUTSIDE this vault" in guide)
+        check("docs: _STRUCTURE.md lists the documents layer", "65-documents/" in
+              (brain / "_STRUCTURE.md").read_text(encoding="utf-8"))
+        if git_ok:
+            check("docs: git authors become people (names only)",
+                  (brain / "10-people" / "Grace Hopper.md").exists() and "g@example.com" not in alltext)
+            check("docs: git dates + vcs status on notes",
+                  "last_commit: 2024-02-01" in lp and "vcs_status: tracked" in lp
+                  and "vcs_status: untracked" in note("inbox/untracked-note.md"))
+        vault_invariants(brain, "docs brain", ["secret-body-do-not-leak", gdf.PLANTED_EMAIL])
+        gj = json.loads((brain / "graph.json").read_text(encoding="utf-8"))
+        check("docs: graph has document nodes, no _index/_files nodes",
+              any(n.get("type") == "document" for n in gj["nodes"])
+              and not any("/_index/" in n["id"] or "/_files/" in n["id"] for n in gj["nodes"]))
+
+        # ---- refresh is a no-op on unchanged stores; originals still untouched ----
+        r_ = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"), str(data), "-o", str(out), "--refresh"],
+                            capture_output=True, text=True)
+        rep = (brain / "_UPDATE_REPORT.md").read_text() if (brain / "_UPDATE_REPORT.md").exists() else ""
+        check("docs: --refresh on unchanged stores = 0 conflicts, 0 updated",
+              r_.returncode == 0 and "conflicts (kept yours, fresh copy beside as *.new.md): 0" in rep
+              and "- updated: 0" in rep, rep[:400] + r_.stderr[-300:])
+        check("docs: originals byte-identical after refresh", _tree_snapshot(store) == before)
+        # ---- --exclude git_docs leaves the store out entirely ----
+        r_ = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"), str(data), "-o", str(d / "v2"),
+                             "--exclude", "git_docs"], capture_output=True, text=True)
+        cov2 = (d / "v2" / "company" / "initech-brain" / "65-documents" / "_DOCS_COVERAGE.md")
+        check("docs: --exclude git_docs skips the linked store",
+              r_.returncode == 0 and cov2.exists() and "Initech git_docs" not in cov2.read_text())
+
+
+def test_company_graph_links():
+    """Company brains: deals link their account, the company's own posts link the
+    organization root, and the root links its map — no unlinked deal/post clouds."""
+    acme = FIXTURES / "company" / "acme"
+    if not acme.is_dir():
+        return
+    with tempfile.TemporaryDirectory() as d:
+        data = Path(d) / "data" / "company" / "acme"
+        shutil.copytree(acme, data)
+        out = Path(d) / "v"
+        r_ = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"), str(Path(d) / "data"), "-o", str(out)],
+                            capture_output=True, text=True)
+        brain = out / "company" / "acme-brain"
+        check("company graph: acme builds", r_.returncode == 0, r_.stderr[-300:])
+        g = json.loads((brain / "graph.json").read_text(encoding="utf-8"))
+        deg = {}
+        for e_ in g["edges"]:
+            deg[e_["a"]] = deg.get(e_["a"], 0) + 1
+            deg[e_["b"]] = deg.get(e_["b"], 0) + 1
+        deals = [n["id"] for n in g["nodes"] if n.get("type") == "deal"]
+        posts = [n["id"] for n in g["nodes"] if n.get("type") == "post"]
+        check("company graph: every deal is linked (account or the company)",
+              all(deg.get(i, 0) > 0 for i in deals), str([i for i in deals if not deg.get(i)][:3]))
+        check("company graph: every company post is linked to the organization",
+              all(deg.get(i, 0) > 0 for i in posts), str([i for i in posts if not deg.get(i)][:3]))
+        check("company graph: the organization root is connected",
+              deg.get("00-org/organization", 0) > 0)
+        vault_invariants(brain, "acme graph brain", [])
+
+
+def test_team_roster():
+    """teamroster.py — a company brain's own team from the user's personal brains
+    (exact company match only; the owner's current position) and a team.json roster;
+    a person named only in a customer document never becomes a company person."""
+    import tempfile
+    import teamroster
+    import docentities
+    from sources.common import Collector
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        pb = td / "personal" / "ada-brain"
+        (pb / "10-people").mkdir(parents=True)
+        (pb / "00-me").mkdir(parents=True)
+        def person(n, comp, role):
+            (pb / "10-people" / f"{n}.md").write_text(
+                f'---\ntype: person\ntitle: {n}\ncompany: "[[{comp}]]"\nrole: "{role}"\nstrength: 3\n---\n')
+        person("Grace Hopper", "Globex", "Co-Founder & COO")
+        person("Ned Stark", "Globex Inc.", "Board Member")
+        person("Ann Other", "Globex Air Lines", "CEO")   # a different company
+        (pb / "00-me" / "identity.md").write_text(
+            "---\ntitle: Ada Lovelace\n---\n\n- **Co-Founder & CTO** — [[Globex]] (2024 – Present)\n"
+            "- **CTO** — [[Globex]] (2019 – 2021)\n")
+        root = td / "data" / "company" / "globex"
+        root.mkdir(parents=True)
+        (root / "team.json").write_text('[{"name": "Kim Roster", "role": "Advisor"}]')
+        out = td / "company" / "globex-brain"
+        out.mkdir(parents=True)
+        brains = teamroster.personal_brains(out)
+        check("team: sibling personal brains auto-detected", [b.name for b in brains] == ["ada-brain"])
+        col = Collector()
+        col.add_person("git_docs", "Grace Hopper", role="COO", company="Globex",
+                       tags=["person/executive", "person/mentioned-in-docs"])
+        teamroster.apply(col, "Globex", brains=brains, roster_root=root)
+        names = {r["name"]: r for r in col.people.values()}
+        check("team: exact company match joins, a longer company name does not",
+              "Grace Hopper" in names and "Ned Stark" in names and "Ann Other" not in names, sorted(names))
+        check("team: the owner's CURRENT position only", names.get("Ada Lovelace", {}).get("role") == "Co-Founder & CTO")
+        check("team: own title beats a passing doc mention (kept as also-reported)",
+              names["Grace Hopper"]["role"] == "Co-Founder & COO"
+              and any(a[0] == "COO" for a in names["Grace Hopper"]["alt"].get("role", [])))
+        check("team: board member tagged board", "person/board" in names["Ned Stark"]["tags"])
+        check("team: roster file adds people no source names", "Kim Roster" in names
+              and "person/advisor" in names["Kim Roster"]["tags"])
+        check("team: no relationship fields cross over", not any(
+            "strength" in r or r.get("connected_on") for r in names.values()))
+    check("docs: role tail loses a dangling joiner",
+          docentities._clean_role("Product Manager, Digital Product and") == "Product Manager, Digital Product")
+
+
+def test_docs_connector():
+    """plugins/docs-connector — the networked half of the document stores, tested
+    OFFLINE: the git path clones a local temp repository; the Drive path runs
+    against an injected fake HTTP layer. The mirror lives outside the data folder,
+    the link is mode 'connector', the Drive sidecar carries no e-mail addresses,
+    syncs are incremental, and a reseed brings the mirror into the brain."""
+    import importlib.util
+    import os as _os
+    p = REPO / "plugins" / "docs-connector" / "skills" / "docs-connect" / "scripts" / "connector.py"
+    if not p.is_file():
+        return
+    spec = importlib.util.spec_from_file_location("sbl_connector", p)
+    con = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(con)
+    try:
+        con.check_git_url("https://user:pw@example.com/org/repo.git")
+        refused = False
+    except SystemExit:
+        refused = True
+    check("connector: refuses a URL with embedded credentials", refused)
+
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        data = d / "data"
+        _os.environ["SBL_CONNECTOR_HOME"] = str(d / "home")
+        _os.environ["SBL_DRIVE_TOKEN_FILE"] = str(d / "home" / "token.json")
+        try:
+            # ---- git (local temp repository; no network) ----
+            if shutil.which("git"):
+                src = d / "remote"
+                src.mkdir()
+                (src / "Plan.md").write_text("# Plan\n\nShip it.\n", encoding="utf-8")
+                env = dict(_os.environ, GIT_AUTHOR_NAME="Ada Lovelace", GIT_AUTHOR_EMAIL="a" + "@example.com",
+                           GIT_COMMITTER_NAME="Ada Lovelace", GIT_COMMITTER_EMAIL="a" + "@example.com")
+                for args in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "one"]):
+                    subprocess.run(["git", "-C", str(src), *args], env=env, capture_output=True)
+                r_ = subprocess.run([sys.executable, str(p), "add-git", "--data", str(data), "--entity", "initech",
+                                     "--url", str(src)], capture_output=True, text=True, env=env)
+                check("connector: add-git clones into the mirror", r_.returncode == 0, r_.stdout + r_.stderr)
+                link = json.loads((data / "company/initech/git_docs/_SOURCE_LINK.json").read_text())
+                mirror = Path(link["root"])
+                check("connector: link is mode connector, mirror outside data/",
+                      link["mode"] == "connector" and data.resolve() not in mirror.parents
+                      and (mirror / "Plan.md").is_file())
+                (src / "Roadmap.md").write_text("# Roadmap\n\nQ3.\n", encoding="utf-8")
+                for args in (["add", "-A"], ["commit", "-q", "-m", "two"]):
+                    subprocess.run(["git", "-C", str(src), *args], env=env, capture_output=True)
+                r_ = subprocess.run([sys.executable, str(p), "sync", "--data", str(data)],
+                                    capture_output=True, text=True, env=env)
+                link = json.loads((data / "company/initech/git_docs/_SOURCE_LINK.json").read_text())
+                check("connector: sync fast-forwards the mirror",
+                      r_.returncode == 0 and (mirror / "Roadmap.md").is_file()
+                      and link["connector"].get("last_sync"), r_.stdout + r_.stderr)
+                out = d / "vault"
+                r_ = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"), str(data), "-o", str(out)],
+                                    capture_output=True, text=True)
+                brain = out / "company" / "initech-brain"
+                check("connector: reseed brings the mirror into the brain",
+                      r_.returncode == 0 and any(brain.rglob("roadmap.md")), r_.stderr[-300:])
+
+            # ---- Google Drive (fake HTTP layer; no network) ----
+            Path(_os.environ["SBL_DRIVE_TOKEN_FILE"]).parent.mkdir(parents=True, exist_ok=True)
+            Path(_os.environ["SBL_DRIVE_TOKEN_FILE"]).write_text(json.dumps(
+                {"refresh_token": "r", "client_id": "c", "client_secret": "s"}))
+            state = {"files": {
+                "root": [{"id": "f1", "name": "Strategy", "mimeType": "application/vnd.google-apps.folder"},
+                         {"id": "d1", "name": "Notes.md", "mimeType": "text/markdown", "size": "12",
+                          "md5Checksum": "m1", "modifiedTime": "2025-01-02T00:00:00Z",
+                          "owners": [{"displayName": "Grace Hopper", "emailAddress": "g" + "@example.com"}]}],
+                "f1": [{"id": "g1", "name": "Vision", "mimeType": "application/vnd.google-apps.document",
+                        "modifiedTime": "2025-02-01T00:00:00Z", "webViewLink": "https://docs.google.com/document/d/g1"}]},
+                "downloads": 0}
+
+            def fake_http(method, url, body, headers):
+                if url.startswith(con.TOKEN_URL):
+                    return {"access_token": "t", "expires_in": 3600}
+                if "/export" in url or "alt=media" in url:
+                    state["downloads"] += 1
+                    return b"# exported\n" if "/export" in url else b"# Notes\nhello\n"
+                q = urllib_parse.parse_qs(urllib_parse.urlsplit(url).query)["q"][0]
+                fid = q.split("'")[1]
+                return {"files": state["files"].get(fid, [])}
+
+            import urllib.parse as urllib_parse
+            con.write_link(str(data), "initech", "google_drive", con.mirror_dir("initech", "google_drive"),
+                           "Initech Drive", {"kind": "drive", "folder": "root"})
+            mir = con.mirror_dir("initech", "google_drive")
+            st = con.sync_drive(mir, "root", str(data), "initech", http=fake_http)
+            side = (data / "company/initech/google_drive/_SOURCE_MANIFEST.json").read_text()
+            check("connector: drive files + exported native doc land in the mirror",
+                  (mir / "Notes.md").is_file() and (mir / "Strategy" / "Vision.docx").is_file()
+                  and st["downloaded"] == 2, str(st))
+            check("connector: drive sidecar keeps owner names, never e-mail addresses",
+                  "Grace Hopper" in side and "@example.com" not in side)
+            st2 = con.sync_drive(mir, "root", str(data), "initech", http=fake_http)
+            check("connector: unchanged drive files are not downloaded again",
+                  st2["downloaded"] == 0 and st2["unchanged"] == 2, str(st2))
+            state["files"]["root"] = state["files"]["root"][:1]
+            st3 = con.sync_drive(mir, "root", str(data), "initech", http=fake_http)
+            check("connector: files deleted in Drive leave the mirror",
+                  st3["removed"] == 1 and not (mir / "Notes.md").exists(), str(st3))
+        finally:
+            _os.environ.pop("SBL_CONNECTOR_HOME", None)
+            _os.environ.pop("SBL_DRIVE_TOKEN_FILE", None)
+
+
 def main():
     print("Second Brain Link — test harness\n")
     test_read_csv_preamble()
@@ -2510,6 +3318,12 @@ def main():
     test_final_sweep()
     test_plugins()
     test_travel_plugin()
+    test_harness()
+    test_dev_tools()
+    test_docs_sources()
+    test_docs_connector()
+    test_team_roster()
+    test_company_graph_links()
     # Per-source fixtures live at tests/fixtures/<personal|company>/<entity>/<source>/.
     # Build each single source export on its own (exercises every adapter + the
     # vault invariants), independent of the multi-entity orchestration above.

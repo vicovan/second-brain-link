@@ -407,6 +407,16 @@ def build_data_catalog(brain: Path, people):
     # company: deals/campaigns are first-class pipeline notes (one note each)
     deal_n, deal_src, _ = (scan_layer(brain, lay["career"])
                            if subject == "company" else (0, Counter(), set()))
+    doc_n, doc_stub, doc_src = 0, 0, Counter()
+    DOC = lay.get("docs", "65-documents")
+    for p_, fm_ in _iter_fm(brain / DOC):
+        if "_index" in p_.parts or "_files" in p_.parts or not re.search(r"(?m)^type: document$", fm_):
+            continue
+        doc_n += 1
+        if not re.search(r"(?m)^sensitivity: (clean|unverified)$", fm_):
+            doc_stub += 1
+        for s_ in re.findall(r"source/([a-z0-9_\-]+)", fm_):
+            doc_src[s_] += 1
     corr = sum(1 for p in people if p["last_contact"])
     warm = sum(1 for p in people if p["status"] == "warm")
     dormant = sum(1 for p in people if p["status"] == "dormant")
@@ -435,7 +445,9 @@ def build_data_catalog(brain: Path, people):
              ("Events & meetings" if subject == "company" else "Events", events,
               f"`{LRN}/`", "name, date, attendees (aggregate)"),
              ("Searches", searches, f"`{SRCH}/search-log.md`", "query (aggregate)"),
-         ], ["Node type", "Count", "Where", "Key fields"]), "",
+         ] + ([("Documents", f"{doc_n} ({doc_stub} metadata-only)", f"`{DOC}/`",
+                "title, category, doc_type, entity, authors, updated, version, sensitivity")]
+              if doc_n else []), ["Node type", "Count", "Where", "Key fields"]), "",
          "## Relations (edges)", "",
          _table([
              ("person —works_at→ org", works_at, "`#person` `company`", "people with a company"),
@@ -447,7 +459,9 @@ def build_data_catalog(brain: Path, people):
              ("you —checked_in/saved→ place", plc_n, f"`{PLC}`", "places (lat/lng → Map View)"),
              ("you —invited_to→ event", events, f"`{LRN}`", "events + meetings"),
              ("algorithm —infers→ you", mirror, f"`{MIR}`", "the platforms' model of you"),
-         ], ["Relation", "Count", "Tag / field", "Meaning"]), ""]
+         ] + ([("person —authored→ document", doc_n, "`authors`", "document authors (repository history / Drive owners)"),
+               ("document —about→ org", doc_n, "`entity`", "the customer / vendor / counterparty a document concerns")]
+              if doc_n else []), ["Relation", "Count", "Tag / field", "Meaning"]), ""]
 
     # field-enrichment-by-source matrix
     L += ["## Field enrichment by source", "",
@@ -459,7 +473,8 @@ def build_data_catalog(brain: Path, people):
               (f"Orgs ({ORG})", ", ".join(f"{s} ({n})" for s, n in org_src.most_common()) or "—"),
               (f"Places ({PLC})", ", ".join(f"{s} ({n})" for s, n in plc_src.most_common()) or "—"),
               (f"Posts ({VOI})", ", ".join(f"{s} ({n})" for s, n in post_src.most_common()) or "—"),
-          ] + ([(f"Deals ({lay['career']})",
+          ] + ([(f"Documents ({DOC})", ", ".join(f"{s} ({n})" for s, n in doc_src.most_common()) or "—")]
+               if doc_n else []) + ([(f"Deals ({lay['career']})",
                  ", ".join(f"{s} ({n})" for s, n in deal_src.most_common()) or "—")]
                if subject == "company" else []),
               ["Node type", "Sources (count)"]), "",
@@ -679,7 +694,123 @@ def build_whoknows(brain, people, ctx):
     return "whoknows.md", "\n".join(lines)
 
 
+def build_continuity(brain, people, ctx):
+    """Company goal (the Harness's continuity report): what breaks if someone leaves — the teams,
+    channels and organisations exactly ONE person in this brain connects to. Deterministic graph
+    counting over data the brain already has; no model, no inference about the people."""
+    holders = defaultdict(list)
+    for kind, key in (("team", "depts"), ("channel", "channels")):
+        for label, ppl in _group_tag(people, key).items():
+            names = {x["name"] for x in ppl}
+            if len(names) == 1:
+                holders[next(iter(names))].append((kind, label))
+    orgs = defaultdict(set)
+    for pp in people:
+        if pp.get("company"):
+            orgs[pp["company"].strip()].add(pp["name"])
+    for org, names in orgs.items():
+        if len(names) == 1 and org:
+            holders[next(iter(names))].append(("organisation", org))
+    ranked = sorted(holders.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+    lines = ["---", "type: goal", "tags: [goal, continuity]", "---", "",
+             "# 🧯 Continuity — what breaks if someone leaves", "",
+             "Each row is a person who is the **only** link in this brain to a team, a channel or an "
+             "organisation. If they leave, that connection goes with them. Counted from the notes — "
+             "no guesses about anyone.", ""]
+    if ranked:
+        rows = [(_link(n), len(items), ", ".join(f"{k}: {v}" for k, v in items[:4]) + (" …" if len(items) > 4 else ""))
+                for n, items in ranked[:25]]
+        lines.append(_table(rows, ["Person", "Only link to", "What"]))
+    else:
+        lines.append("_No single points of failure found — every team, channel and organisation here has at least two people._")
+    lines += ["", "## ▶ Ask your AI to act", "",
+              "> For the three people at the top of the table above, draft a short handover checklist "
+              "for each: what only they hold, who should be introduced to those teams, channels and "
+              "organisations now, and the questions to ask them before the context is gone. Cite the notes."]
+    return "continuity.md", "\n".join(lines)
+
+
+def build_company_goals(brain, people, ctx):
+    """Company goal map derived from the brain's linked DOCUMENTS (65-documents/):
+    the goals, objectives, OKRs and milestones the company itself wrote down
+    (mined deterministically from clean documents — never from a metadata-only
+    stub), grouped by area and newest first, plus what the documents imply
+    (open RFPs, active customers, live fundraising material). Zero API cost."""
+    import graphdata
+    subject, lay = brain_layout(brain)
+    docs_dir = brain / lay.get("docs", "65-documents")
+    stated, rfps, customers, fund = [], {}, {}, []
+    if docs_dir.is_dir():
+        for p in sorted(docs_dir.rglob("*.md")):
+            if "_index" in p.parts or "_files" in p.parts:
+                continue
+            try:
+                fmd, _ = graphdata._parse_front(p.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if fmd.get("type") != "document":
+                continue
+            latest = str(fmd.get("is_latest", "true")).strip('"') != "false"
+            cat = str(fmd.get("category") or "")
+            upd = str(fmd.get("updated") or "")
+            ent = graphdata._inner_link(str(fmd.get("entity") or ""))
+            g = fmd.get("goals")
+            g = g if isinstance(g, list) else ([g] if g else [])
+            if g and latest:
+                for item in g:
+                    stated.append((cat, upd, p.stem, str(item)))
+            if cat.startswith("sales/rfps") and ent:
+                rfps[ent] = max(rfps.get(ent, ""), upd)
+            if cat.startswith("customers") and ent:
+                customers[ent] = max(customers.get(ent, ""), upd)
+            if cat == "fundraising" and latest:
+                fund.append((upd, p.stem))
+    lines = ["---", "type: goal", "tags: [goal, company-goals, company]", "---", "",
+             "# 🎯 Company goals — what the documents say the company is trying to do", "",
+             "Mined from the company's own documents (goal / objective / OKR / milestone / roadmap "
+             "sections and \"Goal: …\" lines in clean documents; metadata-only documents are never read). "
+             "Newest first; superseded versions are skipped. Every line links to the document it came from.", ""]
+    if stated:
+        seen, by_area = set(), {}
+        for cat, upd, stem, item in sorted(stated, key=lambda x: x[1], reverse=True):
+            key = re.sub(r"[^a-z0-9]+", " ", item.lower()).strip()
+            if key in seen:
+                continue
+            seen.add(key)
+            by_area.setdefault(cat.split("/")[0] or "other", []).append((upd, stem, item))
+        order = ["company", "product", "sales", "customers", "fundraising", "engineering", "finance",
+                 "marketing", "compliance-security", "legal-ip", "research", "people-hr", "ops", "inbox"]
+        lines += ["## Stated goals", ""]
+        for area in sorted(by_area, key=lambda a: (order.index(a) if a in order else 99, a)):
+            label = area.replace("-", " & " if area in ("legal-ip",) else " ").title()
+            lines += [f"### {label}", ""]
+            for upd, stem, item in by_area[area][:25]:
+                lines.append(f"- {item} — {_link(stem)}" + (f" ({upd})" if upd else ""))
+            lines.append("")
+    else:
+        lines += ["_No goal, objective, OKR or milestone sections found in the clean documents yet._", ""]
+    if rfps or customers or fund:
+        lines += ["## Implied by the documents", "",
+                  "Not written as goals, but what the document estate shows the company working on:", ""]
+        if rfps:
+            lines += ["**Open opportunities (RFPs / proposals):** " + ", ".join(
+                f"{_link(e)} ({d})" if d else _link(e) for e, d in sorted(rfps.items(), key=lambda x: x[1], reverse=True)), ""]
+        if customers:
+            lines += ["**Customers with active documentation:** " + ", ".join(
+                f"{_link(e)} ({d})" if d else _link(e) for e, d in sorted(customers.items(), key=lambda x: x[1], reverse=True)[:30]), ""]
+        if fund:
+            lines += ["**Fundraising material (latest):** " + ", ".join(
+                _link(s_) for _, s_ in sorted(fund, reverse=True)[:10]), ""]
+    lines += ["## ▶ Ask your AI to act", "",
+              "> Using the stated goals above (open each linked document for context) and what the documents "
+              "imply, write this company's top 5 goals for the next two quarters: one sentence each, a measurable "
+              "finish line, the owner (from the People notes), the documents that support it, and what is "
+              "blocking it. Flag any goal that conflicts with another, or that the newest documents abandoned."]
+    return "company-goals.md", "\n".join(lines)
+
+
 GOALS = {
+    "company-goals": build_company_goals,
     "fundraising": build_fundraising,
     "bd": build_bd,
     "jobsearch": build_jobsearch,
@@ -687,6 +818,7 @@ GOALS = {
     "personalization": build_personalization,
     "onboarding": build_onboarding,
     "whoknows": build_whoknows,
+    "continuity": build_continuity,
 }
 
 # ---------------------------------------------------------------------------
@@ -817,6 +949,9 @@ def write_copilot_prompts(dest: Path, lay=None):
             body = (body.replace("85-places", lay["places"])
                         .replace("30-voice", lay["voice"])
                         .replace("50-mirror", lay["mirror"]))
+            # a company brain's root note is `organization`, not `identity`
+            if lay.get("root") == "00-org":
+                body = body.replace("[[identity]]", "[[organization]]")
         (dest / f"{name}.md").write_text(body + "\n", encoding="utf-8")
     return len(COPILOT_PROMPTS)
 
@@ -936,6 +1071,97 @@ def update_summary(brain: Path, goals, n_prompts):
     f.write_text(txt.rstrip() + "\n\n" + "\n".join(block) + "\n", encoding="utf-8")
 
 
+# Each goal workspace ends in a hand-tuned "▶ Ask your AI to act" prompt. The Harness turns
+# those into ready-made ROUTINES (off, manual, draft) the user can run with one click or put on
+# a schedule — the prompt sat in every vault doing nothing until now. "Who knows what" is an
+# on-demand question, not a routine, so it stays a prompt only.
+ROUTINE_TEMPLATES = {
+    "fundraising": "Find warm paths to investors",
+    "bd": "Find warm leads for new business",
+    "jobsearch": "Find warm intros at my target companies",
+    "datamining": "Surface what I'm missing in my network",
+    "onboarding": "Draft my week-one onboarding plan",
+    "continuity": "Draft handovers for single points of failure",
+    "company-goals": "Turn the documented goals into a two-quarter plan",
+}
+
+
+def act_prompt(md: str) -> str:
+    """The blockquote under '## ▶ Ask your AI to act' in a goal workspace, as plain text."""
+    lines = md.splitlines()
+    try:
+        i = next(k for k, ln in enumerate(lines) if ln.startswith("## ▶ Ask your AI to act"))
+    except StopIteration:
+        return ""
+    out = []
+    for ln in lines[i + 1:]:
+        if ln.startswith(">"):
+            out.append(ln[1:].strip())
+        elif out:
+            break
+    return " ".join(out).strip()
+
+
+# goal key → its workspace note stem in 95-goals/ (a routine links back to it)
+GOAL_STEMS = {"fundraising": "fundraising", "bd": "sales-bd", "jobsearch": "job-search",
+              "datamining": "data-mining", "personalization": "personalization",
+              "onboarding": "onboarding", "whoknows": "whoknows", "continuity": "continuity",
+              "company-goals": "company-goals"}
+
+
+def seed_goal_routines(brain: Path, acts: dict):
+    """Write one routine template per goal prompt into the Harness layer. The user owns them:
+    an edited routine is never overwritten (harness.seed_text keeps theirs, puts ours beside)."""
+    try:
+        import harness
+    except Exception as e:  # never let the value step fail on the harness
+        print(f"  · routines skipped ({e})")
+        return
+    hb = harness.Brain(str(brain))
+    for g, prompt in acts.items():
+        title = ROUTINE_TEMPLATES.get(g)
+        if not title or not prompt:
+            continue
+        stem = GOAL_STEMS.get(g, g)
+        ws = f"\n\nGoal workspace: [[{stem}]]" if (brain / "95-goals" / f"{stem}.md").is_file() else ""
+        fm, body = harness.routine_note("brain", title, schedule="manual", enabled=False, status="draft",
+                                        body=prompt + "\n\nEnd with a short report: what you found, what "
+                                        "is still open, and the next step." + ws)
+        fm.pop("created", None)  # a template must be byte-stable, or every run looks like an update
+        res = harness.seed_text(hb, "routines", title, harness.render_fm(fm) + "\n" + body)
+        if res in ("created", "updated", "kept-yours"):
+            print(f"  ✓ routine: {title} ({res})")
+
+
+def adopt_into_manifest(brain: Path, rels):
+    """analyze.py rewrites a few ENGINE files after the build (Home.md gets the goal
+    links, _SUMMARY.md the goal layer, graph.json the goal nodes). Record their new
+    hashes in the build manifest so a later `--refresh` sees them as engine-owned and
+    updates them — instead of mistaking analyze's edit for the user's and leaving a
+    `*.new.*` copy beside each one."""
+    mf = brain / "_GENERATED.json"
+    if not mf.is_file():
+        return
+    try:
+        import json as _json
+        from sources.common import sha256_text
+        man = _json.loads(mf.read_text(encoding="utf-8"))
+        files = man.get("files") or {}
+        changed = False
+        for rel in rels:
+            p = brain / rel
+            if rel in files and p.is_file():
+                h = sha256_text(p.read_text(encoding="utf-8"))
+                if files[rel] != h:
+                    files[rel] = h
+                    changed = True
+        if changed:
+            man["files"] = files
+            mf.write_text(_json.dumps(man, indent=1, sort_keys=True), encoding="utf-8")
+    except Exception:
+        pass
+
+
 def link_from_home(brain: Path, goals):
     """Append a 'Goal workspaces' section to Home.md (idempotent via a marker)."""
     home = brain / "Home.md"
@@ -952,12 +1178,15 @@ def link_from_home(brain: Path, goals):
              "jobsearch": "Job search", "datamining": "Data mining",
              "personalization": "For me (personalized recommendations)",
              "onboarding": "Onboarding (company)",
-             "whoknows": "Who knows what (company)"}
+             "whoknows": "Who knows what (company)",
+             "continuity": "Continuity — what breaks if someone leaves",
+             "company-goals": "Company goals (from the documents)"}
     for g in goals:
         if g in label:
             stem = {"fundraising": "fundraising", "bd": "sales-bd", "jobsearch": "job-search",
                     "datamining": "data-mining", "personalization": "personalization",
-                    "onboarding": "onboarding", "whoknows": "whoknows"}[g]
+                    "onboarding": "onboarding", "whoknows": "whoknows",
+                    "continuity": "continuity", "company-goals": "company-goals"}[g]
             block.append(f"- [[{stem}]] — {label[g]}")
     block += ["", "Open-ended questions → **Obsidian Copilot → Vault QA**, or the `/commands` "
               "in `copilot-prompts/`.", ""]
@@ -985,9 +1214,13 @@ def main():
     args = ap.parse_args()
 
     brain = Path(args.brain).expanduser()
-    if not (brain / _L(brain, "people")).is_dir():
+    if not ((brain / _L(brain, "people")).is_dir() or (brain / "_GENERATED.json").is_file()):
         print(f"error: {brain} doesn't look like a built brain (no people layer)."); raise SystemExit(1)
     goals = [g.strip() for g in args.goals.split(",") if g.strip() in GOALS]
+    # a brain with linked document stores always gets its documented goals
+    _sub, _lay = brain_layout(brain)
+    if (brain / _lay.get("docs", "65-documents") / "Documents.md").is_file() and "company-goals" not in goals:
+        goals.insert(0, "company-goals")
     if not goals:
         print(f"error: no valid goals in {args.goals!r}; choose from {', '.join(GOALS)}"); raise SystemExit(1)
 
@@ -995,10 +1228,13 @@ def main():
     ctx = {"icp": args.icp, "thesis": args.thesis}
     gdir = brain / "95-goals"
     gdir.mkdir(exist_ok=True)
+    acts = {}
     for g in goals:
         fname, md = GOALS[g](brain, people, ctx)
         (gdir / fname).write_text(md + "\n", encoding="utf-8")
         print(f"  ✓ 95-goals/{fname}")
+        acts[g] = act_prompt(md)
+    seed_goal_routines(brain, acts)
 
     (brain / "Dashboard.md").write_text(build_dashboard(brain, people, goals) + "\n", encoding="utf-8")
     print("  ✓ Dashboard.md")
@@ -1031,7 +1267,9 @@ def main():
             print("  ✓ " + write_graph_config(args.graph_config))
         except Exception as e:
             print(f"  ! could not write --graph-config: {e}")
-    if args.graph_data:
+    # graph.json is rewritten after every analyze run so the goal layer (and any
+    # note analyze added) is part of the typed graph Studio reads
+    if True:
         try:
             import graphdata
             g = graphdata.write_graph_json(brain)
@@ -1041,6 +1279,7 @@ def main():
             print(f"  ! could not write --graph-data: {e}")
     link_from_home(brain, goals)
     update_summary(brain, goals, n)         # reflect the goal layer in _SUMMARY.md
+    adopt_into_manifest(brain, ("Home.md", "_SUMMARY.md", "graph.json"))
     print(f"\n✅ analyzed {len(people)} people for goals: {', '.join(goals)} → {brain}")
 
 

@@ -681,6 +681,7 @@ def main(argv=None):
     for name in ("validate", "geojson", "activate", "show"):
         s = sub.add_parser(name); s.add_argument("trip")
     sub.add_parser("list")
+    s = sub.add_parser("count"); s.add_argument("what", choices=["planned", "booked", "taken"])
     a = ap.parse_args(argv)
     try:
         if a.cmd == "new":
@@ -688,6 +689,19 @@ def main(argv=None):
                      json.loads(a.budget) if a.budget else None, dest=a.dest)
             d = save(it, a.dest)
             print(d / "itinerary.json")
+            return 0
+        if a.cmd == "count":
+            # one number for a Harness goal: trips that reached a real stage, never drafts
+            want = {"planned": ("shopped", "booked", "past"), "booked": ("booked", "past"),
+                    "taken": ("past",)}[a.what]
+            n = 0
+            for t in list_trips(a.dest):
+                try:
+                    if load(t, a.dest).get("status") in want:
+                        n += 1
+                except (ItineraryError, ValueError):
+                    continue
+            print(n)
             return 0
         if a.cmd == "list":
             cur = current(a.dest)

@@ -56,10 +56,12 @@ HOME_STATE = "~/.second-brain/job-search"
 _LAYERS = {
     "person":  {"root": "00-me",  "people": "10-people", "orgs": "15-organizations",
                 "career": "40-career",   "jobs": "45-jobs",
-                "synthesis": "90-synthesis", "goals": "95-goals", "notes": "_notes"},
+                "synthesis": "90-synthesis", "goals": "95-goals", "notes": "_notes",
+                "agentwork": "96-agents"},
     "company": {"root": "00-org", "people": "10-people", "orgs": "15-organizations",
                 "career": "40-pipeline", "jobs": "45-hiring",
-                "synthesis": "90-synthesis", "goals": "95-goals", "notes": "_notes"},
+                "synthesis": "90-synthesis", "goals": "95-goals", "notes": "_notes",
+                "agentwork": "96-agents"},
 }
 LAYER = _LAYERS["person"]["jobs"]      # back-compat default for a personal brain
 

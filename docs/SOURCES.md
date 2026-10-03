@@ -1,6 +1,6 @@
 # Supported sources — export & import guide
 
-> **25 sources.** Everything runs 100% locally — zero network calls. Message, chat
+> **27 sources.** Everything runs 100% locally — zero network calls. Message, chat
 > and email **text is never read** (only who + when — a per-person frequency signal);
 > sensitive files (passwords, logins, payment data) are **quarantined**, never imported.
 > Details: the [privacy model](https://secondbrainlink.com/privacy-model).
@@ -34,6 +34,8 @@
 | Email (mbox) | company | people + relationship signal from headers | **headers only** | 🟢 |
 | Microsoft 365 | company | people + signal from Purview results | **headers only** | 🟡 compliance |
 | Microsoft Teams | company | people, teams/channels, message signal | **content never read** | 🟡 compliance |
+| Git docs repo | company | every document (md/pdf/office/images/code) in a generic taxonomy, versions, authors from the repo history | **linked read-only**; secrets/credentials → metadata-only stubs | 🟢 a local clone |
+| Google Drive | company | every document in a Drive for desktop folder or Takeout, native Docs/Sheets/Slides as links | **linked read-only**; secrets → stubs; cloud-only files never opened | 🟢 |
 
 ## Importing — the same three ways for every source
 
@@ -305,12 +307,56 @@ message frequency signal. **Content columns are never read.**
 **Download:** Purview eDiscovery message report (CSV/JSON) for the teams in scope.
 **Import:** folder `teams`.
 
+### Git docs repo (document store)
+**You get:** one note per document under `65-documents/` — sorted into a generic
+taxonomy (strategy, product, engineering, runbooks, customers/<name>,
+sales/rfps/<name>, finance, fundraising, legal & IP, compliance & security,
+marketing, research, operations), with title, type, the customer/vendor it is
+about, version chain (`v1 < v2 < final`, latest marked), byte-identical duplicates
+kept once, md↔pdf/html/pptx renders grouped, and dates + authors from the
+repository history (author **names** only). Markdown/text/code come in as the note
+body; Word/Excel/PowerPoint text is extracted; safe files (PDFs, decks, images) are
+copied once into `65-documents/_files/` so Studio can open them. The original
+folder tree is kept as an index (`_index/by-folder/`). Every walked file has a row
+in `_DOCS_COVERAGE.md`.
+**Privacy — tiered, enforced in code (no AI):** a deterministic local scanner checks
+every file's path, name, extension and text (gitleaks-style patterns, card numbers,
+IBANs, dense contact lists). Anything that trips it — `.env` files, keys and certs,
+credential sheets, env-var snapshots, Postman environments, pen-test/scan reports,
+archives (never extracted) — becomes a **metadata-only stub**: its content never
+enters the brain, and the brain's agent settings deny reading the original folder.
+Originals are **never modified** (not even the repository's history folder). Honest
+limits: PDF text extraction is best-effort and there is no OCR — image-only PDFs come
+in flagged `unverified`, or as stubs when a neighbour file was flagged.
+**Download:** none — use a local clone of the repository, or let the `docs-connector` plugin clone it from its URL and keep it in sync (`connector.py add-git`).
+**Import:** link it, don't copy it. Studio → Sources → Git docs repo → **Link
+folder…**, or `python3 scripts/doclink.py init --kind git_docs --root <clone>
+--out data/company/<name>/git_docs/`. Preview the tiering first with
+`python3 scripts/docscan.py scan <clone>` (metadata only). Per-company tuning:
+`data/company/<name>/git_docs/rules/{sensitivity,taxonomy}.json` (same shape as
+`mappings/docs/*.json`; aliases, re-routes, excludes, false-positive allows).
+
+### Google Drive (document store)
+**You get:** the same `65-documents/` treatment as a Git docs repo. Native Google
+Docs/Sheets/Slides sit on disk as small pointer files — only their link and id are
+read (never the account e-mail they also carry), so they become notes that link to
+the online document; a Takeout export converts them to Office files, which are read
+like any other.
+**Download:** either Google Drive for desktop (link the `My Drive` / shared-drive
+folder — mark it *Available offline* first: cloud-only placeholders are never opened,
+they become stubs), takeout.google.com → Drive, or the `docs-connector` plugin, which pulls a folder through the Drive API (read-only scope, your own OAuth client) into a local mirror and keeps it in sync.
+**Import:** Studio → Sources → Google Drive → **Link folder…**, or
+`python3 scripts/doclink.py init --kind google_drive --root <folder> --out
+data/company/<name>/google_drive/`.
+
 ---
 
 ## Not supported by design
 
 Personal email inboxes (as a *personal* source), health & wearables, message/chat
-**content**, financial data, and raw file/media dumps. A brain is *who you are and
+**content**, financial data, and raw **media** dumps (photo/video libraries).
+Document stores *are* supported — through `git_docs` / `google_drive`, with the
+tiered model above (sensitive files stay metadata-only). A brain is *who you are and
 what you care about* — not your inbox or your heart-rate log. See the source
 catalog in the docs repo for the reasoning, and `_COVERAGE.md` in every build for
 the honest per-file account (mapped / skipped-by-design / quarantined).

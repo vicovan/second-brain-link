@@ -161,6 +161,29 @@ def build_correlations(collectors, out, provider="claude"):
             lines.append(f"- **{a}** —{pred}→ **{b}**{d}")
         _write(out / "edges.md", "\n".join(lines))
 
+    # ---- documents shared across brains (byte-identical, by content id) ------
+    # A file that sits in two companies' document stores is usually a misfile or
+    # a shared deliverable — worth seeing. Matched on the content hash only.
+    by_cid = defaultdict(list)
+    for c in collectors:
+        for d in getattr(c, "documents", []) or []:
+            cid = d.get("sha12")
+            if cid:
+                by_cid[cid].append((c.entity_name or "?", c.entity_kind, c.entity_vault, d))
+    shared_docs = [(cid, v) for cid, v in sorted(by_cid.items())
+                   if len({a[0] for a in v}) >= 2]
+    if shared_docs:
+        lines = [_fm({"type": "correlation-documents", "title": "Documents in more than one brain",
+                      "tags": ["correlation", "documents"]}),
+                 "", "# Documents in more than one brain", "",
+                 "Byte-identical files found in the linked document stores of several brains — "
+                 "often a file filed under the wrong company, or a shared deliverable.", ""]
+        for cid, apps in shared_docs:
+            title = apps[0][3].get("title") or cid
+            lines.append(f"- **{title}** — " + "; ".join(
+                f"{ent}: `{d.get('original_path', '')}`" for ent, _k, _v, d in apps))
+        _write(out / "documents.md", "\n".join(lines))
+
     # ---- graph.json (sbl-graph/1) — the cross-brain typed-edge dataset ------
     # Node ids are _correlations-relative note paths; cross-vault endpoints use
     # the same ../<kind>/<entity>-brain/<layer>/<Title> relative form the note
@@ -207,7 +230,8 @@ def build_correlations(collectors, out, provider="claude"):
             f"({', '.join(sorted((c.entity_kind+':'+c.entity_name) for c in collectors))}).", "",
             f"- **{len(cross_people)}** people appear in more than one brain → `people/`",
             f"- **{len(cross_orgs)}** organizations referenced by more than one → `orgs/`",
-            f"- **{len(set(edges))}** identity↔company edges → `edges.md`", "",
+            f"- **{len(set(edges))}** identity↔company edges → `edges.md`",
+            f"- **{len(shared_docs)}** documents found in more than one brain → `documents.md`", "",
             "Each cross-note links into the per-entity brains under `../personal/<id>-brain/` "
             "and `../company/<co>-brain/`. Open the whole `vault/` in Obsidian; the graph "
             "view spans every brain.", ""]
@@ -217,4 +241,5 @@ def build_correlations(collectors, out, provider="claude"):
            "per-company brains in this vault. Start at `Home.md`. People/orgs here are "
            "*pointers* into the entity brains — read those for detail. Same privacy rules "
            "as every brain: never surface quarantined PII.\n")
-    return {"people": len(cross_people), "orgs": len(cross_orgs), "edges": len(set(edges))}
+    return {"people": len(cross_people), "orgs": len(cross_orgs), "edges": len(set(edges)),
+            "documents": len(shared_docs)}

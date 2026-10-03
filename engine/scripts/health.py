@@ -67,14 +67,23 @@ def build_health(brain: Path):
     # unresolved wikilinks: links whose target note doesn't exist
     by_title = {n["title"].lower() for n in nodes}
     by_stem = {Path(n["path"]).stem.lower() for n in nodes}
+    # notes deliberately kept out of the graph (document MOCs under _index/) still resolve
+    by_stem |= {p.stem.lower() for p in brain.rglob("*.md") if "_index" in p.parts}
     total_links = 0
     unresolved = Counter()
     for n in nodes:
+        # the brain's own reports (_HEALTH.md quotes last run's unresolved links,
+        # _GRAPH.md shows `[[wikilinks]]` as syntax) are not content
+        if Path(n["path"]).name.startswith("_"):
+            continue
         try:
             body = (brain / n["path"]).read_text(encoding="utf-8")
         except Exception:
             continue
-        for m in re.finditer(r"\[\[([^\]\|#]+)(?:[\|#][^\]]*)?\]\]", body):
+        # a link shown as code (`[[Acme]]` in a guide, fenced examples) is not a link
+        body = re.sub(r"```.*?```", "", body, flags=re.S)
+        body = re.sub(r"`[^`\n]*`", "", body)
+        for m in re.finditer(r"\[\[([^\]\|#\n]+)(?:[\|#][^\]\n]*)?\]\]", body):
             total_links += 1
             t = m.group(1).strip().lower()
             if t not in by_title and t not in by_stem:
@@ -302,7 +311,37 @@ def run(brain: Path):
     (brain / "_HEALTH.md").write_text(render_health_md(h) + "\n", encoding="utf-8")
     write_graph_insights(brain, g)
     write_overview_canvas(brain, g)
+    queue_suggestions(brain, h, g)
     return h
+
+
+def queue_suggestions(brain: Path, h, g):
+    """Hand the suspicions to the Harness review queue (_REVIEW.json) so they reach the Inbox as
+    questions for a human — never merged or changed here. A decided one is never asked again."""
+    try:
+        import harness  # same folder; stdlib
+    except Exception:
+        return
+    try:
+        hb = harness.Brain(str(brain))
+        by_title = {}
+        for n in g.get("nodes", []) if isinstance(g, dict) else []:
+            if n.get("type") == "person" and n.get("path"):
+                by_title.setdefault(n.get("title"), n["path"])
+        for grp in (h.get("duplicate_suspicions") or [])[:20]:
+            paths = [by_title[t] for t in grp if t in by_title]
+            if len(paths) >= 2:
+                harness.review_add(hb, "duplicate", "Same person? " + " · ".join(grp[:3]), paths,
+                                   "These names look like one person split across notes. Open both and decide.",
+                                   source="health check")
+        for c in (h.get("conflicts") or [])[:20]:
+            note = str(c.get("note") or "")
+            if note:
+                harness.review_add(hb, "conflict", "Conflicting " + str(c.get("field")) + " on " + note.split("/")[-1],
+                                   [note + ".md"], "Sources disagree about this person's " + str(c.get("field")) +
+                                   ". Open the note and keep the right one.", source="health check")
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

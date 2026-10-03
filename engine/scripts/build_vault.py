@@ -23,7 +23,8 @@ import sys
 import shutil
 import tempfile
 import zipfile
-from collections import Counter
+import os
+from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -66,11 +67,14 @@ def _quar():  # always read the live registry (rebuilt when --mappings overrides
 from sources.common import (Collector, norm_file, obsidian_name, link, iso_date,
                             nk, SENSITIVE_COL_HINTS, EMAIL_RE, read_csv, read_json)
 import selfheal
+import doclink
 
 TODAY = datetime.now().strftime("%Y-%m-%d")
 OVERRIDES = {"extra_aliases": [], "file_routes": {}}
 STRUCTURE = None   # optional brain_structure.json spec (from profile step)
 PROVIDER = "claude"   # which agent the in-vault guide is written for (set by --provider)
+MAPPING_DIRS = []   # --mappings dirs (carried onto each Collector for the docs sources)
+PEOPLE_FROM = []    # --people-from personal brain dirs (a company brain's own team; see teamroster.py)
 MIN_ORG_REFS = 1   # orgs below this ref count + no metadata go to 15-organizations/_mentions/ (set by --min-org-refs)
 
 # Provider table — the engine is provider-neutral; only the in-vault agent-guide
@@ -165,6 +169,7 @@ def write(path: Path, text: str):
     """Write `text` to `path` (creating parent dirs), normalizing to a single
     trailing newline. UTF-8 so mojibake-repaired names survive on disk. Every
     write is recorded into the active generated-file manifest (see MANIFEST_CTX)."""
+    doclink.assert_not_linked(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text.rstrip() + "\n", encoding="utf-8")
     record_write(path, text)
@@ -174,6 +179,7 @@ def write_bytes_file(path: Path, data: bytes):
     """Binary sibling of write() (avatar images under `_assets/avatars/`):
     creates parents, writes verbatim, records into the manifest so --refresh
     manages the file like any generated note."""
+    doclink.assert_not_linked(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
     record_write_bytes(path, data)
@@ -266,9 +272,10 @@ _LAYERS_PERSON = {
     "root": "00-me", "people": "10-people", "orgs": "15-organizations",
     "reputation": "20-reputation", "voice": "30-voice", "shopping": "35-shopping",
     "career": "40-career", "jobs": "45-jobs", "fundraising": "46-fundraising",
-    "travel": "47-travel",
+    "travel": "47-travel", "agentwork": "96-agents",
     "mirror": "50-mirror", "learning": "60-learning", "services": "70-services",
-    "search": "80-search", "places": "85-places", "synthesis": "90-synthesis",
+    "search": "80-search", "places": "85-places", "docs": "65-documents",
+    "synthesis": "90-synthesis",
     "uncategorized": "99-uncategorized", "quarantine": "_quarantine",
     "notes": "_notes",
 }
@@ -276,9 +283,10 @@ _LAYERS_COMPANY = {
     "root": "00-org", "people": "10-people", "orgs": "15-organizations",
     "reputation": "20-brand", "voice": "30-content", "shopping": "35-procurement",
     "career": "40-pipeline", "jobs": "45-hiring", "fundraising": "46-fundraising",
-    "travel": "47-travel",
+    "travel": "47-travel", "agentwork": "96-agents",
     "mirror": "50-market-view", "learning": "60-knowledge", "services": "70-support",
-    "search": "80-signals", "places": "85-locations", "synthesis": "90-synthesis",
+    "search": "80-signals", "places": "85-locations", "docs": "65-documents",
+    "synthesis": "90-synthesis",
     "uncategorized": "99-uncategorized", "quarantine": "_quarantine",
     "notes": "_notes",
 }
@@ -304,10 +312,14 @@ _LAYER_ROLE_TEXT = {
                     "FUNDRAISING — written by the fundraising plugin, not the builder: the funding plan, target records, applications and email drafts."),
     "travel": ("TRAVEL — written by the travel-planner plugin, not the builder: trip ideas, itineraries, the map data the Studio Map canvas draws.",
                "TRAVEL — written by the travel-planner plugin, not the builder: trips, itineraries and their map data."),
+    "agentwork": ("AGENT WORK — written by the Harness (Studio + harness.py), not the builder: Goals (outcomes with a finish line), Routines (work that repeats), Reports (each run's handoff) and Activity (what each run did, step by step).",
+                  "AGENT WORK — written by the Harness (Studio + harness.py), not the builder: Goals, Routines, Reports and Activity for the agents working on this company brain."),
     "mirror": ("HOW THE ALGORITHMS SEE YOU — inferences + ad-targeting segments (fed by the mirror/ad_segment emits).",
                "MARKET VIEW — how platforms/audiences model the org: follower/visitor demographics, segments."),
     "learning": ("Courses/coaching + events.",
                  "KNOWLEDGE — meetings, events, learning."),
+    "docs": ("DOCUMENTS — your linked document stores (Git docs repo / Google Drive), one note per document in a generic taxonomy; sensitive files are metadata-only stubs; safe files copied to `_files/`; `_index/` keeps the original folder tree.",
+             "DOCUMENTS — the company's linked document stores (Git docs repo / Google Drive), one note per document in a generic taxonomy (strategy, product, engineering, customers, sales, finance, legal, compliance, marketing…); sensitive files are metadata-only stubs; safe files copied to `_files/`; `_index/` keeps the original folder tree."),
     "services": ("Freelance / Services Marketplace activity.",
                  "SUPPORT — ticket volume and service signals."),
     "search": ("Your search history — a curiosity log.",
@@ -344,7 +356,7 @@ def layer_roles(subject):
     lay = layout_for(subject)
     idx = 1 if subject == "company" else 0
     order = ["root", "people", "orgs", "reputation", "voice", "shopping", "career",
-             "mirror", "learning", "services", "search", "places", "synthesis",
+             "mirror", "learning", "docs", "services", "search", "places", "synthesis",
              "notes", "uncategorized", "quarantine"]
     return [(lay[k] + "/", _LAYER_ROLE_TEXT[k][idx]) for k in order]
 
@@ -420,6 +432,10 @@ class VaultWriter:
         """Render the full vault. Order matters: orgs render AFTER career/people
         so every company referenced there is already registered → `[[X]]` links
         resolve. home() / scaffolding() write the MOC and agent guide last."""
+        docs_ = list(getattr(self.col, "documents", []) or [])
+        a_count_ = Counter(a for d in docs_ for a in set(d.get("authors") or []))
+        self.col.doc_author_counts = {a: n for a, n in a_count_.items()
+                                      if len(docs_) >= 10 and n > len(docs_) / 2}
         self.identity()
         self.people()
         self.organizations()
@@ -430,6 +446,7 @@ class VaultWriter:
         self.mirror()
         self.misc()
         self.places()
+        self.documents()
         self.synthesis()
         self.home()
         self.user_notes_space()
@@ -447,8 +464,12 @@ class VaultWriter:
             out["avatar_url"] = au
         data = rec.get("avatar_bytes")
         if data:
+            head = data[:512].lstrip().lower()
             ext = (".png" if data[:8] == b"\x89PNG\r\n\x1a\n"
-                   else ".gif" if data[:3] == b"GIF" else ".jpg")
+                   else ".gif" if data[:3] == b"GIF"
+                   else ".webp" if data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+                   else ".svg" if head.startswith(b"<svg") or (head.startswith(b"<?xml") and b"<svg" in data[:2048])
+                   else ".jpg")
             rel = f"_assets/avatars/{obsidian_name(title)}{ext}"
             write_bytes_file(self.out / rel, data)
             out["avatar"] = rel
@@ -518,8 +539,40 @@ class VaultWriter:
         if i.get("languages"):
             body.append("## Languages\n\n" +
                         ", ".join(x for x in i["languages"] if x) + "\n")
+        if company_mode:
+            # the company is the centre of its own graph: link its areas, its own org
+            # note (where people's `company` points) and its leadership
+            cmap = []
+            if getattr(self.col, "documents", None):
+                cmap.append("- [[Documents]] — the company's documents, by area")
+            own = obsidian_name(name) if name else ""
+            if own and own in {obsidian_name(o) for o in self.col.orgs}:
+                cmap.append(f"- [[{own}]] — the organization as others reference it")
+            def _cls(r):
+                ts = [str(t) for t in (r.get("tags") or ())]
+                for c in ("founder", "executive", "board", "advisor", "investor", "team"):
+                    if f"person/{c}" in ts:
+                        return c
+                return ""
+            groups = {}
+            for r in self.col.people.values():
+                if r.get("company") and nk(r["company"]) == nk(name or ""):
+                    groups.setdefault(_cls(r) or "team", []).append(r["name"])
+            for c, lab in (("founder", "Founders"), ("executive", "Leadership"), ("board", "Board"),
+                           ("advisor", "Advisors"), ("investor", "Investors"), ("team", "Team")):
+                if groups.get(c):
+                    cmap.append(f"- {lab}: " + ", ".join(link(x) for x in sorted(groups[c])[:24]))
+            if (self.out / root_dir / "data-handling.md").exists():
+                cmap.append("- [[data-handling]] — how this brain handles personal data")
+            if cmap:
+                body += ["## Map", ""] + cmap + [""]
         fname = "organization.md" if company_mode else "identity.md"
         write(self.out / root_dir / fname, "\n".join(body))
+        if company_mode and fmd.get("avatar"):
+            # a stable name for the brain's own logo — Studio's company switcher shows it
+            src = self.out / fmd["avatar"]
+            if src.is_file():
+                write_bytes_file(self.out / "_assets" / ("logo" + src.suffix), src.read_bytes())
 
     def _company_data_controller_note(self, root_dir):
         """Company mode: emit a short note making the local-first / data-controller
@@ -589,7 +642,15 @@ class VaultWriter:
                     relationship = "employee"
                 elif any(t.startswith("person/customer") for t in tset):
                     relationship = "customer"
-                elif any(t.startswith("person/author") for t in tset) or "slack" in srcs_:
+                elif any(t.startswith(("person/founder", "person/executive")) for t in tset):
+                    relationship = "founder" if any(t.startswith("person/founder") for t in tset) else "executive"
+                elif any(t.startswith("person/board") for t in tset):
+                    relationship = "board"
+                elif any(t.startswith("person/advisor") for t in tset):
+                    relationship = "advisor"
+                elif any(t.startswith("person/investor") for t in tset):
+                    relationship = "investor"
+                elif any(t.startswith(("person/author", "person/team")) for t in tset) or "slack" in srcs_:
                     relationship = "employee"
                 elif any(t.startswith("person/email") for t in tset):
                     relationship = "correspondent"
@@ -629,6 +690,10 @@ class VaultWriter:
                          for f_, pairs in sorted(alt.items()) for v, src in pairs]
                 alt_lines = "\n## Also reported\n\n" + "\n".join(rows_) + "\n"
             details = _details_block(r)
+            n_auth = (getattr(self.col, "doc_author_counts", {}) or {}).get(name, 0)
+            if n_auth:
+                note = note[:-4] + f"\ndocuments_authored: {n_auth}\n---"
+                details = f"\nAuthored **{n_auth}** of the company's documents — see [[Documents]].\n" + details
             write(d / f"{base}.md", note + f"\n\n# {name}\n\n{sub}\n" + alt_lines + details)
         self.col.note(f"vault: {len(seen)} person notes (merged across sources)")
         self._people_count = len(seen)
@@ -676,6 +741,9 @@ class VaultWriter:
                    "known_contacts": counts.get(name, 0),
                    "location": meta.get("location", "")}
             fmd.update(self._geo(meta.get("location", "")))
+            lb = (getattr(self.col, "org_logos", {}) or {}).get(name)
+            if lb:
+                fmd.update(self._save_avatar(title, {"avatar_bytes": lb}))
             alt_o = meta.get("alt") or {}
             for f_ in ("industry", "location"):
                 if alt_o.get(f_):
@@ -761,13 +829,19 @@ class VaultWriter:
         for idx, p in enumerate(c.posts):
             if not p["text"]:
                 continue
-            note = fm({"type": "post",
-                       "tags": note_tags(["post"], [p["source"]], p.get("tags")),
-                       "kind": p["kind"],
-                       "source": p["source"], "created": p["date"], "url": p.get("url", "")})
+            pfm = {"type": "post",
+                   "tags": note_tags(["post"], [p["source"]], p.get("tags")),
+                   "kind": p["kind"],
+                   "source": p["source"], "created": p["date"], "url": p.get("url", "")}
+            by = ""
+            if getattr(c, "subject", "person") == "company" and c.identity.get("name"):
+                # the company's own voice clusters around the company (00-org/organization)
+                pfm["org"] = f"[[organization|{obsidian_name(c.identity['name'])}]]"
+                by = f"\n\n*Published by [[organization|{obsidian_name(c.identity['name'])}]]*"
+            note = fm(pfm)
             # content-addressed filename → stable across rebuilds (no idx churn)
             h8 = hashlib.sha1(p["text"].encode("utf-8")).hexdigest()[:8]
-            write(posts_dir / f"{p['date'] or 'post'}-{h8}.md", note + f"\n\n{p['text']}\n")
+            write(posts_dir / f"{p['date'] or 'post'}-{h8}.md", note + f"\n\n{p['text']}{by}\n")
         if c.comments:
             lines = [fm({"type": "voice", "tags": ["voice"]}), "", "# Comments\n"]
             for r in c.comments:
@@ -901,14 +975,20 @@ class VaultWriter:
                 while base.lower() in seen_deal:
                     base = f"{title} {i}"; i += 1
                 seen_deal.add(base.lower())
+                acct = e.get("org", "")
+                acct_link = link(acct) if acct and acct in c.orgs else ""
                 note = fm({"type": "deal", "title": base,
                            "tags": note_tags(["deal", f"deal/{e.get('kind','deal')}"],
                                              [e.get("source", "")]),
                            "kind": e.get("kind", "deal"),
                            "date": e.get("date", ""),
                            "value": e.get("value", ""),
+                           "account": acct_link,
                            "sources": [e.get("source", "")]})
-                write(pipe / f"{base}.md", note + f"\n\n# {e['name']}\n")
+                owner = (f"\n\nAccount: {acct_link}" if acct_link else
+                         (f"\n\nRun by [[organization|{obsidian_name(c.identity['name'])}]]"
+                          if c.identity.get("name") else ""))
+                write(pipe / f"{base}.md", note + f"\n\n# {e['name']}{owner}\n")
             deals_n = len(seen_deal)
             if deals_n:
                 c.note(f"vault: {deals_n} deal/campaign notes → {self.L('career')}/")
@@ -1076,6 +1156,518 @@ class VaultWriter:
             write(d / f"{p_base}.md", body)
         self._places_count = len(c.places)
 
+    # 65 — documents (git_docs / google_drive)
+    _DOC_CAT_LABELS = None
+
+    def documents(self):
+        """Write the `docs` layer from the Collector's documents (fed by the
+        document-store sources): one note per logical document under a generic
+        taxonomy, safe files copied once (by content hash) into `_files/`,
+        sensitive documents as metadata-only STUBS (the Collector already
+        dropped their content), `_index/` MOCs (by original folder, by entity,
+        versions, duplicates, sensitive) and `_DOCS_COVERAGE.md` — one status
+        row for every walked path. Originals are read through doclink (read-only)
+        and never written. Never writes an absolute path into a note."""
+        import urllib.parse
+        import doctax
+        c = self.col
+        docs = list(getattr(c, "documents", []) or [])
+        assets = list(getattr(c, "doc_assets", []) or [])
+        cov = list(getattr(c, "doc_coverage", []) or [])
+        if not docs and not assets and not cov:
+            return
+        L = self.L("docs")
+        base = self.out / L
+        files_dir = f"{L}/_files"
+        try:
+            cats = doctax.load_rules().get("categories", {})
+        except Exception:
+            cats = {}
+
+        def cat_label(cat):
+            parts = cat.split("/")
+            for i in range(len(parts), 0, -1):
+                k = "/".join(parts[:i])
+                if k in cats:
+                    return cats[k]
+            return cat.replace("-", " ").title()
+
+        copied = {}         # (root_id, logical rel) -> vault rel of the copy
+        by_sha = {}         # sha12 -> vault rel (one copy per content)
+
+        def safe_name(n):
+            n = re.sub(r'[\\/:*?"<>|#^\[\]]', "_", n).strip() or "file"
+            return n[:150]
+
+        def do_copy(root_id, rel, src, name, sha12):
+            if not src:
+                return ""
+            key = (root_id, rel)
+            if key in copied:
+                return copied[key]
+            if sha12 and sha12 in by_sha:
+                copied[key] = by_sha[sha12]
+                return copied[key]
+            root = doclink.REGISTERED_ROOTS.get(root_id)
+            if root is None:
+                return ""
+            try:
+                data = doclink.read_bytes(src, root)
+            except OSError:
+                return ""
+            if not sha12:
+                from sources._docs import content_id as _cid
+                sha12 = _cid(hashlib.sha256(data).hexdigest())
+            sh = sha12
+            if name.lower().endswith(".svg"):
+                # an SVG drawn through <img> needs its namespace; inline-HTML partials
+                # often omit it. Only the vault COPY is fixed — the original is untouched.
+                head = data[:4096]
+                if b"<svg" in head and b"http://www.w3.org/2000/svg" not in head:
+                    data = data.replace(b"<svg", b'<svg xmlns="http://www.w3.org/2000/svg"', 1)
+            vrel = f"{files_dir}/{sh}/{safe_name(name)}"
+            write_bytes_file(self.out / vrel, data)
+            copied[key] = vrel
+            by_sha[sh] = vrel
+            return vrel
+
+        # 1) every copy first (so md link rewriting can point at them)
+        for a in assets:
+            if a.get("copy_from"):
+                a["vault_file"] = do_copy(a["root_id"], a["rel"], a["copy_from"], a["name"], a["sha12"])
+        for d in docs:
+            if d.get("copy_from"):
+                d["vault_file"] = do_copy(d["root_id"], d["original_path"], d["copy_from"],
+                                          d.get("file_name") or d["original_name"], d.get("sha12"))
+            for r in d.get("renders") or []:
+                if r.get("copy_from"):
+                    r["vault_file"] = do_copy(d["root_id"], r["rel"], r["copy_from"], r["name"], r.get("sha12"))
+
+        note_by_rel = {}    # (root_id, logical rel) -> note name
+        for d in docs:
+            note_by_rel[(d["root_id"], d["original_path"])] = d["note_name"]
+            for a in d.get("also_at") or []:
+                note_by_rel[(d["root_id"], a)] = d["note_name"]
+            for r in d.get("renders") or []:
+                note_by_rel[(d["root_id"], r["rel"])] = d["note_name"]
+        note_by_stem = {}
+        for d in docs:
+            note_by_stem.setdefault(doctax.stem_of(d["original_name"]).lower(), d["note_name"])
+        known_people = {obsidian_name(p["name"]) for p in c.people.values()}
+        # an author of more than half of a sizeable document set carries no signal per
+        # document (a one-person docs repo would turn the graph into a star around
+        # them): keep them as plain text on the documents and link them ONCE from
+        # their person note ("Authored N documents — see Documents")
+        a_count = Counter(a for d in docs for a in set(d.get("authors") or []))
+        dominant = {a for a, n in a_count.items() if len(docs) >= 10 and n > len(docs) / 2}
+        c.doc_author_counts = {a: a_count[a] for a in dominant}
+        copied_by_name = {}
+        for (rid_, rel_), vrel_ in sorted(copied.items()):
+            copied_by_name.setdefault(rel_.rsplit("/", 1)[-1].lower(), vrel_)
+        known_orgs = {obsidian_name(n) for n in c.orgs}
+
+        def rel_link(note_path, vault_rel):
+            # vault-relative (no leading ./): Obsidian resolves it from the vault
+            # root and Studio's file viewer takes vault-relative paths as-is.
+            return urllib.parse.quote(vault_rel, safe="/._-~")
+
+        def rewrite_md(body, d, note_path):
+            src_dir = d["original_path"].rsplit("/", 1)[0] if "/" in d["original_path"] else ""
+            rid = d["root_id"]
+            out_lines, fence = [], False
+            for ln in body.split("\n"):
+                if ln.lstrip().startswith(("```", "~~~")):
+                    fence = not fence
+                    out_lines.append(ln)
+                    continue
+                if fence:
+                    out_lines.append(ln.replace("[[", "[​["))
+                    continue
+
+                def wl(m):
+                    tgt = m.group(2).strip()
+                    alias = (m.group(4) or "").lstrip("|").strip()
+                    base_name = tgt.split("/")[-1]
+                    vf = copied_by_name.get(base_name.lower())
+                    if vf and os.path.splitext(base_name)[1]:
+                        return f"{m.group(1)}[{alias or base_name}]({rel_link(note_path, vf)})"
+                    stem = doctax.stem_of(base_name).lower()
+                    note = note_by_stem.get(stem)
+                    if note:
+                        return f"[[{note}|{alias or tgt}]]"
+                    return alias or tgt
+
+                ln = re.sub(r"(!?)\[\[([^\]|#]+)(#[^\]|]*)?(\|[^\]]*)?\]\]", wl, ln)
+
+                def ml(m):
+                    bang, text, href = m.group(1), m.group(2), m.group(3)
+                    if bang and re.match(r"^https?://", href, re.I):
+                        # a remote image the store ALSO keeps locally → the local copy
+                        # (Studio never fetches remote images; this one renders offline)
+                        base_name = urllib.parse.unquote(href.split("?", 1)[0].split("#", 1)[0]).rsplit("/", 1)[-1]
+                        vf = copied_by_name.get(base_name.lower())
+                        if vf:
+                            return f"![{text}]({rel_link(note_path, vf)})"
+                        return m.group(0)
+                    if re.match(r"^[a-z][a-z0-9+.-]*:", href, re.I) or href.startswith("#"):
+                        return m.group(0)
+                    path = urllib.parse.unquote(href.split("#", 1)[0].strip("<>"))
+                    if not path:
+                        return m.group(0)
+                    tgt = os.path.normpath(os.path.join(src_dir, path)).replace(os.sep, "/")
+                    if tgt.startswith("../"):
+                        return text or path
+                    vf = copied.get((rid, tgt))
+                    if vf:
+                        return f"{bang}[{text}]({rel_link(note_path, vf)})"
+                    note = note_by_rel.get((rid, tgt))
+                    if note:
+                        return f"[[{note}|{text or note}]]"
+                    return f"*{text}*" if (bang and text) else (text or "")
+
+                ln = re.sub(r"(!?)\[([^\]]*)\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)", ml, ln)
+                out_lines.append(ln)
+            return "\n".join(out_lines)
+
+        lk = lambda n: f"[[{n}]]"
+        written = []
+        # one HUB note per category (a real graph node the documents attach to); a
+        # sub-category hub hangs under its parent's hub, top hubs under Documents
+        taken = known_people | known_orgs | {d["note_name"] for d in docs}
+        hub_of = {}
+        for cat in sorted({d["category"] for d in docs}):
+            for k_ in range(1, len(cat.split("/")) + 1):
+                sub_ = "/".join(cat.split("/")[:k_])
+                if sub_ in hub_of:
+                    continue
+                t_ = obsidian_name(cat_label(sub_))
+                if t_.lower() in {x.lower() for x in taken} or t_ in hub_of.values() or t_ in ("Documents",):
+                    t_ = obsidian_name(f"{cat_label(sub_)} documents")
+                hub_of[sub_] = t_
+        # GROUP hubs inside a large area (or any counterparty area): one per customer /
+        # vendor / RFP, or per source folder — so a 200-document area splits into real
+        # sub-clusters (Wizz Air, Air Transat…) instead of one blob around its hub
+        group_keys = set()
+        by_cat_dir = defaultdict(lambda: defaultdict(list))
+        for d in docs:
+            by_cat_dir[d["category"]][d["note_dir"]].append(d)
+        for cat_, dirs in sorted(by_cat_dir.items()):
+            total_ = sum(len(v) for v in dirs.values())
+            counterparty = cat_ in ("customers", "sales/rfps", "engineering/vendors")
+            if not (counterparty or total_ >= 40):
+                continue
+            real = {nd: v for nd, v in dirs.items() if nd and nd != cat_ and nd not in hub_of and len(v) >= 3}
+            if len(real) < 2 and not counterparty:
+                continue
+            for nd, v in sorted(real.items()):
+                ent_ = next((x.get("entity") for x in v if x.get("entity")), "")
+                folder_ = nd.split('/')[-1].replace('-', ' ').title()
+                if ent_ and cat_ == "customers":
+                    lab_ = f"{ent_} documents"
+                elif ent_ and cat_.startswith("sales"):
+                    lab_ = f"{ent_} RFP"
+                elif ent_ and cat_ == "engineering/vendors":
+                    lab_ = f"{ent_} integration"
+                elif ent_:
+                    lab_ = f"{cat_label(cat_)} · {ent_}"
+                else:
+                    lab_ = f"{cat_label(cat_)} · {folder_}"
+                t_ = obsidian_name(lab_)
+                if t_.lower() in {x.lower() for x in taken} or t_ in hub_of.values():
+                    t_ = obsidian_name(f"{lab_} ({nd.split('/')[-1]})")
+                hub_of[nd] = t_
+                group_keys.add(nd)
+        hub_key = lambda d: d["note_dir"] if (d["note_dir"] in hub_of and d["note_dir"] != d["category"]) else d["category"]
+        for d in sorted(docs, key=lambda x: (x["note_dir"], x["note_name"])):
+            note_path = base / d["note_dir"] / f"{d['note_name']}.md" if d["note_dir"] else base / f"{d['note_name']}.md"
+            tier = d.get("sensitivity", "clean")
+            stub = tier not in ("clean", "unverified")
+            ent = d.get("entity") or ""
+            ent_link = lk(obsidian_name(ent)) if ent and obsidian_name(ent) in known_orgs else ""
+            authors = [a for a in (d.get("authors") or [])
+                       if obsidian_name(a) in known_people and a not in dominant]
+            tags = note_tags(["document", f"document/{_tag_slug(d.get('doc_type') or 'document')}",
+                              "docs/" + "/".join(_tag_slug(x) for x in d["category"].split("/")),
+                              f"sensitivity/{_tag_slug(tier)}"]
+                             + ([f"entity/{_tag_slug(ent)}"] if ent else [])
+                             + (["document/latest"] if d.get("version_group") and d.get("is_latest") else []),
+                             [d["source"]])
+            fmd = {"type": "document", "title": d["title"], "doc_id": d["doc_id"],
+                   "area": lk(hub_of[hub_key(d)]),
+                   "source": d["source"], "sources": [d["source"]], "tags": tags,
+                   "category": d["category"], "doc_type": d.get("doc_type", ""),
+                   "entity": ent_link or ent, "entity_kind": d.get("entity_kind", ""),
+                   "authored_by": d.get("authored_by", "internal"),
+                   "original_root_id": d["root_id"], "original_root_label": d["root_label"],
+                   "original_path": d["original_path"], "original_ext": d.get("original_ext", ""),
+                   "mime": d.get("mime", ""), "size_bytes": d.get("size_bytes", 0),
+                   "content_id": d.get("sha12", ""),
+                   "created": d.get("created", ""), "updated": d.get("updated", ""),
+                   "date_in_name": d.get("date_in_name", ""),
+                   "vcs_status": d.get("vcs_status", ""),
+                   "first_commit": d.get("first_commit", ""), "last_commit": d.get("last_commit", ""),
+                   "commit_count": d.get("commit_count", 0),
+                   "authors": [lk(obsidian_name(a)) for a in authors],
+                   "authors_text": [a for a in (d.get("authors") or []) if a in dominant],
+                   "renamed_from": d.get("renamed_from", ""),
+                   "version_group": d.get("version_group", ""), "version": d.get("version", ""),
+                   "is_latest": "true" if d.get("is_latest", True) else "false",
+                   "supersedes": lk(d["supersedes"]) if d.get("supersedes") else "",
+                   "superseded_by": lk(d["superseded_by"]) if d.get("superseded_by") else "",
+                   "also_at": d.get("also_at") or [],
+                   "renders": [f"{r['ext']}:{r['rel']}" for r in d.get("renders") or []],
+                   "file": d.get("vault_file", ""), "file_status": d.get("file_status", ""),
+                   "url": d.get("url", ""),
+                   "sensitivity": tier,
+                   "sensitivity_reasons": d.get("sensitivity_reasons") or [],
+                   "scan_method": d.get("scan_method", ""), "scan_chars": d.get("scan_chars", 0)}
+            if d.get("word_count"):
+                fmd["word_count"] = d["word_count"]
+            if d.get("headings"):
+                fmd["headings"] = d["headings"]
+            mentioned = [m for m in (d.get("mentions") or []) if obsidian_name(m) in known_people]
+            if mentioned:
+                fmd["people"] = [lk(obsidian_name(m)) for m in mentioned]
+            if d.get("goals"):
+                fmd["goals"] = d["goals"][:40]
+            if d.get("excerpt"):
+                fmd["excerpt"] = d["excerpt"]
+            out = [fm(fmd), "", f"# {d['title']}", ""]
+            if stub:
+                out += ["> [!warning] Sensitive — content not imported",
+                        f"> The scanner flagged this document (`{tier}`: "
+                        f"{', '.join(d.get('sensitivity_reasons') or []) or 'policy'}). Only its "
+                        "metadata is in the brain; the original is untouched in the linked store "
+                        "(Studio › Reveal original). Do not try to read it.", ""]
+            elif tier == "unverified":
+                out += ["> [!info] Copied, not text-scanned",
+                        "> A binary the scanner could not read as text; the file is copied but "
+                        "its contents were not checked.", ""]
+            meta = [f"{lk(hub_of[hub_key(d)])} · {d.get('doc_type') or 'document'}"]
+            if ent_link:
+                meta.append(f"about {ent_link}")
+            if authors:
+                meta.append("by " + ", ".join(lk(obsidian_name(a)) for a in authors[:6]))
+            out += [" · ".join(meta), ""]
+            out += ["| | |", "|---|---|",
+                    f"| Original | `{d['root_label']}` › `{d['original_path']}` |",
+                    f"| Updated | {d.get('updated') or '—'} |",
+                    f"| Size | {d.get('size_bytes', 0):,} bytes |"]
+            if d.get("version"):
+                out.append(f"| Version | {d['version']}{' (latest)' if d.get('is_latest') else ''} |")
+            if d.get("url"):
+                out.append(f"| Online | {d['url']} |")
+            out.append("")
+            if d.get("vault_file") and d.get("embed_image") and not stub:
+                # SVG diagrams (and other images kept as documents) render in place —
+                # Obsidian and Studio draw them through <img>, so no script ever runs
+                out += [f"![{d['title']}]({rel_link(note_path, d['vault_file'])})", ""]
+            if d.get("vault_file"):
+                out += [f"[Open {d.get('file_name') or d['original_name']}]({rel_link(note_path, d['vault_file'])})", ""]
+            rnd = d.get("renders") or []
+            if rnd:
+                out.append("**Other formats:** " + " · ".join(
+                    (f"[{r['ext'].lstrip('.')}]({rel_link(note_path, r['vault_file'])})" if r.get("vault_file")
+                     else f"{r['ext'].lstrip('.')} ({r.get('status')})") for r in rnd))
+                out.append("")
+            if d.get("supersedes") or d.get("superseded_by"):
+                vv = []
+                if d.get("superseded_by"):
+                    vv.append(f"newer: {lk(d['superseded_by'])}")
+                if d.get("supersedes"):
+                    vv.append(f"older: {lk(d['supersedes'])}")
+                out += ["**Versions:** " + " · ".join(vv), ""]
+            if mentioned and not stub:
+                out += ["**People:** " + ", ".join(lk(obsidian_name(m)) for m in mentioned[:20]), ""]
+            if d.get("goals") and not stub:
+                out += ["**Goals stated here:**", ""] + [f"- {g}" for g in d["goals"][:15]] + [""]
+            if d.get("also_at"):
+                out += ["**Identical copies at:** " + ", ".join(f"`{a}`" for a in d["also_at"][:20]), ""]
+            body = d.get("body") or ""
+            if body and not stub:
+                if d.get("md_links"):
+                    body = rewrite_md(body, d, note_path)
+                else:
+                    body = body.replace("[[", "[\u200b[")
+                out += ["---", "", body.rstrip(), ""]
+            write(note_path, "\n".join(out))
+            written.append(d)
+
+        # 2) indexes
+        idx = base / "_index"
+        by_cat = defaultdict(list)
+        for d in docs:
+            by_cat[d["category"]].append(d)
+        tiers = Counter(d.get("sensitivity", "clean") for d in docs)
+        def row(d):
+            flag = "" if d.get("sensitivity") in ("clean", "unverified") else " 🔒"
+            latest = " · latest" if d.get("version_group") and d.get("is_latest") else ""
+            return f"- {lk(d['note_name'])}{flag} — {d.get('doc_type') or 'document'}{latest}"
+        cat_notes = {}
+        for sub_cat, title in sorted(hub_of.items()):
+            parent = "/".join(sub_cat.split("/")[:-1])
+            while parent and parent not in hub_of:
+                parent = "/".join(parent.split("/")[:-1])
+            items = [d for d in docs if hub_key(d) == sub_cat]
+            children = sorted(c_ for c_ in hub_of if c_ != sub_cat and c_.startswith(sub_cat + "/")
+                              and not any(o_ != sub_cat and c_.startswith(o_ + "/") and o_.startswith(sub_cat + "/")
+                                          for o_ in hub_of))
+            covered = [d for d in docs if d["note_dir"] == sub_cat or d["note_dir"].startswith(sub_cat + "/")
+                       or d["category"] == sub_cat or d["category"].startswith(sub_cat + "/")]
+            n_all = len(covered)
+            n_stub = sum(1 for d in covered if d.get("sensitivity") not in ("clean", "unverified"))
+            up = lk(hub_of[parent]) if parent else "[[Documents]]"
+            lines = [fm({"type": "document-category", "title": title, "category": sub_cat,
+                         "tags": ["document-category", "docs/" + "/".join(_tag_slug(x) for x in sub_cat.split("/"))],
+                         "documents": n_all, "metadata_only": n_stub, "parent": up}), "",
+                     f"# {title if sub_cat in group_keys else cat_label(sub_cat)}", "",
+                     f"Part of {up} · **{n_all}** document(s)" + (f", {n_stub} metadata-only 🔒" if n_stub else "") + ".", ""]
+            if children:
+                lines += ["## Areas", ""] + [f"- {lk(hub_of[c_])}" for c_ in children] + [""]
+            if items:
+                sub = defaultdict(list)
+                for d in items:
+                    sub[d["note_dir"]].append(d)
+                lines += ["## Documents", ""]
+                for sd, its in sorted(sub.items()):
+                    if len(sub) > 1:
+                        lines += ["", f"### {sd.split('/')[-1].replace('-', ' ').title() if sd else cat_label(sub_cat)}", ""]
+                    lines += [row(d) for d in sorted(its, key=lambda x: x["note_name"])]
+            if not parent:
+                cat_notes[sub_cat] = title
+            write(base / sub_cat / f"{title}.md", "\n".join(lines))
+        # by original folder (the source tree, preserved)
+        by_root = defaultdict(list)
+        for (src, label, rel, st) in cov:
+            by_root[label].append((rel, st))
+        note_status = {}
+        for d in docs:
+            note_status[(d["root_label"], d["original_path"])] = d["note_name"]
+        asset_files = {(a.get("root_id"), a["rel"]): a.get("vault_file") for a in assets}
+        root_ids = {d["root_label"]: d["root_id"] for d in docs}
+        folder_notes = []
+        for label, rows in sorted(by_root.items()):
+            tops = defaultdict(list)
+            for rel, st in rows:
+                tops[rel.split("/")[0] if "/" in rel else ""].append((rel, st))
+            for top, items in sorted(tops.items()):
+                title = obsidian_name(f"Folder - {label} - {top or '(root)'}")
+                folder_notes.append((label, top, title, len(items)))
+                lines = [fm({"type": "document-index", "title": title, "tags": ["document-index", "document-index/folder"]}),
+                         "", f"# {label} › {top or '(root files)'}", "",
+                         "The original folder, exactly as it is in the linked store. "
+                         "🔒 = metadata-only stub · ⨯ = not a document / excluded.", ""]
+                cur_dir = None
+                for rel, st in sorted(items):
+                    dname = rel.rsplit("/", 1)[0] if "/" in rel else ""
+                    if dname != cur_dir:
+                        cur_dir = dname
+                        lines += ["", f"### `{dname or '/'}`", ""]
+                    fname = rel.rsplit("/", 1)[-1]
+                    note = note_by_rel.get((root_ids.get(label, ""), rel))
+                    vf = asset_files.get((root_ids.get(label, ""), rel))
+                    np_ = idx / "by-folder" / f"{title}.md"
+                    if st.startswith("imported") or st.startswith("stub") or st.startswith("render") or st.startswith("duplicate"):
+                        mark = " 🔒" if st.startswith("stub") else ""
+                        lines.append(f"- `{fname}` → {lk(note) if note else ''}{mark}"
+                                     + (f" *({st.split(' →')[0]})*" if st.startswith(("render", "duplicate")) else ""))
+                    elif vf:
+                        lines.append(f"- [`{fname}`]({rel_link(np_, vf)}) — asset")
+                    else:
+                        lines.append(f"- ⨯ `{fname}` — {st}")
+                write(idx / "by-folder" / f"{title}.md", "\n".join(lines))
+        # by entity
+        by_ent = defaultdict(list)
+        for d in docs:
+            if d.get("entity"):
+                by_ent[d["entity"]].append(d)
+        ent_notes = []
+        for ent, items in sorted(by_ent.items()):
+            title = obsidian_name(f"Documents about {ent}")
+            ent_notes.append(title)
+            el = lk(obsidian_name(ent)) if obsidian_name(ent) in known_orgs else ent
+            lines = [fm({"type": "document-index", "title": title, "tags": ["document-index", "document-index/entity"],
+                         "entity": el}), "", f"# Documents about {el}", "",
+                     f"{len(items)} document(s).", ""]
+            lines += [row(d) for d in sorted(items, key=lambda x: (x["category"], x["note_name"]))]
+            write(idx / "by-entity" / f"{title}.md", "\n".join(lines))
+        # versions / duplicates / sensitive
+        vg = defaultdict(list)
+        for d in docs:
+            if d.get("version_group"):
+                vg[(d["category"], d.get("entity", ""), d["version_group"])].append(d)
+        lines = [fm({"type": "document-index", "title": "Document versions", "tags": ["document-index"]}), "",
+                 "# Document versions", "", "Documents that exist in several versions; the latest is marked.", ""]
+        for (cat, ent, key), items in sorted(vg.items()):
+            lines.append(f"- **{key}** ({cat}{', ' + ent if ent else ''}): " + ", ".join(
+                f"{lk(d['note_name'])}{' ✅' if d.get('is_latest') else ''}" for d in items))
+        write(idx / "Document versions.md", "\n".join(lines))
+        dups = [d for d in docs if d.get("also_at")]
+        lines = [fm({"type": "document-index", "title": "Document duplicates", "tags": ["document-index"]}), "",
+                 "# Duplicate documents", "", "Byte-identical files kept once; the other paths are listed.", ""]
+        lines += [f"- {lk(d['note_name'])} — also at " + ", ".join(f"`{a}`" for a in d["also_at"]) for d in dups]
+        write(idx / "Document duplicates.md", "\n".join(lines))
+        sens = [d for d in docs if d.get("sensitivity") not in ("clean", "unverified")]
+        lines = [fm({"type": "document-index", "title": "Sensitive documents", "tags": ["document-index"]}), "",
+                 "# Sensitive documents (metadata only)", "",
+                 "These files were flagged by the local scanner (no AI involved). Their content is NOT in "
+                 "this brain — only the metadata below. The originals are untouched.", "",
+                 "| Document | Tier | Reasons |", "|---|---|---|"]
+        lines += [f"| {lk(d['note_name'])} | {d['sensitivity']} | {', '.join(d.get('sensitivity_reasons') or [])} |"
+                  for d in sorted(sens, key=lambda x: x["original_path"])]
+        write(idx / "Sensitive documents.md", "\n".join(lines))
+
+        # 3) the layer home
+        linked = list(getattr(c, "linked_sources", []) or [])
+        lines = [fm({"type": "document-index", "title": "Documents", "tags": ["document-index", "moc"],
+                     "sources": sorted({d["source"] for d in docs} | {l["source"] for l in linked})}), "",
+                 "# 📄 Documents", "",
+                 "Part of [[organization|" + obsidian_name(c.identity.get("name") or "the organization") + "]]."
+                 if getattr(c, "subject", "person") == "company" and c.identity.get("name") else "", "",
+                 f"**{len(docs)}** documents from {len(linked)} linked store(s) — "
+                 + " · ".join(f"{k}: {n}" for k, n in tiers.most_common()) + ".", "",
+                 "Sensitive files are **metadata-only stubs** (🔒) — the deterministic local scanner kept "
+                 "their content out. Originals are never modified. Every walked file is accounted for in "
+                 "[[_DOCS_COVERAGE]].", "", "## Linked stores", ""]
+        for l in linked:
+            if l.get("missing"):
+                lines.append(f"- **{l['label']}** ({l['source']}) — ⚠ linked folder not found")
+            else:
+                lines.append(f"- **{l['label']}** ({l['source']}, {l.get('mode', 'local')}) — "
+                             f"{l['walked']} paths → {l['documents']} documents, {l['stubs']} stubs, "
+                             f"{l['assets']} assets{'' if l.get('git') or l['source'] != 'git_docs' else ' · no git history'}")
+        lines += ["", "## By category", ""]
+        for cat, title in sorted(cat_notes.items()):
+            n_all = sum(1 for d in docs if d["category"] == cat or d["category"].startswith(cat + "/"))
+            lines.append(f"- {lk(title)} — {n_all}")
+        lines += ["", "## By original folder", ""]
+        for label, top, title, n in folder_notes:
+            lines.append(f"- {lk(title)} — {n} paths")
+        if ent_notes:
+            lines += ["", "## By customer / vendor / counterparty", ""]
+            lines += [f"- {lk(t)}" for t in ent_notes]
+        lines += ["", "## Also", "", "- [[Document versions]] · [[Document duplicates]] · [[Sensitive documents]]", "",
+                  "## Recently updated", ""]
+        recent = sorted((d for d in docs if d.get("updated")), key=lambda x: x["updated"], reverse=True)[:20]
+        lines += [f"- {d['updated']} — {lk(d['note_name'])}" for d in recent]
+        write(base / "Documents.md", "\n".join(lines))
+
+        # 4) coverage — every walked path, one status
+        stc = Counter(st.split(" (")[0].split(" →")[0] for (_, _, _, st) in cov)
+        lines = [fm({"type": "coverage", "title": "Document coverage", "tags": ["coverage"]}), "",
+                 "# Document coverage", "",
+                 f"**{len(cov)}** paths walked across {len(linked)} linked store(s): "
+                 + " · ".join(f"{k}: {n}" for k, n in stc.most_common()) + ".", "",
+                 "Nothing is silently dropped — every file in the linked folders has exactly one row.", ""]
+        for label in sorted({x[1] for x in cov}):
+            lines += [f"## {label}", ""]
+            for (src, lab, rel, st) in sorted(x for x in cov if x[1] == label):
+                lines.append(f"- `{rel}` — {st}")
+            lines.append("")
+        write(base / "_DOCS_COVERAGE.md", "\n".join(lines))
+        self._docs_count = len(docs)
+        self._docs_roots = [l for l in linked if not l.get("missing")]
+
     # 90 — synthesis
     def synthesis(self):
         """Write the `90-synthesis/` brains — the goal-driven summaries the agent
@@ -1166,6 +1758,42 @@ class VaultWriter:
                        f"`{_ll['mirror']}/` · "
                        f"`{_ll['learning']}/` · `{_ll['services']}/` · `{_ll['search']}/` · "
                        f"`{_ll['places']}/` · `{_ll['notes']}/` your own notes")
+        if getattr(self, "_docs_count", 0):
+            layers_line += (f"\n\n**Documents:** [[Documents]] — {self._docs_count} documents "
+                            f"from your linked document stores (`{_ll['docs']}/`).")
+        if getattr(c, "subject", "person") == "company":
+            # a Company Brain is rooted on the organization, not on a person's twin
+            starts = ["- [[organization]] — the company: its map, founders, board and team"]
+            if getattr(self, "_docs_count", 0):
+                starts.append("- [[Documents]] — every document, by area")
+            starts.append("- [[network-map]] — the people and organizations around the company")
+            body = f"""{fm({"type": "moc", "tags": ["moc", "home"], "title": "Home",
+                        "sources": sorted(c.sources)})}
+
+# 🧠 Second Brain Link — Home
+
+The Company Brain of **{name}**, built from **{srcs}**. Start here, then ask your AI anything.
+
+> [!tip] Try asking your AI
+> - "Who are our founders, board and team, and what does each of them own?"
+> - "Summarise what we've committed to each customer, with the documents behind it."
+> - "Which documents should a new hire read first, and in what order?"
+
+## Start here
+{chr(10).join(starts)}
+
+## Layers
+{layers_line}
+
+## How to explore
+Open **Graph view** to see the company as a map — its areas, documents, customers and
+people, linked. Filter with the **tag pane** or **Properties** (`sources`, `category`).
+Everything is plain Markdown you own.
+
+*Built by Second Brain Link · secondbrainlink.com · sources: {srcs}*
+"""
+            write(self.out / "Home.md", body)
+            return
         body = f"""{fm({"type": "moc", "tags": ["moc", "home"], "title": "Home",
                         "sources": sorted(c.sources)})}
 
@@ -1232,9 +1860,48 @@ Everything is plain Markdown you own.
         (CLAUDE.md/AGENTS.md), a `.gitignore` that excludes quarantine/attachments,
         and ALWAYS a `_STRUCTURE.md` vault map (what goes where + each file's role)."""
         prov = self._prov()
-        write(self.out / prov["guide"], vault_guide(prov))
-        write(self.out / ".gitignore", "_quarantine/\nattachments/\n.obsidian/\n.trash/\n")
+        docs_on = bool(getattr(self, "_docs_count", 0) or getattr(self, "_docs_roots", None))
+        write(self.out / prov["guide"], vault_guide(prov, docs=self.L("docs") if docs_on else None))
+        gi = "_quarantine/\nattachments/\n.obsidian/\n.trash/\n"
+        if docs_on:
+            gi += f"{self.L('docs')}/_files/\n"
+        write(self.out / ".gitignore", gi)
+        if docs_on:
+            self._agent_permissions()
         self._structure_index()
+
+    def _agent_permissions(self):
+        """`<brain>/.claude/settings.json` — deny agents Read/Edit on every linked
+        document store's ORIGINAL folder (Studio runs chats with cwd = the brain,
+        so these apply as project settings), plus `_quarantine/`. Merged
+        non-destructively: an existing file keeps every other key, and its own
+        deny rules are kept (union). A path segment that carries an e-mail
+        address (Drive for desktop puts the account in the folder name) is
+        written as `*`, so no address lands in the brain."""
+        p = self.out / ".claude" / "settings.json"
+        cur = {}
+        if p.exists():
+            try:
+                cur = json.loads(p.read_text(encoding="utf-8")) or {}
+            except Exception:
+                cur = {}
+        perms = cur.setdefault("permissions", {})
+        deny = list(perms.get("deny") or [])
+        for l in getattr(self, "_docs_roots", []) or []:
+            root = str(l.get("root") or "")
+            if not root:
+                continue
+            segs = ["*" if "@" in seg else seg for seg in Path(root).parts[1:]]
+            pat = "//" + "/".join(segs) + "/**"
+            for tool in ("Read", "Edit"):
+                rule = f"{tool}({pat})"
+                if rule not in deny:
+                    deny.append(rule)
+        q = f"Read(./{self.L('quarantine')}/**)"
+        if q not in deny:
+            deny.append(q)
+        perms["deny"] = deny
+        write(p, json.dumps(cur, indent=2))
 
     def _structure_index(self):
         """Write `_STRUCTURE.md` — the vault MAP: every folder and every generated
@@ -1423,6 +2090,18 @@ def build_uncategorized_and_coverage(col, out, file_index, all_paths, consumed_k
                      "override dir) — no Python needed. Detected shapes:")
         for key, shape, hits in sorted(harvested):
             lines.append(f"- `{key}` — {hits} records · shape: {shape}")
+    linked = list(getattr(col, "linked_sources", []) or [])
+    if linked:
+        lines.append("\n## Linked document stores\n\nRead in place (read-only) through "
+                     "`_SOURCE_LINK.json`; every walked path has a row in the documents layer's "
+                     "`_DOCS_COVERAGE.md`.")
+        for l in linked:
+            if l.get("missing"):
+                lines.append(f"- **{l['label']}** ({l['source']}) — linked folder not found")
+            else:
+                lines.append(f"- **{l['label']}** ({l['source']}) — {l['walked']} paths → "
+                             f"{l['documents']} documents ({l['stubs']} metadata-only stubs), "
+                             f"{l['assets']} assets")
     if uncategorized:
         lines.append("\n## Adaptation opportunity\n\nUncategorized files were summarized "
                      "generically. To map them, add a mapping JSON rule (preferred) or "
@@ -1466,7 +2145,8 @@ def write_seed_summary(out: Path, col, sources_used, subj, emit_list, stats):
     lines += ["",
               f"Key buckets — people: **{len(col.people)}** · organizations: "
               f"**{len(col.orgs)}** · places: **{len(col.places)}** · interests: "
-              f"**{len(col.interests)}** · posts: **{len(col.posts)}** · message "
+              f"**{len(col.interests)}** · posts: **{len(col.posts)}** · documents: "
+              f"**{len(getattr(col, 'documents', []) or [])}** · message "
               f"correspondents: **{len(col.msg_signal)}** (signal only, no bodies).", "",
               "_Generated by build_vault.py alongside `_COVERAGE.md` / `_BUILD_REPORT.md`._"]
     write(out / "_SUMMARY.md", "\n".join(lines))
@@ -1527,6 +2207,7 @@ def _build_one(mods, root, file_index, all_paths, out, subj, emit_names, full,
     col.provider = PROVIDER             # carry provider on the instance (see _prov)
     col.min_org_refs = MIN_ORG_REFS     # carry org-trim threshold on the instance
     col.file_keys = set(file_index)     # for the company data-handling note
+    col.mapping_dirs = list(MAPPING_DIRS)   # docs sources read --mappings <dir>/docs/*.json
     consumed_keys = set()
     sources_used = []
     for mod in mods:
@@ -1545,6 +2226,25 @@ def _build_one(mods, root, file_index, all_paths, out, subj, emit_names, full,
             consumed_keys |= set(ck)
 
     col.subject = subj
+    hint = getattr(col, "doc_org_hint", None)
+    if subj == "company" and hint:
+        if not col.identity.get("name"):
+            col.set_identity(hint.get("source", "git_docs"), name=hint["name"])
+        if hint.get("logo_bytes") and not col.identity.get("avatar_bytes"):
+            col.identity["avatar_bytes"] = hint["logo_bytes"]
+            col.note(f"[docs] organization logo: {hint.get('logo_rel', '')}")
+    if subj == "company" and col.identity.get("name"):
+        # the company's own team (founders, board, employees) from the user's own
+        # personal brains + an optional data/company/<name>/team.json roster
+        try:
+            import teamroster
+            slug = out.name[:-6] if out.name.endswith("-brain") else ""
+            teamroster.apply(col, col.identity["name"],
+                             aliases=[a for a in ((hint or {}).get("name", ""), slug) if a],
+                             brains=teamroster.personal_brains(out, PEOPLE_FROM),
+                             roster_root=root)
+        except Exception as e:                                # pragma: no cover
+            col.note(f"[team] skipped: {type(e).__name__}: {e}")
     if subj == "person" and not col.subject_entity:
         col.subject_entity = col.identity.get("name", "")
 
@@ -1619,16 +2319,26 @@ def refresh_sync(new_dir: Path, live_dir: Path):
     if nmf.exists():
         new_man = (json.loads(nmf.read_text(encoding="utf-8")) or {}).get("files", {})
 
-    def _on_disk_sha(path: Path):
+    def _on_disk_shas(path: Path):
+        """Both hashes of a file on disk: a text note is recorded with
+        sha256_text (normalised trailing newline) but a verbatim copy written by
+        write_bytes_file (a document under 65-documents/_files/, an avatar) is
+        recorded with sha256_bytes — so a file matches when EITHER equals the
+        manifest value. None when the file is missing/unreadable."""
         try:
-            return _sha256_text(path.read_text(encoding="utf-8"))
-        except UnicodeDecodeError:
-            try:                     # binary generated file (e.g. _assets/avatars/*)
-                return _sha256_bytes(path.read_bytes())
-            except Exception:
-                return None
+            raw = path.read_bytes()
         except Exception:
             return None
+        out = {_sha256_bytes(raw)}
+        try:
+            out.add(_sha256_text(raw.decode("utf-8")))
+        except UnicodeDecodeError:
+            pass
+        return out
+
+    def _on_disk_sha(path: Path):
+        shas = _on_disk_shas(path)
+        return None if shas is None else shas
 
     stats = {"new": [], "updated": [], "unchanged": [], "conflicts": [],
              "deleted_stale": [], "kept_stale": []}
@@ -1640,9 +2350,9 @@ def refresh_sync(new_dir: Path, live_dir: Path):
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
             stats["new"].append(rel)
-        elif live_sha == new_sha:                  # identical already
+        elif new_sha in live_sha:                  # identical already
             stats["unchanged"].append(rel)
-        elif rel not in old_man or live_sha == old_man.get(rel):
+        elif rel not in old_man or old_man.get(rel) in live_sha:
             # engine-owned and untouched by the user → safe overwrite
             shutil.copy2(src, dst)
             stats["updated"].append(rel)
@@ -1657,7 +2367,7 @@ def refresh_sync(new_dir: Path, live_dir: Path):
         live_sha = _on_disk_sha(dst)
         if live_sha is None:
             continue
-        if live_sha == old_sha:                    # stale + unedited → delete
+        if old_sha in live_sha:                    # stale + unedited → delete
             dst.unlink()
             stats["deleted_stale"].append(rel)
         else:                                      # stale but user-edited → keep
@@ -1951,11 +2661,26 @@ def plan(root: Path):
     print(f"Sources detected: {', '.join(m.NAME for m in sources) or 'none'}")
     print(f"Total files on disk: {len(all_paths)}")
 
-def vault_guide(prov=None):
+def vault_guide(prov=None, docs=None):
     """The in-vault agent guide, written to the provider's guide filename
     (CLAUDE.md for Claude, AGENTS.md for OpenAI/Codex). Same guidance either way —
-    only the addressed agent name differs."""
+    only the addressed agent name differs. `docs` = the documents layer folder
+    when this brain has linked document stores (adds the Documents rules)."""
     agent = (prov or _provider())["agent"]
+    docs_rules = "" if not docs else f"""
+## Documents — `{docs}/` (linked document stores)
+- Start at `{docs}/Documents.md`, then `{docs}/_index/` (by category, by original
+  folder, by customer/vendor, versions, duplicates). Each document is one note:
+  read its frontmatter (`category`, `doc_type`, `entity`, `updated`, `is_latest`,
+  `sensitivity`) before its body. Prefer `is_latest` versions.
+- Notes tagged `sensitivity/…` other than `clean`/`unverified` are METADATA-ONLY
+  stubs: the local scanner found credentials, secrets or dense personal data, so
+  the content was deliberately kept out. Never try to obtain it.
+- NEVER read, open, grep or list anything OUTSIDE this vault — in particular the
+  original document folders these notes came from (`original_root_id` is a handle
+  for Studio's "Reveal original", not a path for you). Copies you MAY open live in
+  `{docs}/_files/`.
+"""
     return f"""# Working in this vault — built by Second Brain Link (secondbrainlink.com)
 
 Guide for {agent} (and any coding agent). A digital-twin vault built from one or
@@ -1982,7 +2707,7 @@ value is in connections, voice, and intent — not raw storage.
 ## Hard privacy rules
 - NEVER read `_quarantine/`. Never surface anyone's email, phone, or private
   message body — that data was deliberately kept out of this vault.
-
+{docs_rules}
 ## Drafting
 - Ground voice in `30-voice/` + `90-synthesis/positions-i-hold.md`; never invent
   opinions the user hasn't expressed. Keep new links tight.
@@ -2010,7 +2735,7 @@ def main():
     BEFORE detection so the override mappings win. Sets the module globals
     (PROVIDER/STRUCTURE/OVERRIDES) that get carried onto each Collector. The only
     networked step is the opt-in, PATH-gated --gbrain-import handoff at the end."""
-    global OVERRIDES, STRUCTURE, PROVIDER, MIN_ORG_REFS
+    global OVERRIDES, STRUCTURE, PROVIDER, MIN_ORG_REFS, MAPPING_DIRS, PEOPLE_FROM
     ap = argparse.ArgumentParser(description="Build a multi-source digital-twin vault.")
     ap.add_argument("source")
     ap.add_argument("-o", "--output", default="second-brain-vault")
@@ -2057,6 +2782,10 @@ def main():
                     help="extra mapping dir(s) with sources/<name>.json and/or "
                          "brain/layout.json that override/extend the shipped mappings "
                          "(repeatable; later wins). No Python needed to add a source.")
+    ap.add_argument("--people-from", action="append", default=[], metavar="BRAIN",
+                    help="company brains: a personal brain folder to take the company's own "
+                         "team from (people whose `company:` is this company, and your own "
+                         "current position). Repeatable; default = sibling vault/personal/*-brain.")
     ap.add_argument("--exclude", action="append", default=[], metavar="SOURCE",
                     help="skip a source ENTIRELY — its files are never detected, "
                          "imported or harvested (matches the source folder name, e.g. "
@@ -2064,6 +2793,11 @@ def main():
     args = ap.parse_args()
     PROVIDER = args.provider
     MIN_ORG_REFS = max(1, args.min_org_refs)
+    MAPPING_DIRS = list(args.mappings)
+    PEOPLE_FROM = list(args.people_from)
+    # a linked document store may never contain the data folder or the output
+    doclink.GUARD_PATHS[:] = [str(Path(args.source).expanduser()),
+                              str(Path(args.output).expanduser())]
     if args.mappings:
         _sources.register_mappings(args.mappings)   # rebuild registry (mapping-wins)
         try:

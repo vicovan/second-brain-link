@@ -308,22 +308,37 @@ Agent(subagent_type: "general-purpose", prompt: <brief>)
 is sent in the user's name; a smaller model is a worse hiring manager, not a cheaper one. This
 holds for every subagent that judges, writes or fills anything: never pin a smaller model for
 it. (A purely mechanical, independently verified chore is the only place a smaller model fits.)
-The brief contains, verbatim: `posting.md`, `fit.md`, the CV Markdown, `answers.json`, and:
+The brief contains, verbatim: `posting.md`, `answers.json`, **the CV as the employer receives
+it** — the text extracted from the built PDF, not the Markdown source, so a broken layout or a
+garbled line is seen exactly as a screener sees it:
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/cv-tailor/scripts/check_pdf.py <app dir>/<cv>.pdf --text
+```
+— and the prompt below. Leave `fit.md` out: a hiring manager never sees the candidate's own
+analysis, and with it in hand the reviewer grades the argument instead of the page.
 
 > You are the hiring manager for this role, screening 300 applications. Do not use any tools.
 > Read the posting, then the CV and answers as they would arrive. Return JSON only:
 > `{"verdict": "shortlist|maybe|reject", "six_second_read": "<what the top third of page 1 told
-> you>", "reasons": ["…"], "bullets": [{"text": "…", "action": "keep|cut|rewrite", "why": "…"}],
+> you>", "remembered": "<the one thing you remember after six seconds>", "reasons": ["…"],
+> "bullets": [{"text": "…", "action": "keep|cut|rewrite", "why": "…"}],
+> "not_understood": ["<bullets a non-engineer recruiter could not follow>"],
+> "generated_phrases": ["<the three phrases that most sound machine-written, quoted>"],
+> "irrelevant": ["<bullets that answer nothing in the posting>"],
 > "top_fixes": ["…", "…", "…"], "reads_generated": true|false}`.
-> Shortlist only if you would put this person on a screening call over the other 299. Name
-> anything that reads as templated or AI-written.
+> Shortlist only if you would put this person on a screening call over the other 299. Set
+> `reads_generated` true if you would suspect a tool wrote this CV — uniform bullet shapes,
+> label-colon lists, stylised one-liners, words no person uses about their own work.
 
 Record the verdict:
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/cv-tailor/scripts/lint_cv.py review <app dir> \
-   --verdict <shortlist|maybe|reject> --reason "<first reason>"
+   --verdict <shortlist|maybe|reject> [--reads-generated] --reason "<first reason>"
 ```
-- **shortlist** → continue.
+- **shortlist** with `reads_generated: false` → continue.
+- **`reads_generated: true`** blocks like a `maybe`, whatever the verdict: rewrite every quoted
+  `generated_phrases` item and every `not_understood` bullet, cut the `irrelevant` ones, re-run
+  the gates, review once more. Still true → fill but do not submit.
 - **maybe** → apply `top_fixes` once (re-run the CV and answers gates), review once more. Still
   `maybe` → fill the form but do not submit; report it as `filled` with the reviewer's reasons.
 - **reject** → stop; log `--status skipped_review --note "<reason>"`. A reviewer's reject on a

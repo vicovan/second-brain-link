@@ -43,6 +43,20 @@ for a free-text answer, and your tool call **waits** until the user answers. The
 back as the tool result, inside the same turn, just as in a terminal. A decision you ask
 for this way is called a **gate** below.
 
+### The approval card — before anything that matters
+
+Right before an `AskUserQuestion` that approves something consequential (the submit gate), write a fenced `approval` block in the same message. Studio turns it into the approval card above the question: the consequence in one sentence, the real document to open, every field with the note it came from (a blank stays blank — never invent one), and your never-do list. It is hidden from the chat text. Paths are vault-relative; sources are wikilinks.
+
+```approval
+{"consequence": "This submits your application to Acme — Staff Engineer.", "irreversible": true,
+ "artifact": "45-jobs/applications/<date>/<key>/<cv>.pdf",
+ "fields": [{"label": "Years of experience", "value": "12", "source": "[[00-me/identity]]"},
+            {"label": "Salary expectation", "value": "", "source": ""}],
+ "never": ["passwords", "ID numbers", "creating accounts"]}
+```
+
+Set `irreversible: true` only when the step truly can't be undone (submit, send) — Studio then needs an explicit Approve, never a single stray click. If the user says no, their reason comes back with the refusal: honour it, and don't ask the same thing again this run.
+
 Fallback only: if `AskUserQuestion` is unavailable or its call fails, emit a single fenced
 `gate` block instead and **end your turn**. Studio renders it as buttons and the click
 arrives as your next message. The session stays alive, so you carry on from where you stopped.
