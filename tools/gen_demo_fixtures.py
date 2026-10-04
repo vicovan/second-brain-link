@@ -39,7 +39,10 @@ The story the two archives tell (keep it coherent when you extend them):
     He keeps a travel corpus the Travel Agent can plan from: coffee he loved in London,
     Tokyo and San Francisco (reviewed ★5), a Lisbon trip he took (fado cellar, Web Summit,
     a sunset photo on the Tagus) and saved-but-never-visited pins in Lisbon, Tokyo and
-    Seoul (`TRAVEL_PLACES`, `TIMELINE_VISITS`, `FB_EVENTS`). He also applied for a few
+    Seoul (`# Place NAMES become FILE names in the shipped demo: keep them plain ASCII letters. An accented
+# letter (é, í) has two Unicode forms; the macOS .dmg stores the other one than the signed app,
+# which broke the code-signature seal ("Second Brain Studio is damaged", v1.4.1).
+TRAVEL_PLACES`, `TIMELINE_VISITS`, `FB_EVENTS`). He also applied for a few
     advisory / fractional product roles at client companies (`JOHN_APPLICATIONS`).
   * Acme Robotics — a 200-person collaborative-robotics company: five departments, twelve
     customers, six vendors, Salesforce deals, Slack, Workspace calendars, and a LINKED
@@ -186,13 +189,13 @@ PRODUCTS = ["Torque Wrench Set", "Lidar Module", "Servo Driver", "Carbon Tripod"
 #   mode: "saved" -> Saved Places.json (+ the Saved/<list>.csv), "review" -> Reviews.json
 TRAVEL_PLACES = [
     # Lisbon — saved for a trip he has not taken yet ("Want to go")
-    ("Alfama Tile Café", "Lisbon", "PT", 38.7117, -9.1303, "saved", "2024-02-11", None, "", "Want to go"),
+    ("Alfama Tile Cafe", "Lisbon", "PT", 38.7117, -9.1303, "saved", "2024-02-11", None, "", "Want to go"),
     ("Miradouro Roastery", "Lisbon", "PT", 38.7154, -9.1340, "saved", "2024-02-11", None, "", "Want to go"),
     ("Tasca do Largo", "Lisbon", "PT", 38.7110, -9.1445, "saved", "2024-03-02", None, "", "Want to go"),
     ("LX Riverside Market", "Lisbon", "PT", 38.7070, -9.1459, "saved", "2024-03-02", None, "", "Want to go"),
-    ("Belém Pastry House", "Lisbon", "PT", 38.6975, -9.2032, "saved", "2024-03-05", None, "", "Want to go"),
+    ("Belem Pastry House", "Lisbon", "PT", 38.6975, -9.2032, "saved", "2024-03-05", None, "", "Want to go"),
     ("Tagus Design Museum", "Lisbon", "PT", 38.7079, -9.1366, "saved", "2024-03-05", None, "", "Want to go"),
-    ("Príncipe Real Garden Bar", "Lisbon", "PT", 38.7166, -9.1487, "saved", "2024-04-18", None, "", "Want to go"),
+    ("Principe Real Garden Bar", "Lisbon", "PT", 38.7166, -9.1487, "saved", "2024-04-18", None, "", "Want to go"),
     ("Sintra Ridge Trail", "Sintra", "PT", 38.7876, -9.3906, "saved", "2024-04-18", None, "", "Want to go"),
     # Lisbon — the one night he did spend there (Web Summit week, 2022)
     ("Lisbon Fado Cellar", "Lisbon", "PT", 38.7123, -9.1296, "review", "2022-10-14", 4,
