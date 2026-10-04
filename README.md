@@ -50,6 +50,8 @@ Full per-OS guide + troubleshooting: **[INSTALL.md](INSTALL.md)**.
 | **Fundraising Agent** · [`fundraising`](plugins/fundraising/) | Screens funds and programs against your filter chain, verifies them on their own sites, writes a dated Funding Plan, drafts applications and investor emails — **never sends** | `46-fundraising/` |
 | **Travel Agent** · [`travel-planner`](plugins/travel-planner/) | Plans a trip from the places already in your brain, draws it on Studio's **Map**, then reads real flight and hotel prices in your own browser and lists them the way the sites do — **books nothing** | `47-travel/` |
 
+**…and let it keep working — the Harness** *(developer preview)*. Give an agent a **goal** with a finish line (*"3 interviews by Nov 30"*) or a **routine** that repeats (*"weekdays at 07:00, scout new jobs"*). Everything that needs you lands in one **Inbox**; **Activity** shows what each run did, step by step. It all lives in your brain's `96-agents/` folder as plain notes — see [The Harness](#the-harness--goals-routines-inbox-activity).
+
 See [Agents — make the brain do work](#agents--make-the-brain-do-work) to install them.
 
 ---
@@ -60,7 +62,12 @@ See [Agents — make the brain do work](#agents--make-the-brain-do-work) to inst
 
 - **Agents tab** — run a plugin agent beside your brain: the note it writes updates live next to the conversation, questions and approval gates arrive as buttons, and several agents and chats can run **in parallel**, each clearly marked, each with its own Stop.
 - **Map** — Google Maps over every geo-tagged note (your saved places, check-ins, geocoded people and companies), with filters, AI search over your places and a place search. Agents draw on it: the Travel Agent's trip, its suggestions and your other trips, each in its own look. Uses **your own** Maps API key.
+- **Agents' work** — Inbox, Goals, Routines and Activity sit under **Agents** in the section menu: approvals and reports arrive in the Inbox, goals show their progress, routines show when they run next.
+- **Memory** — every chat and agent remembers what you tell it and what came of it, in your brain's `_memory/` folder; anything an agent *inferred* is marked as such, and you can review, edit or forget each item in the Memory manager.
+- **Brain stats** — one click on the sidebar's stats strip opens notes, sources, the graph, quality checks, agents' work and memory in one place.
+- **A guided start** — a short welcome, a map of Studio's concepts and guided tours, replayable any time from the **?** button.
 - **Attachments** — drop, paste or attach files to a chat; PDFs and other files open in-app.
+- **On your phone** — the browser Studio works on a phone and installs as an app (*Add to Home Screen* / *Install app*); panels become bottom sheets.
 
 ![Second Brain Studio — the desktop app](docs/studio-shot-desktop.png)
 
@@ -314,11 +321,14 @@ your-vault/
 ├── 30-voice/                    # posts, comments, reactions, interests, saved items
 ├── 40-career/                   # applications, preferences, saved jobs, reusable answers
 ├── 45-jobs/ · 46-fundraising/ · 47-travel/   # written by the AGENTS (plugins), not the builder — only if you use them
+├── 65-documents/                # company brains: one note per file of a linked docs repo / Google Drive (sensitive files metadata-only)
 ├── 50-mirror/                   # HOW THE ALGORITHMS SEE YOU — inferences + ad profile
 ├── 60-learning/                 # courses, coaching, events (incl. Google Calendar)
 ├── 70-services/                 # freelance / Services Marketplace (if used)
 ├── 80-search/                   # your search history — a curiosity log
 ├── 85-places/                   # saved/reviewed/visited places (Google Maps + Timeline, IG venues, FB check-ins & events) — with coordinates, city, kind, your rating
+├── 96-agents/                   # the HARNESS — Goals/ · Routines/ · Reports/ · Activity/ (written by agents + Studio, never by the builder)
+├── _memory/                     # what your chats and agents remember (yours to review, edit or forget)
 ├── 90-synthesis/                # THE PAYOFF (derived, not raw):
 │   ├── network-map.md           #   clusters, people-by-source, strongest & dormant ties
 │   ├── positions-i-hold.md      #   your real public stances (for writing in your voice)
@@ -350,7 +360,7 @@ The `90-synthesis/` notes are the summarized "brains" of each layer — they're 
 
 **Owner mode (`--full`).** The default build is privacy-safe (third-party emails/phones stripped, message bodies never read, sensitive files quarantined). For *your own* brain on *your own* machine, `--full` captures everything — emails, phones, every extra column, and the otherwise-quarantined personal files folded into `00-me/` as `my-*.md` tables — so no field is dropped.
 
-**Updating with a newer archive (`--refresh`).** Exports are snapshots; when you download a fresh one, add `--refresh` instead of rebuilding over your edits. Every generated file is tracked in `_GENERATED.json` (path + hash), so the engine knows exactly what it owns: unedited engine notes update in place, **notes you edited are kept** (the fresh version lands beside them as `<name>.new.md`), stale unedited notes are removed, and everything you created — any folder, plus all of `_notes/` — is untouched. The run is summarized in `_UPDATE_REPORT.md`; re-run `analyze.py` afterwards. Studio's **Reseed** offers the same choice: **Update** (refresh) or **Rebuild from scratch**.
+**Updating with a newer archive (`--refresh`).** Exports are snapshots; when you download a fresh one, add `--refresh` instead of rebuilding over your edits. Every generated file is tracked in `_GENERATED.json` (path + hash), so the engine knows exactly what it owns: unedited engine notes update in place, **notes you edited are kept** (the fresh version lands beside them as `<name>.new.md`), stale unedited notes are removed, and everything you created — any folder, plus all of `_notes/` — is untouched. The run is summarized in `_UPDATE_REPORT.md`; re-run `analyze.py` afterwards. Studio's **Reseed** offers the same choice: **Update** (refresh) or **Rebuild from scratch** — and a Rebuild keeps everything you and your agents made (`_notes/`, `_memory/`, the agents' layers, goals and routines): they are set aside, the brain is built fresh, and they go back in.
 
 ---
 
@@ -627,10 +637,10 @@ file in `engine/scripts/emitters/`. **Adding an agent** = one folder under `plug
 - **v0.5 — multi-source.** Facebook, Instagram, and Google Takeout; one unified vault that merges a person across networks. ✅
 - **v0.7 — personal *and* company.** Company sources (LinkedIn Company, Google Workspace, Slack), sibling personal/company vaults, `--full` owner mode, GBrain emitter, self-heal. ✅
 - **v0.8 — cross-model + multi-entity + self-adapt.** One engine, two providers (Claude + OpenAI Codex); multiple identities/companies → per-entity brains + `_correlations/`; declarative JSON source mappings + universal harvester + an `85-places/` layer. ✅
-- **v1 — 25 sources.** Personal: X/Twitter, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok, Amazon. Company: Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email, Microsoft 365, Teams. Plus offline geocoding (places → map), subject-aware company vault layout, and `--refresh` incremental updates (`_GENERATED.json` manifest, edits kept, `_notes/` untouchable). ✅ *(this release)*
+- **v1 — 27 sources.** Personal: X/Twitter, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok, Amazon. Company: Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email, Microsoft 365, Teams, plus the document stores — a Git docs repo and Google Drive, linked read-only. Plus offline geocoding (places → map), subject-aware company vault layout, and `--refresh` incremental updates (`_GENERATED.json` manifest, edits kept, `_notes/` untouchable). ✅
 - **v1.2 — sharper entity resolution.** Stable IDs + precision-biased fuzzy matching beyond name-only merge (still conservative — a wrong merge is worse than a miss).
 - **v1.5 — always fresh.** Local re-import shipped in v1 (`--refresh`); next is scheduled/managed sync so the snapshot stops being a snapshot without manual re-exports.
-- **v2 — the brain that acts.** First slice shipped: the `plugins/` surface and three agents — **Jobs**, **Fundraising** and **Travel** — running in Studio's Agents tab, in parallel, behind approval gates, writing their work back as vault layers. 🧪 *(developer preview)* Next: more agents from the same brain — network revival, meeting briefings, follow-ups.
+- **v2 — the brain that acts.** First slice shipped: the `plugins/` surface and three agents — **Jobs**, **Fundraising** and **Travel** — running in Studio's Agents tab, in parallel, behind approval gates, writing their work back as vault layers; **memory** for every chat and agent; and **the Harness** — goals, routines, an inbox and an activity log in `96-agents/`. 🧪 *(developer preview)* Next: more agents from the same brain — network revival, meeting briefings, follow-ups.
 
 Every network you own is just one more link.
 
@@ -651,7 +661,7 @@ ships, and each plugin declares its own network use in its manifest before you i
 | **Jobs** · [`job-search`](plugins/job-search/) | Sweeps open ATS boards against the criteria you set, scores and shortlists (knock-out and likelihood gates), tailors an ATS-first CV per role, fills the application in your browser at the autonomy level you choose, and tracks every outcome | `45-jobs/` |
 | **Fundraising** · [`fundraising`](plugins/fundraising/) | Screens funds and programs through your own ordered filter chain, verifies survivors on their own sites with dated evidence, writes a Funding Plan, drafts program applications and investor emails — never sends; a target is "contacted" only when you say so | `46-fundraising/` |
 | **Travel** · [`travel-planner`](plugins/travel-planner/) | Trip ideas from cities you saved and never visited; a day-by-day itinerary from your own places, drawn on Studio's Map; suggestions checked against real reviews and your taste; real flight and hotel prices read in your browser (Google Flights, Google Hotels, Booking.com, Agoda…) shown as familiar lists, each with when and where it was seen; stopover nights from separate tickets, with the self-transfer risk spelled out — books nothing | `47-travel/` |
-
+| **Docs connector** · [`docs-connector`](plugins/docs-connector/) | The networked half of the document stores: clones / fast-forwards a Git docs repository, or pulls a Google Drive folder with your own read-only credentials, into a mirror the engine then links — the engine itself never touches the network | `65-documents/` (via the engine) |
 **Install** (from a checkout; one Claude install serves the CLI and both Studios):
 
 ```bash
@@ -679,6 +689,39 @@ Studio won't list it.
   prices there).
 
 See [`plugins/README.md`](plugins/README.md) for the contract and how to build your own.
+
+## The Harness — goals, routines, inbox, activity
+
+*Developer preview.* The agents above do a job when you ask. The Harness lets them keep working
+toward an outcome — and keeps you in charge of every step that matters.
+
+| | What it is | Example |
+|---|---|---|
+| **Goals** | an outcome with a **finish line**, counted from real results (not from what an agent says it did) | *3 interviews by Nov 30* · *5 investor meetings this quarter* |
+| **Routines** | work that **repeats**, optionally toward a goal; each checks its own conditions before it starts | *Weekdays 07:00: scout new jobs* · *Mondays: who should I reconnect with?* |
+| **Inbox** | the **one place** for everything that needs you | approvals, reports with news, suggested fixes, memories to review |
+| **Activity** | **what exactly happened** on every run, step by step | a timeline you can replay |
+
+Everything is plain Markdown in your brain's `96-agents/` folder (`Goals/`, `Routines/`,
+`Reports/`, `Activity/`), so Obsidian, Studio and any AI read the same files. Studio shows it
+under **Agents** in the section menu; on the desktop, routines can run in the background from
+the menu bar (off until you turn it on — your computer has to be awake). Anything that leaves
+your machine or can't be undone still waits for your approval.
+
+From the terminal, the `sbl` command (stdlib only, run it from the repo) reads the same files:
+
+```bash
+./sbl goals    vault/personal/<id>-brain    # goals and their progress
+./sbl routines vault/personal/<id>-brain    # routines and when they run next
+./sbl inbox    vault/personal/<id>-brain    # what needs you
+./sbl runs     vault/personal/<id>-brain    # activity, newest first
+./sbl run      vault/personal/<id>-brain <routine>   # a dry run: checks, conditions, handoff — no model
+./sbl demo                                  # build the demo brains (synthetic people) to try it all
+```
+
+Spec: [`engine/references/harness.md`](engine/references/harness.md).
+
+---
 
 ## Contributing
 
