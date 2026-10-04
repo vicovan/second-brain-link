@@ -22,38 +22,58 @@
   "providers": [
     "claudecode"
   ],
+  "subjects": [
+    "personal",
+    "company"
+  ],
   "color": "#0f9d74",
   "suggestions": [
     {
       "t": "Set me up",
-      "q": "Set up my fundraising profile. Pull everything you can from this brain, my deck and my facts file first — then ask me only the decisions: the round, my minimum cheque, where I can raise from, entity, cofounder stance, exclusions and how autonomous you should be."
+      "stage": "setup",
+      "short": "Pull the facts from this brain, my deck and my facts file; ask me only the decisions.",
+      "q": "Set up or update my fundraising profile. Pull everything you can from this brain, my deck and my facts file first — then ask me only the decisions: the round, my minimum cheque, where I can raise from, entity, cofounder stance, exclusions and how autonomous you should be."
     },
     {
       "t": "Build my funding plan",
+      "stage": "do",
+      "when": "onboarded",
+      "short": "Screen every target, verify the survivors on their own sites (fan-out told first), write the dated plan.",
       "q": "Build my funding plan: screen every target against my filter chain, verify the survivors on their own sites (tell me the fan-out before you spend it), then write the Funding Plan with the ledger, a dated timeline, the tiers, the decisions I owe and what to do this week."
     },
     {
       "t": "Screen this list",
+      "stage": "do",
+      "when": "onboarded",
+      "short": "Paste it or drop a CSV; I run my filter chain and say what fell out, and on which filter.",
       "q": "Screen a list of investors or programs. I'll paste it or drop a CSV next — import it as unverified leads, run my filter chain, and tell me which survived, which fell out and on which filter, before verifying anything."
     },
     {
       "t": "Apply to a program",
+      "stage": "do",
+      "when": "has-work",
+      "short": "Find the real form, draft every answer from my facts, fill and verify it in my browser — then my gate.",
       "q": "Apply to a program from my plan: find its real form, draft every answer from my profile and stories within the form's limits, lint it against my facts, fill it in my browser and verify every field — then finish the way my autonomy setting says."
     },
     {
-      "t": "Prepare this week's packages",
-      "q": "Prepare this week's packages: for each Tier 2 target, build the brief, score the fit, draft the email, lint it, run the independent investor review, and give me the Open-in-Mail buttons for everything that passes. Do not send anything."
-    },
-    {
       "t": "Draft this week's emails",
-      "q": "Draft this week's investor emails: one per Tier 2 target, each with a hook from something verified on their own site, linted against my facts, saved as a note and as a Gmail draft. Do not send anything."
+      "stage": "do",
+      "when": "has-work",
+      "short": "One package per Tier 2 target — brief, fit, draft, lint, independent review. Drafts only; I press Send.",
+      "q": "Draft this week's investor emails as packages: for each Tier 2 target, build the brief, score the fit, draft the email with a hook from something verified on their own site, lint it against my facts, run the independent investor review, and give me the Open-in-Mail buttons for everything that passes — plus a Gmail draft when that tool is available. Do not send anything; I press Send."
     },
     {
       "t": "What's due?",
+      "stage": "track",
+      "when": "has-work",
+      "short": "Follow-ups, program deadlines in the next two weeks, claims to re-verify.",
       "q": "What's due? List follow-ups, program deadlines in the next two weeks and anything I need to re-verify — and draft the follow-ups that are due."
     },
     {
       "t": "Record a reply",
+      "stage": "track",
+      "when": "has-work",
+      "short": "Paste it; I log it against the target, update the plan, and prep me if it is a meeting.",
       "q": "I heard back from an investor or a program. I'll paste the email or tell you what happened — log it against the right target, update the plan, and if it's a meeting, prep me from the target note and my stories."
     }
   ],

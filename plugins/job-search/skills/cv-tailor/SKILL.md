@@ -97,8 +97,13 @@ final message.
   Settings), read it too — it carries their real wording, which `profile.md` may have
   summarised away. Never contradict `profile.md`; it stays the source of truth for facts.
 - Read `profile/profile.md` in full.
+- **Apply the profile's CV conventions (§10)** — date format, spelling system, title forms — and
+  each role's **public record** for dates and location, **company site** for the URL line, and
+  **acquired / renamed** for one continuous entry under the new owner. Where a profile predates
+  these fields, use what it has and tell the user in one line that `/onboard` → "upgrade my
+  profile" adds them.
 - **Title mirroring — playbook §3, the three-rung ladder.** Mirror the target title verbatim in the
-  headline AND in the first sentence of the summary; use an allowed title variant for each role
+  headline (the summary may use it once, naturally — never as a bolded opener); use an allowed title variant for each role
   where one matches; otherwise keep the true title and add a one-line **context line** — team
   size, who the role reported to, what it covered. **Never write a title the user did not hold** —
   titles are the most verifiable thing on a CV.
@@ -118,8 +123,10 @@ final message.
   the first one under the most recent relevant role answers the JD's **#1 requirement**.
 - Rewriting = the same true fact in their words. **Never add scope, scale or numbers** that are not
   in `profile/profile.md` §7.
-- Build the Core Competencies list: JD must-haves first (both forms), then
-  nice-to-haves, then the user's strongest adjacent keywords. 40–60 terms.
+- Write the **Skills** line (the last section): one plain comma-separated line of 12–18 terms,
+  JD must-haves first, each one truthfully supported by the profile. No grid of labelled skill
+  groups at the top of the page — recruiters read it as generated, and the ATS gets the same
+  keywords from the bullets and this line.
 - Apply the company-type variant (playbook §7) and regional convention (§8).
 - Decide the older-roles depth (merge roles more than ten years back unless relevant).
 - For full-time employee targets, decide how the user's own ventures and side
@@ -128,9 +135,10 @@ final message.
 
 ### 3b. Write the summary — playbook §3c
 - **Professional Summary, rewritten from scratch every time.** Three or four sentences, implied
-  subject (no "I"): target title verbatim and bolded + strongest proof · the JD's riskiest
-  `critical` requirement answered with a specific fact · a scale credential (team, org, users)
-  from the profile. **55–90 words, no sentence over 28 words, at least one under 12.** The top
+  subject (no "I"), that say who this person is and why they fit THIS role: the career in one
+  line · the JD's riskiest `critical` requirement answered with a specific fact · a scale
+  credential (team, org, users) from the profile. It reads like a confident senior person
+  describing their own career — not credentials glued with semicolons, not "<Title> profile:". **55–90 words, no sentence over 28 words, at least one under 12.** The top
   five `fit.md` keywords inside it. Plain words: a recruiter who is not an engineer must
   understand every sentence.
 - **Never name a gap on the CV** (playbook §3c, "Gaps never go on the CV"). Gaps live in
@@ -180,8 +188,8 @@ how loudly each one shouts:
    (*deterministic, orchestration, end to end*, algorithm names). Say what changed for whom.
 3. **The headline** — the posting's title first, then one short differentiator, ≤ 80 characters.
    The title never reappears in the bullets, and no "-level" phrasing anywhere.
-4. **Core Competencies as one `·` wall** — convert it to a `kv` block, four or five labelled
-   groups, ≤ 7 terms each.
+4. **A skills grid at the top** — no labelled skill groups above the work history. Skills are one
+   plain line at the end.
 5. **Em-dashes** — two per page, maximum. Count them.
 6. **Even sentence lengths** — put at least one sentence under twelve words in the summary.
 7. **Round numbers** (100%, 3x, 50+) — use the real uneven figure.
@@ -193,6 +201,11 @@ how loudly each one shouts:
 **Rewrite, do not just unbold or swap punctuation** — deleting a lead-in leaves a broken sentence
 (*"…for volume and for trust high-volume data pipelines"*), and swapping an em-dash for a comma
 manufactures comma splices. Read every changed sentence back.
+
+Then **the bullet test, one bullet at a time** (playbook §3f): only-you · so what · read aloud ·
+serves the posting · one idea. Read every bullet as the recruiter will — two seconds, no context.
+A bullet that fails and cannot be made specific truthfully is cut. Then **the consistency pass**
+(playbook §3g): spelling system, title forms, tense, punctuation, dates, capitalisation.
 
 Facts never move. This is how it is written, not what it says.
 
@@ -213,7 +226,7 @@ ship 3 pages.
 
 ### 5b. Title check before verifying
 Read the built CV's role headers back and confirm:
-1. The **headline** and the **first sentence of the summary** both contain the target title verbatim.
+1. The **headline** contains the target title verbatim, first.
 2. **Every** role title appears in `profile/profile.md` §4.0. Anything else is a defect — fix it.
 3. Any role whose title still reads distant from the target carries a scope-equivalence line.
 
@@ -280,19 +293,12 @@ links:
 ## Professional Summary
 <!-- blocks: prose -->
 
-Four sentences. Target title verbatim and **bolded** in the first one.
-
-## Core Competencies
-<!-- blocks: kv -->
-
-- **Architecture:** Cloud-native · distributed systems · event-driven · multi-tenant SaaS
-- **AI / ML:** LLM systems · agentic AI · retrieval architecture · embeddings
-- **Leadership:** Leading senior engineers · hiring · executive communication
+Three or four sentences in plain words: who this person is and why they fit this role.
 
 ## Work Experience
 <!-- blocks: mixed -->
 
-### Chief Technology Officer | Northwind Data · one-line company descriptor
+### Chief Technology Officer | Northwind Data · One-Line Company Descriptor in Title Case
 *07/2021 – 04/2022*
 City, Country · what the company does
 <https://northwind.example>
@@ -302,12 +308,17 @@ City, Country · what the company does
 - Opens with a verb, says what changed for whom, then how.
 - **A bold lead-in:** at most one "Label:" bullet per role.
 
-#### Earlier ventures and roles
+#### Earlier Experience
 
 ## Education
 <!-- blocks: entries -->
 
-- **Degree** · Institution — 06/2017
+- **Degree** · Institution — 2017
+
+## Skills
+<!-- blocks: prose -->
+
+Distributed systems, multi-tenant SaaS, LLM systems, hiring and developing managers, Python, AWS
 ```
 
 **Block kinds.** `prose` = paragraphs · `kv` = labelled competency groups · `entries` = a
@@ -317,18 +328,18 @@ decides (`Core Competencies` → kv, `Education` → entries), so a hand-edited 
 
 **Inline markup** in any text: `**bold**`, `*italic*`, `[label](https://url)`.
 
-**`kv` is how Core Competencies must be written** — four or five labelled groups, not one
-middot-separated wall of fifty terms. The wall is the loudest "generated by a machine" signal on the
-page, and no recruiter reads past its third line. Same keywords, same ATS value, a fraction of the
-visual noise.
+**No skills block at the top of the page** — neither a middot wall nor a grid of labelled `kv`
+groups. Both read to a recruiter as generated, and both push the work history below the fold. The
+keywords live in the bullets (where the evidence is) and in one plain `## Skills` line at the end;
+the ATS indexes both. `lint_cv.py` fails a skills section or `kv` block above the work history.
 
 **A role's meta lines are the ones directly under the `###`, with no blank line between them**:
 italic is the dates, `<...>` is a company URL (one line each; an acquired employer may carry both
 the new owner's site and the old one), anything else is the location and descriptor. The
 blank line is what separates them from a following paragraph — keep it.
 
-Section order for ATS: Professional Summary → Core Competencies → Work Experience →
-(programme-specific section) → Education → Technical Skills (optional).
+Section order: Professional Summary → Work Experience → (Open Source, or a programme-specific
+section) → Education → Skills.
 
 `scripts/cv_md.py` converts between this and the internal structure
 (`to-md`, `to-json`, and `check` for a round-trip gate over a folder of CVs).
@@ -349,11 +360,18 @@ Section order for ATS: Professional Summary → Core Competencies → Work Exper
   country, write `Remote from <country> · <Employer country> company (<city>)`, never just the
   employer's city — otherwise the reader assumes they lived there, and the assumption surfaces
   later as a discrepancy.
-- **Typeface: one sans family, no serif.** A display serif on a CV reads as a template.
+- **Typeface: one sans family, no serif.** A display serif on a CV reads as a template. The
+  builder picks a designed open-licensed sans when one is installed (IBM Plex Sans, Source Sans 3,
+  Inter, Lato), else a system sans; it never downloads a font.
+- **Design is drawn, never written.** The accent band, the section-rule accents and the bullet
+  colour are vector shapes with no text in them, so the page still extracts as one clean column.
+  The only running text is the page-2+ footer (`name · page`), drawn after the page content so a
+  parser reads it last. Never add icons, photos, columns, text boxes or contact details in a
+  header/footer — those are what break scrapers.
 - **Colour: one deep blue** (`#1F4E8C`) on the headline, section headings and links. Nothing else is
   coloured. Bright web-blue everywhere is what makes a CV look generated; no colour at all reads as
   a plain-text dump.
-- Target title verbatim in headline and summary.
+- Target title verbatim in the headline.
 - ≤ 2 pages; PDF always; verified with `lint_cv.py` (gate green) and `check_pdf.py` before delivery.
 - Strictly reverse-chronological, consistent date format; overlaps framed per the profile's
   framing policy.

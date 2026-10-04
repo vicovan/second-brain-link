@@ -33,7 +33,7 @@ try:
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.enums import TA_LEFT, TA_RIGHT
     from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Table,
-                                    TableStyle, HRFlowable, KeepTogether)
+                                    TableStyle, HRFlowable, KeepTogether, Flowable)
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
     HAVE_REPORTLAB = True
@@ -57,6 +57,13 @@ if HAVE_REPORTLAB:
 # ---------------------------------------------------------------- fonts
 FONT_CANDIDATES = [
     # (regular, bold) — first pair found wins. Unicode coverage matters (Zürich, Kraków, São Paulo).
+    # Designed text faces first: a CV set in the system default reads like every generated
+    # CV; a considered sans with a semibold reads as someone chose it. All are open-licensed
+    # and only used when already installed — nothing is downloaded or bundled.
+    ("IBMPlexSans-Regular.ttf", "IBMPlexSans-SemiBold.ttf"),
+    ("SourceSans3-Regular.ttf", "SourceSans3-Semibold.ttf"),
+    ("Inter-Regular.ttf", "Inter-SemiBold.ttf"),
+    ("Lato-Regular.ttf", "Lato-Bold.ttf"),
     ("Carlito-Regular.ttf", "Carlito-Bold.ttf"),
     ("LiberationSans-Regular.ttf", "LiberationSans-Bold.ttf"),
     ("Arial.ttf", "Arial Bold.ttf"),
@@ -83,6 +90,10 @@ def _find(name):
 # The italic face of each candidate. Without it `*text*` silently renders upright, and the role
 # context line reads as one more paragraph of body text.
 ITALIC = {
+    "IBMPlexSans-Regular.ttf": "IBMPlexSans-Italic.ttf",
+    "SourceSans3-Regular.ttf": "SourceSans3-It.ttf",
+    "Inter-Regular.ttf": "Inter-Italic.ttf",
+    "Lato-Regular.ttf": "Lato-Italic.ttf",
     "Carlito-Regular.ttf": "Carlito-Italic.ttf",
     "LiberationSans-Regular.ttf": "LiberationSans-Italic.ttf",
     "Arial.ttf": "Arial Italic.ttf",
@@ -126,7 +137,10 @@ def md(text, unicode_ok=True):
         if m:
             label = "".join(_ESC.get(c, c) for c in m.group(1))
             url = m.group(2)
-            out.append(f'<link href="{url}" color="#1F4E8C"><u>{label}</u></link>')
+            # every link on the page looks the same: the one blue, no underline (the role
+            # lines' company sites set the style; an underlined inline link next to them reads
+            # as two different kinds of link)
+            out.append(f'<link href="{url}" color="#1F4E8C">{label}</link>')
         else:
             s = "".join(_ESC.get(c, c) for c in p)
             s = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", s)
@@ -134,22 +148,72 @@ def md(text, unicode_ok=True):
             out.append(s)
     return "".join(out)
 
+# ---------------------------------------------------------------- design
+# Everything below is drawn, never written: a band, rules and accents are vector shapes with no
+# text in them, so a parser reading the page sees exactly the same single column of words.
+
+class SectionRule(Flowable):
+    """The hairline under a section heading, with a short accent segment at its left end."""
+
+    def __init__(self, width, scale=1.0):
+        super().__init__()
+        self.width, self.scale = width, scale
+
+    def wrap(self, aw, ah):
+        return self.width, 5.5 * self.scale
+
+    def draw(self):
+        c, y = self.canv, 4.2 * self.scale
+        c.setStrokeColor(RULE); c.setLineWidth(0.5); c.line(0, y, self.width, y)
+        c.setStrokeColor(BLUE); c.setLineWidth(1.6); c.line(0, y, 22, y)
+
+
+def _accent_band(c, doc):
+    """First page only: a thin accent band across the top edge."""
+    c.saveState()
+    w, h = doc.pagesize
+    c.setFillColor(BLUE); c.rect(0, h - 4, w, 4, stroke=0, fill=1)
+    c.restoreState()
+
+
+if HAVE_REPORTLAB:
+    class CVDoc(SimpleDocTemplate):
+        """Adds a quiet running footer (name · page) from page 2 — the convention of a typeset
+        CV; contact details never go there. It is drawn in afterPage, i.e. AFTER the page's
+        content, so a text extractor reads it last on the page instead of first."""
+
+        def __init__(self, *a, footer_name="", footer_font="Helvetica", **kw):
+            super().__init__(*a, **kw)
+            self._footer_name, self._footer_font = footer_name, footer_font
+
+        def afterPage(self):
+            if self.page < 2:
+                return
+            c = self.canv
+            c.saveState()
+            w, _ = self.pagesize
+            c.setStrokeColor(RULE); c.setLineWidth(0.5)
+            c.line(self.leftMargin, 11.5 * mm, w - self.rightMargin, 11.5 * mm)
+            c.setFont(self._footer_font, 7.5); c.setFillColor(MUTED)
+            c.drawRightString(w - self.rightMargin, 8 * mm, f"{self._footer_name}  ·  {self.page}")
+            c.restoreState()
+
 # ---------------------------------------------------------------- build
 def build(content, out_pdf, scale=1.0, font=("Helvetica", "Helvetica-Bold"), unicode_ok=True):
     REG, BOLD = font
     base = 9.8 * scale
     lead = base * 1.38          # airier than the usual template — a page that breathes
     styles = {
-        "name": ParagraphStyle("name", fontName=BOLD, fontSize=21 * scale, leading=24 * scale,
-                               textColor=INK, spaceAfter=2 * scale),
+        "name": ParagraphStyle("name", fontName=BOLD, fontSize=23 * scale, leading=26 * scale,
+                               textColor=INK, spaceAfter=1.5 * scale),
         "headline": ParagraphStyle("headline", fontName=REG, fontSize=10.6 * scale,
                                    leading=13.4 * scale, textColor=BLUE, spaceAfter=4 * scale),
         "contact": ParagraphStyle("contact", fontName=REG, fontSize=base * 0.97, leading=lead,
                                   textColor=INK),
         "status": ParagraphStyle("status", fontName=REG, fontSize=base * 0.93, leading=lead * 0.95,
                                  textColor=MUTED),
-        "h": ParagraphStyle("h", fontName=BOLD, fontSize=base * 0.96, leading=base * 1.25,
-                            textColor=BLUE, spaceBefore=10 * scale, spaceAfter=0, keepWithNext=1),
+        "h": ParagraphStyle("h", fontName=BOLD, fontSize=base * 0.92, leading=base * 1.2,
+                            textColor=BLUE, spaceBefore=11 * scale, spaceAfter=0, keepWithNext=1),
         "sub": ParagraphStyle("sub", fontName=BOLD, fontSize=base, leading=lead, textColor=INK,
                               spaceBefore=5 * scale, spaceAfter=1, keepWithNext=1),
         "p": ParagraphStyle("p", fontName=REG, fontSize=base, leading=lead, textColor=INK,
@@ -164,7 +228,7 @@ def build(content, out_pdf, scale=1.0, font=("Helvetica", "Helvetica-Bold"), uni
                                 textColor=MUTED, alignment=TA_RIGHT),
         "b": ParagraphStyle("b", fontName=REG, fontSize=base, leading=lead, textColor=INK,
                             leftIndent=11, bulletIndent=1.5, spaceAfter=2.8 * scale,
-                            bulletFontName=REG, bulletFontSize=base * 0.85, bulletColor=MUTED),
+                            bulletFontName=REG, bulletFontSize=base * 0.85, bulletColor=BLUE),
         "kvk": ParagraphStyle("kvk", fontName=BOLD, fontSize=base * 0.95, leading=lead * 0.97,
                               textColor=MUTED),
         "kvv": ParagraphStyle("kvv", fontName=REG, fontSize=base * 0.95, leading=lead * 0.97,
@@ -172,7 +236,7 @@ def build(content, out_pdf, scale=1.0, font=("Helvetica", "Helvetica-Bold"), uni
     }
     M = lambda t: md(t, unicode_ok)
 
-    doc = SimpleDocTemplate(out_pdf, pagesize=A4,
+    doc = CVDoc(out_pdf, pagesize=A4, footer_name=content.get("name", ""), footer_font=REG,
                             leftMargin=18 * mm, rightMargin=18 * mm,
                             topMargin=15 * mm, bottomMargin=14 * mm,
                             title=f"{content['name']} — CV", author=content["name"],
@@ -202,15 +266,14 @@ def build(content, out_pdf, scale=1.0, font=("Helvetica", "Helvetica-Bold"), uni
     loc_bits = [x for x in [c.get("location"), c.get("status")] if x]
     if loc_bits:
         story.append(Paragraph(sep.join(M(b) for b in loc_bits), styles["status"]))
-    story.append(HRFlowable(width="100%", thickness=0.5, color=RULE,
-                            spaceBefore=6 * scale, spaceAfter=1))
+    story.append(Spacer(1, 3 * scale))
 
     # ---- sections
     for sec in content.get("sections", []):
         if sec.get("heading"):
             story.append(Paragraph(M(sec["heading"]).upper(), styles["h"]))
-            story.append(HRFlowable(width="100%", thickness=0.5, color=RULE,
-                                    spaceBefore=2 * scale, spaceAfter=4.5 * scale))
+            story.append(SectionRule(avail, scale))
+            story.append(Spacer(1, 3.5 * scale))
         blocks = sec.get("blocks", [])
         i = 0
         while i < len(blocks):
@@ -231,7 +294,7 @@ def build(content, out_pdf, scale=1.0, font=("Helvetica", "Helvetica-Bold"), uni
                 rows = [[Paragraph(M(k), styles["kvk"]), Paragraph(M(v), styles["kvv"])]
                         for k, v in pairs]
                 if rows:
-                    lab = max(28, min(140, int(avail * 0.22)))
+                    lab = max(28, min(150, int(avail * 0.25)))
                     tbl = Table(rows, colWidths=[lab, avail - lab], hAlign="LEFT")
                     tbl.setStyle(TableStyle([
                         ("VALIGN", (0, 0), (-1, -1), "TOP"),
@@ -299,7 +362,7 @@ def build(content, out_pdf, scale=1.0, font=("Helvetica", "Helvetica-Bold"), uni
                 story.append(Spacer(1, b.get("height", 4) * scale))
             i += 1
 
-    doc.build(story)
+    doc.build(story, onFirstPage=_accent_band)
     return doc.page
 
 def build_docx(content, out_docx):

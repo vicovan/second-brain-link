@@ -57,6 +57,40 @@ plugins/<name>/
   requirements.txt               optional — a plugin may have dependencies; the engine may not
 ```
 
+### `studio.json` — how the Agent opens in Studio
+
+The welcome screen of an agent chat is built from the manifest, zero tokens spent:
+
+```json
+"subjects": ["personal"],
+"suggestions": [
+  { "t": "Set me up", "stage": "setup",
+    "short": "Build my profile from this brain; ask only what it cannot find.",
+    "q": "Set up or update my … profile. …" },
+  { "t": "Run today's search", "stage": "do", "short": "…", "q": "…" },
+  { "t": "Record a reply",     "stage": "track", "when": "has-work", "short": "…", "q": "…" }
+]
+```
+
+- `t` + `q` are the contract since the first plugin and stay required: the title, and the
+  full prompt the click sends. Everything below is optional — a plugin that declares none of
+  it renders exactly as before (title + prompt on every card).
+- `short` — the one-line *outcome* the card shows; the prompt folds behind a chevron.
+- `stage` — `setup` | `do` (default) | `track`. Studio shows **one** hero card ("Start
+  here" / "Next"), then the work, then what came back. A `setup` card is the hero only
+  until `requires.profile` exists in the brain; after that it collapses into an *Update my
+  profile* link, so word its `q` as "Set up **or update** …".
+- `when` — `onboarded` hides the card until `requires.profile` exists; `has-work` hides it
+  until the agent's layer holds output in a subfolder other than its profile (a shortlist,
+  a target, a trip — the layer root's dashboards do not count, onboarding renders those
+  too). On a meta-tier brain, whose notes are not on the page, nothing is hidden.
+- `subjects` — which brain kinds the agent is *for* (`personal`, `company`; default both).
+  Opened on the other kind, Studio says so in one line and still lets the user ask.
+
+Studio validates every value (unknown `stage`/`when`/`subjects` are dropped, text is
+bounded) in both readers — `second-brain-link-web/src/lib/agents/discover.ts` and
+`second-brain-studio/src/main/agents.ts`, which must stay mirrors.
+
 ## Two packagings, one source
 
 The same split the engine skill uses, for the same reason: one implementation, thin

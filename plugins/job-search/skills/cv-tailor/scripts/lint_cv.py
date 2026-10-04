@@ -49,7 +49,37 @@ BANNED = [
     # "reads generated" from reviewers
     "first-class", "first class", "in one seat", "the normal case", "product substance",
     "single mandate", "as a matter of course", "-level ownership",
+    # filler a recruiter has read on every CV that day — it names no thing and no result
+    "best practices", "cross-functional collaboration", "high-performing team", "key initiatives",
+    "innovative solutions", "scalable solutions", "modern data stack", "fostered a culture",
+    "drove alignment", "strategic initiatives", "wide range of", "a variety of", "successfully",
+    "effectively", "efficiently", "instrumental in", "played a key role", "worked closely with",
 ]
+
+# A bullet must carry at least one anchor a reader can picture: a number, or a name (a product,
+# customer, market, standard, system). These capitalised words do not count — every CV has them.
+GENERIC_CAPS = {"AI", "API", "APIs", "SaaS", "B2B", "B2C", "ML", "LLM", "LLMs", "CEO", "CTO",
+                "CPO", "VP", "IT", "UI", "UX", "QA", "HR", "R&D", "KPI", "KPIs", "OKR", "OKRs"}
+_NUMBER_WORDS = re.compile(r"\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|"
+                           r"fifteen|twenty|thirty|forty|fifty|hundreds?|thousands?|millions?|"
+                           r"billions?|dozens?|double[ds]?|tripled?|halved?)\b", re.I)
+GENERIC_PER_ROLE = 1
+
+# Consistency: a reader who notices "organise" beside "authorize", or "CTO" beside "Chief
+# Technology Officer", reads a page assembled from parts. One choice, everywhere.
+SPELLING = [  # (British stem, American stem)
+    ("organis", "organiz"), ("authoris", "authoriz"), ("optimis", "optimiz"),
+    ("prioritis", "prioritiz"), ("standardis", "standardiz"), ("tokenis", "tokeniz"),
+    ("modernis", "moderniz"), ("customis", "customiz"), ("centralis", "centraliz"),
+    ("recognis", "recogniz"), ("specialis", "specializ"), ("analys", "analyz"),
+    ("defence", "defense"), ("licence", "license"), ("behaviour", "behavior"),
+    ("colour", "color"), ("centre", "center"), ("travell", "travel"),
+]
+TITLE_FORMS = [("CTO", "Chief Technology Officer"), ("CEO", "Chief Executive Officer"),
+               ("CPO", "Chief Product Officer"), ("CIO", "Chief Information Officer"),
+               ("COO", "Chief Operating Officer"), ("VP", "Vice President")]
+_PAST_IRREGULAR = set("""built led ran made set wrote took gave grew drove won cut sold brought
+began became kept held met chose found taught spent sent shipped""".split())
 
 # Words that are a tell when the CV uses them and the posting does not: system-design jargon a
 # hiring manager has to translate. Allowed when the posting itself says them.
@@ -276,6 +306,19 @@ def _has_kw(k, text):
     return re.search(r"(?<![a-z0-9])" + re.escape(k.lower()) + r"(?![a-z0-9])", text) is not None
 
 
+def _anchored(text, own=()):
+    """True if a bullet names something specific: a number, or a capitalised name that is not
+    the bullet's first word, not one of the words every CV carries, and not the role's own
+    employer (naming your own company in its own role adds nothing a reader did not know)."""
+    plain = re.sub(r"\*\*|\*|\[|\]\([^)]*\)", "", text).strip()
+    if re.search(r"\d", plain) or _NUMBER_WORDS.search(plain):
+        return True
+    words = re.findall(r"[A-Za-z][\w&.+'-]*", plain)
+    own = {w.lower() for w in own}
+    return any(w[0].isupper() and w.strip(".") not in GENERIC_CAPS
+               and w.strip(".'s").lower() not in own for w in words[1:])
+
+
 def _sibling(fit, name):
     if not fit:
         return None
@@ -296,6 +339,19 @@ def lint_cv(md_path, profile=None, keywords=None, fit=None, posting=None):
     if why:
         fails.append(f"'{why[0]}' section on the CV — move it to the cover letter / why-answers")
 
+    # 1b. No skills block above the work history — a grid of labelled skill groups (or a wall
+    # of terms) at the top reads as generated and pushes the evidence below the fold. Skills are
+    # one plain line at the end.
+    exp_at = next((i for i, h in enumerate(heads) if re.search(r"experience|employment|career", h, re.I)),
+                  len(heads))
+    for s_ in sections[:exp_at]:
+        h_ = s_.get("heading", "")
+        if re.search(r"competenc|skills|expertise|technolog", h_, re.I) or \
+                any(b.get("type") == "kv" for b in s_.get("blocks", [])):
+            fails.append(f"'{h_}' sits above the work history — move skills to one plain "
+                         f"'## Skills' line at the end")
+            break
+
     # Collect prose by where it sits.
     summary, prose, bullets_by_role = "", [], []
     roles = []
@@ -311,6 +367,7 @@ def lint_cv(md_path, profile=None, keywords=None, fit=None, posting=None):
             elif t == "role":
                 cur = {"title": b.get("title", ""),
                        "org": re.split(r"\s*[·|]\s*", b.get("org") or "")[0].strip(),
+                       "org_full": re.split(r"\s*·\s*", b.get("org") or "")[0],
                        "dates": b.get("dates", ""), "bullets": []}
                 roles.append(cur)
                 if b.get("scope"):
@@ -455,6 +512,63 @@ def lint_cv(md_path, profile=None, keywords=None, fit=None, posting=None):
     if core and len(core.split()) >= 2 and core.lower() in rest.lower():
         fails.append(f"target title '{core}' repeated in the body — headline and summary only")
 
+    # 3f. Role-line descriptors in Title Case, like the rest of the role line.
+    small = {"a", "an", "and", "for", "of", "the", "to", "in", "on", "at", "by", "or", "with"}
+    for s_ in sections:
+        for b in s_.get("blocks", []):
+            if b.get("type") != "role" or "·" not in (b.get("org") or ""):
+                continue
+            desc = b["org"].split("·", 1)[1].strip()
+            low_words = [w for w in re.findall(r"[A-Za-z][\w'-]*", desc)
+                         if w[0].islower() and w.lower() not in small]
+            if low_words:
+                warns.append(f"role descriptor not in Title Case: '{desc}'")
+
+    # 3g. Consistency.
+    allt = (summary + "\n" + body).lower()
+    gb_hits, us_hits = [], []
+    for gb, us in SPELLING:
+        if us == "travel":
+            g = re.search(r"\btravell(?:ed|ing|er)", allt)
+            u = re.search(r"\btravel(?:ed|ing|er)\b", allt)
+        else:
+            g, u = re.search(r"\b" + gb, allt), re.search(r"\b" + us, allt)
+        if g:
+            gb_hits.append(g.group(0))
+        if u:
+            us_hits.append(u.group(0))
+    if gb_hits and us_hits:
+        fails.append(f"spelling mixes British ({', '.join(gb_hits[:3])}…) and American "
+                     f"({', '.join(us_hits[:3])}…) — pick one, matching the posting")
+    titles = " ".join((r["title"] or "") for r in roles)
+    for short, long_ in TITLE_FORMS:
+        if re.search(rf"\b{short}\b", titles) and long_.lower() in titles.lower():
+            fails.append(f"role titles mix '{short}' and '{long_}' — use one form throughout")
+    all_b = [((b.get("lead") or "") + " " + (b.get("text") or "")).strip()
+             for r in roles for b in r["bullets"]]
+    ends = {t.rstrip()[-1:] == "." for t in all_b if t}
+    if len(ends) > 1:
+        fails.append("some bullets end with a full stop and some do not — make them all the same")
+    dashes_used = {m for r in roles for m in re.findall(r"\d\s*([–—-])\s*(?:\d|present)", r["dates"] or "", re.I)}
+    if len(dashes_used) > 1:
+        fails.append(f"date ranges use different dashes ({' '.join(sorted(dashes_used))}) — use one")
+    for r in roles:
+        ended = not re.search(r"present|now|current", r["dates"] or "", re.I)
+        tenses = set()
+        for b in r["bullets"]:
+            w = re.sub(r"\*\*|\*", "", (b.get("lead") or "") + " " + (b.get("text") or "")).split()
+            if not w:
+                continue
+            f = w[0].lower().strip(":,")
+            if f.endswith("ed") or f in _PAST_IRREGULAR:
+                tenses.add("past")
+            elif f.endswith("s") and not f.endswith("ss") and len(f) > 3:
+                tenses.add("present")
+        if ended and "present" in tenses:
+            fails.append(f"{r['org'] or r['title']}: present tense in a role that has ended — past tense")
+        elif len(tenses) > 1:
+            warns.append(f"{r['org'] or r['title']}: bullets mix present and past tense")
+
     # 3e. Dates: one format throughout.
     styles = set()
     for r in roles:
@@ -518,6 +632,20 @@ def lint_cv(md_path, profile=None, keywords=None, fit=None, posting=None):
     if fit and pathlib.Path(fit).exists() and not re.search(
             r"^#+ [^\n]*bullet plan", pathlib.Path(fit).read_text(encoding="utf-8"), re.I | re.M):
         warns.append("fit.md has no '## Bullet plan' — map each critical requirement to one proof first")
+
+    # 6b. Specificity — a bullet that could sit on any other candidate's CV is not read. Every
+    # bullet in the three most recent roles needs an anchor (a number or a name).
+    for r in roles[:3]:
+        loose = [((b.get("lead") or "") + " " + (b.get("text") or "")).strip()
+                 for b in r["bullets"]]
+        own = re.findall(r"[A-Za-z][\w&-]*", r.get("org_full") or r["org"] or "")
+        loose = [t for t in loose if not _anchored(t, own)]
+        for t in loose:
+            warns.append(f"{r['org'] or r['title']}: generic bullet (no number, no name): {t[:60]!r}…")
+        if len(loose) > GENERIC_PER_ROLE:
+            fails.append(f"{r['org'] or r['title']}: {len(loose)} bullets with no number and no name "
+                         f"(max {GENERIC_PER_ROLE}) — say which product, customer, market or system, "
+                         f"or cut it")
 
     # 7. Countable scope — a recent role with no figure at all gives a recruiter nothing to weigh.
     for r in roles[:3]:

@@ -14,10 +14,10 @@ the check's trigger word and leaving a broken sentence.
 ## Structure
 - [ ] Single column, no tables for body content (the builder only uses a
       borderless 2-cell row for role-title/date lines, which extracts in order).
-- [ ] Standard section names in this order: Professional Summary · Core
-      Competencies · Work Experience · (programme-statement section ONLY for an accelerator or
-      investor programme that asks for one) · Education · Technical Skills (optional) ·
-      Languages (optional). No "Why <Company>" section on an employment CV.
+- [ ] Standard section names in this order: Professional Summary · Work Experience · (Open
+      Source, or a programme-statement section ONLY for an accelerator or investor programme that
+      asks for one) · Education · Skills (one plain line) · Languages (optional). No skills grid
+      above the work history. No "Why <Company>" section on an employment CV.
 - [ ] Contact block on page 1 top: name, headline, email, phone, city+country,
       LinkedIn, website — all as real text (no icons-only, no header/footer
       objects; parsers skip headers/footers).
@@ -32,6 +32,10 @@ the check's trigger word and leaving a broken sentence.
 - [ ] Each role line fits on one line.
 - [ ] Every link shows its URL as text (`example.com`-style), never a linked title.
 
+## Design (must stay invisible to a parser)
+- [ ] Decoration is drawn shapes only (band, rules, bullet colour); no text in graphics, no icons.
+- [ ] The only header/footer text is `name · page` on page 2+, and it extracts LAST on its page.
+
 ## Text & fonts
 - [ ] Real embedded TrueType text (pdffonts shows emb=yes); no text-as-image.
 - [ ] No text in white/tiny/hidden; no keyword blocks disguised as design.
@@ -42,9 +46,9 @@ the check's trigger word and leaving a broken sentence.
 - [ ] Hyphens/dashes: en dash between dates is fine; avoid exotic symbols.
 
 ## Keywords
-- [ ] Every must-have keyword from the JD appears ≥ 2× (competencies + a
-      bullet), both acronym and long form on first use.
-- [ ] Target job title appears verbatim in headline AND summary.
+- [ ] Every must-have keyword from the JD appears in a bullet where it is true, and in the Skills
+      line; acronym and long form on first use.
+- [ ] Target job title appears verbatim in the headline.
 - [ ] Years of experience stated, using the profile's own figure.
 - [ ] check_pdf.py reports 0 missing must-have keywords.
 

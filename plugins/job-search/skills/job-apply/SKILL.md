@@ -321,7 +321,8 @@ analysis, and with it in hand the reviewer grades the argument instead of the pa
 > Read the posting, then the CV and answers as they would arrive. Return JSON only:
 > `{"verdict": "shortlist|maybe|reject", "six_second_read": "<what the top third of page 1 told
 > you>", "remembered": "<the one thing you remember after six seconds>", "reasons": ["…"],
-> "bullets": [{"text": "…", "action": "keep|cut|rewrite", "why": "…"}],
+> "bullets": [{"text": "…", "action": "keep|cut|rewrite", "generic": true|false, "why": "…"}],
+> (grade EVERY bullet on the page; `generic` = it could sit on another candidate's CV),
 > "not_understood": ["<bullets a non-engineer recruiter could not follow>"],
 > "generated_phrases": ["<the three phrases that most sound machine-written, quoted>"],
 > "irrelevant": ["<bullets that answer nothing in the posting>"],
@@ -336,6 +337,8 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/cv-tailor/scripts/lint_cv.py review <app di
    --verdict <shortlist|maybe|reject> [--reads-generated] --reason "<first reason>"
 ```
 - **shortlist** with `reads_generated: false` → continue.
+- **Any bullet graded `generic: true` or `rewrite`** is rewritten (or cut) before submitting —
+  every bullet must earn its two seconds.
 - **`reads_generated: true`** blocks like a `maybe`, whatever the verdict: rewrite every quoted
   `generated_phrases` item and every `not_understood` bullet, cut the `irrelevant` ones, re-run
   the gates, review once more. Still true → fill but do not submit.

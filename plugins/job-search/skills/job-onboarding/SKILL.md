@@ -112,7 +112,11 @@ untouched, then list what was added:
    situation and action of each. Mark any number not in `profile.md` as `(unconfirmed)`.
 5. `scoring.md` — if it has no **shortlist likelihood** component, propose the rubric's default
    weights and apply floor, showing old → new, and write them only on a yes.
-6. If a legacy state folder with applications exists, offer
+6. `profile.md` §4 **Public record / Company site / Acquired** per role, and §10 **CV conventions**.
+   Read the public record from a LinkedIn data export (`Positions.csv`) or text the user pastes —
+   never by fetching LinkedIn. Where the internal dates and the public record differ, say so role
+   by role and record which the CV uses; check each company site responds before recording it.
+7. If a legacy state folder with applications exists, offer
    `learn.py import-legacy <folder>` (it copies; the source is untouched).
 
 ## Step 1 — Look before you ask

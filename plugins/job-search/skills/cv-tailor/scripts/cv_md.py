@@ -38,15 +38,10 @@ public plugin should not need a pip install to read its own files.
 
     Body text.
 
-    ## Core Competencies
-    <!-- blocks: kv -->
-
-    - **Label:** value one - value two
-
     ## Work Experience
     <!-- blocks: mixed -->
 
-    ### Job Title | Employer - one-line descriptor
+    ### Job Title | Employer - One-Line Descriptor
     *05/2026 - Present*
     City, Country - what the company does
     <https://employer.example>
@@ -54,7 +49,7 @@ public plugin should not need a pip install to read its own files.
     - **Bold lead-in:** the rest of the bullet.
     - A bullet with no lead-in.
 
-    #### Earlier ventures and roles
+    #### Earlier Experience
 
     ## Education
     <!-- blocks: entries -->
@@ -78,7 +73,8 @@ FM_KEYS_ORDER = ["type", "title", "tags", "name", "headline", "output_basename",
                  "email", "phone", "location", "status"]
 
 SECTION_KIND = {           # fallback when no <!-- blocks: --> marker is present
-    "core competencies": "kv",
+    "core competencies": "kv",     # older CVs; new ones put skills in one line at the end
+    "skills": "prose",
     "education": "entries",
     "professional summary": "prose",
 }

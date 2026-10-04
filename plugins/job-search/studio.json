@@ -22,30 +22,48 @@
   "providers": [
     "claudecode"
   ],
+  "subjects": [
+    "personal"
+  ],
   "color": "#3e6ae1",
   "suggestions": [
     {
       "t": "Set me up",
-      "q": "Set up my job-search profile. Ask me the onboarding questions — target roles, geography, compensation floor, hard exclusions and my settled application answers — pulling whatever you can from this brain and my CV first, so you only ask what you genuinely cannot find."
+      "stage": "setup",
+      "short": "Build my job profile from this brain and my CV; ask me only what it cannot find.",
+      "q": "Set up or update my job-search profile. Pull whatever you can from this brain and my CV first, then ask me only what you genuinely cannot find: target roles, geography, compensation floor, hard exclusions and my settled application answers."
     },
     {
-      "t": "Launch a job search",
+      "t": "Run today's job search",
+      "stage": "do",
+      "short": "Sweep the open boards, score against my rubric, hand me today’s ranked shortlist.",
       "q": "Launch a job search: sweep the open ATS boards against my criteria, score everything against my rubric, drop what I can't actually apply to, and give me today's ranked shortlist with comp and the apply route for each."
     },
     {
       "t": "Tailor my CV for a job",
+      "stage": "do",
+      "short": "Paste a posting next; I build the ATS-first Markdown and PDF from my profile, every claim true.",
       "q": "Tailor my CV for a specific job description and build the PDF. I'll paste the job description or the posting URL next — mirror the title, lead with the keywords that matter, and keep every claim true to my profile."
     },
     {
-      "t": "Apply and fill the form",
+      "t": "Apply to a shortlisted role",
+      "stage": "do",
+      "when": "has-work",
+      "short": "Fill the employer’s own form from my profile and verify every field; submit or stop at the gate, per my setting.",
       "q": "Apply to a role from the shortlist: resolve it to the employer's own ATS form, open it in my browser, fill every field from my profile and answers, verify each one in the DOM, then finish the way my autonomy setting says — submit it, or show me a short review and wait."
     },
     {
       "t": "How is the pipeline doing?",
+      "stage": "track",
+      "when": "has-work",
+      "short": "Interview rate by archetype, portal and score band — and what the outcomes say to change.",
       "q": "Show me the KPI: interview rate by archetype, score band and portal, what the gates stopped and why, today's valid applications against my daily target, and what the outcomes so far say I should change."
     },
     {
       "t": "Record a reply",
+      "stage": "track",
+      "when": "has-work",
+      "short": "Paste the email; I log it against the application and prep me if it is a screen or interview.",
       "q": "I heard back on an application. I'll paste the email or tell you what happened — log it against the right application, and if it's a screen or interview, prep me from that role's fit file and my stories."
     }
   ],

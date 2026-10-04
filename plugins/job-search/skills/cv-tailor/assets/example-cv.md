@@ -23,28 +23,22 @@ links:
      What to notice: the headline is the posting's title plus one short differentiator; the summary
      is three sentences of uneven length; bullets open with a verb, say what changed for whom before
      how; at most one bullet per role uses a "Label:" opener; one date format throughout; the
-     current employed role is on top and the open-source work sits in its own small section. -->
+     current employed role is on top and the open-source work sits in its own small section; the
+     summary says who she is in plain sentences, with no bolded title label; skills are one plain
+     line at the end, never a grid at the top. -->
 
 ## Professional Summary
 <!-- blocks: prose -->
 
-**VP Engineering** with 14 years in data platforms, the last five running the group behind a
+Engineering leader with 14 years in data platforms, the last five running the group behind a
 multi-tenant analytics product for 400 enterprise customers. Rebuilt its ingestion as a streaming
 system with no maintenance window, cutting data latency from 6 hours to under 4 minutes. Hires
 managers, grows teams across time zones, and still reviews code.
 
-## Core Competencies
-<!-- blocks: kv -->
-
-- **Leadership:** Multi-team organisations · developing engineering managers · hiring · roadmap planning
-- **Data platform:** Streaming architecture · event-driven systems · multi-tenant SaaS · data quality and lineage
-- **Reliability:** Observability · incident practice · SLOs · zero-downtime migration
-- **Stack:** Python · Go · Kafka · PostgreSQL · Kubernetes · AWS
-
 ## Work Experience
 <!-- blocks: mixed -->
 
-### Director of Engineering | Meridian Analytics · enterprise analytics platform
+### Director of Engineering | Meridian Analytics · Enterprise Analytics Platform
 *03/2021 – Present*
 Remote from Portugal · US company (Boston) · Series C, 300 staff
 <https://example.com>
@@ -55,18 +49,18 @@ Remote from Portugal · US company (Boston) · Series C, 300 staff
   6 hours to under 4 minutes with no maintenance window.
 - Grew the platform group from 9 to 23 across three time zones and hired the two engineering
   managers who now run it.
-- **Data quality customers can see:** lineage on every field, contract tests at each boundary,
-  and a quality score in the product.
+- Put a data-quality score in front of all 400 customers, backed by lineage on every field and
+  contract tests at each boundary.
 
-### Staff Engineer | Northwind Systems · B2B logistics SaaS
+### Staff Engineer | Northwind Systems · B2B Logistics SaaS
 *06/2017 – 02/2021*
 Lisbon, Portugal
 
 - Led the move off a shared monolith database to per-service stores in 14 increments, with
   no customer-visible downtime.
-- Wrote the incident practice the company still uses.
+- Wrote the incident practice still used across its 30 services.
 
-### Backend Engineer | Globex Payments · marketplace payments
+### Backend Engineer | Globex Payments · Marketplace Payments
 *09/2011 – 05/2017*
 Lisbon, Portugal · acquired 2017
 
@@ -84,3 +78,10 @@ schema-contract test tool for Kafka topics.
 <!-- blocks: entries -->
 
 - **MSc Computer Science** · University of Lisbon — 06/2011
+
+## Skills
+<!-- blocks: prose -->
+
+Streaming architecture, event-driven systems, multi-tenant SaaS, data quality and lineage,
+observability, incident practice, hiring and developing engineering managers, Python, Go, Kafka,
+PostgreSQL, Kubernetes, AWS

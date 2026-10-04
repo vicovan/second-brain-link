@@ -30,17 +30,40 @@ Design constraints this script is written against (all verified in the engine):
 Synthetic-data policy: RFC-2606 reserved domains only, no real people, no real
 addresses. Message bodies are never read by the engine; the canary strings here exist
 so the test suite can assert that.
+
+The story the two archives tell (keep it coherent when you extend them):
+
+  * John Carter — founder & CEO of Acme Robotics (San Francisco), ex Director of Product at
+    Meridian Labs (London), MSc Bletchley Institute. Grace Hopper (Acme's VP Engineering) is
+    his strongest contact; Priya Nair (Northwind Capital) the only — and dormant — investor.
+    He keeps a travel corpus the Travel Agent can plan from: coffee he loved in London,
+    Tokyo and San Francisco (reviewed ★5), a Lisbon trip he took (fado cellar, Web Summit,
+    a sunset photo on the Tagus) and saved-but-never-visited pins in Lisbon, Tokyo and
+    Seoul (`TRAVEL_PLACES`, `TIMELINE_VISITS`, `FB_EVENTS`). He also applied for a few
+    advisory / fractional product roles at client companies (`JOHN_APPLICATIONS`).
+  * Acme Robotics — a 200-person collaborative-robotics company: five departments, twelve
+    customers, six vendors, Salesforce deals, Slack, Workspace calendars, and a LINKED
+    document store (`_docs/acme-handbook`, read through `git_docs/_SOURCE_LINK.json`) with
+    runbooks, a launch plan, a seed-round narrative and one credentials-named file that must
+    render as a metadata-only stub. John Carter and Priya Nair appear in BOTH brains, which
+    is what populates `_correlations/`.
+
+Everything is derived from `SEED`; the same seed yields byte-identical files (no `hash()`,
+no wall-clock time, fixed link ids), so `diff -r` between two runs is empty.
 """
 import argparse
 import json
 import random
 import shutil
 import sys
+import zlib
 from datetime import date, timedelta
 from pathlib import Path
 
 SEED = 0xC0FFEE
-TODAY = date(2026, 8, 17)
+# The demo's "today": the newest Slack day-file / order / message is just before this. Every
+# date in both archives is relative to it, so bumping it moves the whole story forward.
+TODAY = date(2026, 10, 3)
 
 # --------------------------------------------------------------------------- pools
 FIRST = """Ada Alan Grace Priya Dana Maya Jonas Omar Ivy Noah Lena Kofi Ruth Eli Nora
@@ -154,10 +177,114 @@ PRODUCTS = ["Torque Wrench Set", "Lidar Module", "Servo Driver", "Carbon Tripod"
             "Bench Multimeter", "Notebook (A5)", "Standing Desk Mat", "Headlamp",
             "Rain Shell", "Soldering Station", "Caliper", "Label Printer"]
 
+# ------------------------------------------------------------- John's travel corpus
+# Named places with real-world-plausible coordinates (fictional venues). This is what the
+# Travel Agent plans from: `saved` pins never visited become trip ideas (Lisbon, Tokyo,
+# Seoul), ★4+ reviews define his taste (third-wave coffee, small rooms, no buffets), and
+# the Timeline visits / FB events / IG venue prove where he has actually been. Each entry:
+# (name, city, country, lat, lng, mode, date, rating, review, saved-list)
+#   mode: "saved" -> Saved Places.json (+ the Saved/<list>.csv), "review" -> Reviews.json
+TRAVEL_PLACES = [
+    # Lisbon — saved for a trip he has not taken yet ("Want to go")
+    ("Alfama Tile Café", "Lisbon", "PT", 38.7117, -9.1303, "saved", "2024-02-11", None, "", "Want to go"),
+    ("Miradouro Roastery", "Lisbon", "PT", 38.7154, -9.1340, "saved", "2024-02-11", None, "", "Want to go"),
+    ("Tasca do Largo", "Lisbon", "PT", 38.7110, -9.1445, "saved", "2024-03-02", None, "", "Want to go"),
+    ("LX Riverside Market", "Lisbon", "PT", 38.7070, -9.1459, "saved", "2024-03-02", None, "", "Want to go"),
+    ("Belém Pastry House", "Lisbon", "PT", 38.6975, -9.2032, "saved", "2024-03-05", None, "", "Want to go"),
+    ("Tagus Design Museum", "Lisbon", "PT", 38.7079, -9.1366, "saved", "2024-03-05", None, "", "Want to go"),
+    ("Príncipe Real Garden Bar", "Lisbon", "PT", 38.7166, -9.1487, "saved", "2024-04-18", None, "", "Want to go"),
+    ("Sintra Ridge Trail", "Sintra", "PT", 38.7876, -9.3906, "saved", "2024-04-18", None, "", "Want to go"),
+    # Lisbon — the one night he did spend there (Web Summit week, 2022)
+    ("Lisbon Fado Cellar", "Lisbon", "PT", 38.7123, -9.1296, "review", "2022-10-14", 4,
+     "Small room, real fado, book ahead.", ""),
+    # Tokyo — saved for the Robot Expo trip he keeps postponing
+    ("Shibuya Standing Coffee", "Tokyo", "JP", 35.6614, 139.6983, "saved", "2025-01-20", None, "", "Want to go"),
+    ("Nakameguro Canal Roasters", "Tokyo", "JP", 35.6440, 139.6990, "saved", "2025-01-20", None, "", "Want to go"),
+    ("Yanaka Ramen Counter", "Tokyo", "JP", 35.7263, 139.7671, "saved", "2025-01-22", None, "", "Want to go"),
+    ("Kiyosumi Garden Tea", "Tokyo", "JP", 35.6800, 139.7985, "saved", "2025-02-03", None, "", "Want to go"),
+    ("Ueno Robotics Museum", "Tokyo", "JP", 35.7188, 139.7760, "saved", "2025-02-03", None, "", "Want to go"),
+    ("Golden Gai Listening Bar", "Tokyo", "JP", 35.6938, 139.7046, "saved", "2025-02-09", None, "", "Want to go"),
+    ("Kanda Pour-Over Bar", "Tokyo", "JP", 35.6953, 139.7708, "review", "2023-11-05", 5,
+     "The best pour-over I have had; single-origin, tiny counter, no laptops.", "Favourite coffee"),
+    # Seoul — two pins, one weekend
+    ("Bukchon Hanok Teahouse", "Seoul", "KR", 37.5826, 126.9830, "saved", "2025-02-10", None, "", "Want to go"),
+    ("Seongsu Espresso Works", "Seoul", "KR", 37.5446, 127.0557, "saved", "2025-02-10", None, "", "Want to go"),
+    # London — three mornings in a row at the same counter (the Timeline agrees)
+    ("Harbour Third Wave", "London", "GB", 51.5202, -0.0776, "review", "2024-06-12", 5,
+     "Proper third-wave espresso. Went back three mornings in a row.", "Favourite coffee"),
+    ("Chain Hotel Breakfast Hall", "London", "GB", 51.5074, -0.1278, "review", "2024-06-13", 2,
+     "Buffet breakfast, forgettable. Would rather find a café.", ""),
+    # San Francisco — home turf
+    ("Mission Espresso Lab", "San Francisco", "US", 37.7599, -122.4148, "review", "2024-08-30", 5,
+     "Light roast, patient baristas, great pastries.", "Favourite coffee"),
+    ("Telegraph Hill Steps", "San Francisco", "US", 37.8024, -122.4058, "review", "2024-09-02", 4,
+     "Steep, quiet, the best view of the bay for the price of nothing.", ""),
+]
+REVIEW_LINES = {
+    3: ["Fine for a quick stop; nothing to go back for.", "Decent, a bit loud at lunch."],
+    4: ["Good light, quiet in the mornings.", "Friendly, consistent, worth the detour.",
+        "Great room; the coffee is the weak point."],
+    5: ["Exactly the kind of place I look for — small, careful, no fuss.",
+        "Went twice in one week. The owner remembers your order."],
+}
+HOME_LATLNG = (37.7749, -122.4194)          # San Francisco (identity + Timeline HOME)
+
+# Google's on-device Timeline (semanticSegments) — dated visits the engine names by the
+# nearest saved place; HOME is skipped by design. (place, local ISO start, tz)
+TIMELINE_VISITS = [
+    ("Harbour Third Wave", "2024-06-12T08:10:00", "+01:00"),
+    ("Harbour Third Wave", "2024-06-13T08:05:00", "+01:00"),
+    ("Harbour Third Wave", "2024-06-14T08:15:00", "+01:00"),
+    ("Lisbon Fado Cellar", "2022-10-14T21:00:00", "+01:00"),
+    ("Mission Espresso Lab", "2024-08-30T09:00:00", "-07:00"),
+    ("Telegraph Hill Steps", "2024-09-02T12:30:00", "-07:00"),
+    ("Kanda Pour-Over Bar", "2023-11-05T10:20:00", "+09:00"),
+]
+# Facebook event responses — venues with coordinates land in 85-places; the meetup has none.
+FB_EVENTS = {
+    "events_joined": [
+        {"name": "Web Summit Lisbon", "start_timestamp": 1665741600,
+         "place": {"name": "Lisbon Arena", "address": "Parque das Nações, Lisbon",
+                   "coordinate": {"latitude": 38.7686, "longitude": -9.0939}}},
+        {"name": "Harbour Runners Spring 10K", "start_timestamp": 1718434800,
+         "place": {"name": "Victoria Park Bandstand", "address": "Hackney, London",
+                   "coordinate": {"latitude": 51.5362, "longitude": -0.0387}}},
+        {"name": "Robotics meetup", "start_timestamp": 1718200800},
+    ],
+    "events_declined": [],
+    "events_interested": [
+        {"name": "Tokyo Robot Expo", "start_timestamp": 1769821200,
+         "place": {"name": "Tokyo Big Sight", "address": "Ariake, Tokyo",
+                   "coordinate": {"latitude": 35.6298, "longitude": 139.7942}}},
+    ],
+}
+# LinkedIn Job Applications — advisory / fractional product roles at companies in his own
+# network, which is the Jobs Agent's lane in the demo. (company, title, days ago)
+JOHN_APPLICATIONS = [
+    ("Verge Freight", "Board Advisor, Automation", 410),
+    ("Saltbox Foods", "Fractional Chief Product Officer", 330),
+    ("Tidewater Marine", "Product Advisor (Robotics)", 240),
+    ("Kiln Ceramics", "Fractional Head of Product", 160),
+    ("Analytical Engines", "VP Product", 95),
+]
+
 
 def d(offset_days):
     """A date offset from TODAY, ISO. Negative = past."""
     return (TODAY + timedelta(days=offset_days)).isoformat()
+
+
+def profile_url(name):
+    """One stable public-profile URL per person. The same person must carry the same URL in every
+    export (correlate.py refuses a cross-brain merge on a conflicting canonical_url)."""
+    return "https://www.linkedin.com/in/" + "-".join(name.lower().split())
+
+
+def epoch(day_):
+    """Unix seconds at 09:00 UTC on a date. (The old `toordinal()*86400` counted from year 1, so
+    every Facebook timestamp landed in year 3994 and its 11-digit note filename read as a phone
+    number to the PII sweep.)"""
+    return (day_.toordinal() - date(1970, 1, 1).toordinal()) * 86400 + 9 * 3600
 
 
 def li_date(offset_days):
@@ -275,21 +402,24 @@ class World:
                                                "role": r.choice(["Buyer", "Plant Manager",
                                                                  "CTO", "Ops Lead",
                                                                  "Procurement"])})
-        # Priya Nair and John Carter appear in BOTH brains -> _correlations/
+        # Priya Nair and John Carter appear in BOTH brains -> _correlations/. John's title
+        # here matches his own LinkedIn Positions (he founded Acme); Priya sits on the board.
         self.acme_people.append({"name": "Priya Nair", "dept": "Operations",
                                  "role": "Board Advisor", "msgs": 12})
-        self.acme_people.append({"name": "John Carter", "dept": "Engineering",
-                                 "role": "Technical Advisor", "msgs": 26})
+        self.acme_people.append({"name": "John Carter", "dept": "Operations",
+                                 "role": "Founder & CEO", "msgs": 26})
 
         # ---- places -------------------------------------------------------------
         # Places and posts are leaf-only in this engine (nothing links to them), so
         # they land as degree-0 halo dots in the cellular view. Keep them present for
         # the map view and the voice layer, but well below the people count.
         self.places = []
-        for i in range(112):
+        combos = [(w, k) for w in VENUE_WORDS for k in VENUE_KINDS]
+        r.shuffle(combos)
+        for w, k in combos[:112]:
             city, cc, lat, lng = r.choice(CITIES)
             self.places.append({
-                "name": f"{r.choice(VENUE_WORDS)} {r.choice(VENUE_KINDS).title()} {i + 1}",
+                "name": f"{w} {k.title()}",
                 "city": city, "cc": cc,
                 "lat": round(lat + r.uniform(-0.09, 0.09), 5),
                 "lng": round(lng + r.uniform(-0.09, 0.09), 5),
@@ -335,7 +465,7 @@ def gen_john(root, W):
     # and shipping it proves the preamble handling works.
     conns = P
     rows = [(p["name"].split()[0], " ".join(p["name"].split()[1:]),
-             f"https://www.linkedin.com/in/{p['name'].split()[0].lower()}{i}",
+             profile_url(p["name"]),
              "", p["company"], p["role"], li_date(p["since"]))
             for i, p in enumerate(conns)]
     w_text(root, f"{li}/Connections.csv",
@@ -367,11 +497,13 @@ def gen_john(root, W):
         ["Name"], [("English",), ("Portuguese",)]))
 
     # messages.csv — the ONLY lever on `strength`, hence on works_at edge weight.
+    # The conversation id is a crc32, not hash(): Python salts hash() per process, which
+    # made two runs of this script differ in this one column.
     mrows = []
     for p in P:
         lo, hi = p.get("age", (5, 700))
         for k in range(p["msgs"]):
-            mrows.append((f"c{abs(hash(p['name'])) % 9999}", p["name"], p["name"],
+            mrows.append((f"c{zlib.crc32(p['name'].encode('utf-8')) % 9999}", p["name"], p["name"],
                           "", "John Carter",
                           f"{d(-r.randint(lo, hi))} 09:{k % 60:02d}:00 UTC", "",
                           "private message body not imported"))
@@ -384,7 +516,7 @@ def gen_john(root, W):
            csv_rows(["Organization"], [(o,) for o in orgs]))
     w_text(root, f"{li}/Job Applications.csv", csv_rows(
         ["Company Name", "Job Title", "Application Date"],
-        [(o, "Advisor", d(-r.randint(60, 500))) for o in orgs[:6]]))
+        [(co, title, d(-ago)) for co, title, ago in JOHN_APPLICATIONS]))
     w_text(root, f"{li}/Search Queries.csv", csv_rows(
         ["Search Query", "Time"],
         [(t, d(-r.randint(10, 400))) for t in TOPICS]))
@@ -419,14 +551,14 @@ def gen_john(root, W):
     fb = [p for p in P if "facebook" in p["extra"]]
     w_json(root, "facebook/connections/friends/your_friends.json",
            {"friends_v2": [{"name": p["name"],
-                            "timestamp": int((TODAY - timedelta(days=-p["since"])).toordinal() * 86400)}
+                            "timestamp": epoch(TODAY - timedelta(days=-p["since"]))}
                            for p in fb]})
     w_json(root, "facebook/your_facebook_activity/posts/your_posts__check_ins__photos_and_videos_1.json",
-           [{"timestamp": int((TODAY - timedelta(days=r.randint(5, 700))).toordinal() * 86400),
+           [{"timestamp": epoch(TODAY - timedelta(days=r.randint(5, 700))),
              "data": [{"post": f"Field notes on {r.choice(TOPICS)}."}]} for _ in range(24)])
     checkins = [p for p in W.places if p["kind"] == "check-in"]
     w_json(root, "facebook/your_facebook_activity/posts/check-ins.json",
-           [{"timestamp": int((TODAY - timedelta(days=30)).toordinal() * 86400),
+           [{"timestamp": epoch(TODAY - timedelta(days=r.randint(20, 400))),
              "data": [{"place": {"name": p["name"],
                                  "coordinate": {"latitude": p["lat"], "longitude": p["lng"]}}}]}
             for p in checkins])
@@ -441,6 +573,10 @@ def gen_john(root, W):
     w_json(root, "facebook/personal_information/profile_information/profile_information.json",
            {"profile_v2": {"name": {"full_name": "John Carter"},
                            "current_city": {"name": "San Francisco"}}})
+    # event responses: a venue with coordinates becomes a place (rule-level `require`
+    # keeps the coordinate-less meetup out of 85-places)
+    w_json(root, "facebook/your_facebook_activity/events/your_event_responses.json",
+           {"event_responses_v2": FB_EVENTS})
 
     # ---- instagram --------------------------------------------------------------
     ig = [p for p in P if "instagram" in p["extra"]]
@@ -448,9 +584,17 @@ def gen_john(root, W):
            [{"string_list_data": [{"value": p["name"],
                                    "href": f"https://instagram.com/{p['name'].split()[0].lower()}",
                                    "timestamp": 1700000000}]} for p in ig])
-    w_json(root, "instagram/your_instagram_activity/media/posts_1.json",
-           [{"title": f"{r.choice(VENUE_WORDS)} — {r.choice(TOPICS)}",
-             "creation_timestamp": 1700000000 + i * 90000} for i in range(20)])
+    ig_posts = [{"title": f"{r.choice(VENUE_WORDS)} — {r.choice(TOPICS)}",
+                 "creation_timestamp": 1700000000 + i * 90000} for i in range(20)]
+    # one geotagged post (the Lisbon trip) — the only IG post that may become a place
+    ig_posts.append({
+        "media": [{"uri": "media/posts/202210/tagus.jpg", "creation_timestamp": 1665770400,
+                   "title": "",
+                   "media_metadata": {"photo_metadata": {"exif_data": [
+                       {"latitude": 38.7058, "longitude": -9.144}]}}}],
+        "title": "Sunset over the Tagus", "creation_timestamp": 1665770400,
+        "location": {"name": "Cais Sunset Pier", "latitude": 38.7058, "longitude": -9.144}})
+    w_json(root, "instagram/your_instagram_activity/media/posts_1.json", ig_posts)
     w_json(root, "instagram/preferences/your_topics/your_topics.json",
            {"topics": [{"string_map_data": {"Name": {"value": t}}} for t in TOPICS]})
     w_json(root, "instagram/personal_information/personal_information/personal_information.json",
@@ -459,21 +603,59 @@ def gen_john(root, W):
     # ---- google maps (GeoJSON: coordinates are [lng, lat]) ----------------------
     saved = [p for p in W.places if p["kind"] == "saved"]
     revd = [p for p in W.places if p["kind"] == "reviewed"]
+    saved_feats = [
+        {"type": "Feature",
+         "geometry": {"type": "Point", "coordinates": [p["lng"], p["lat"]]},
+         "properties": {"location": {"name": p["name"], "country_code": p["cc"],
+                                     "address": f"{p['city']}"},
+                        "date": p["date"]}} for p in saved]
+    review_feats = [
+        {"type": "Feature",
+         "geometry": {"type": "Point", "coordinates": [p["lng"], p["lat"]]},
+         "properties": {"location": {"name": p["name"], "country_code": p["cc"]},
+                        "five_star_rating_published": (rt := r.choice([3, 4, 4, 5, 5])),
+                        "review_text_published": r.choice(REVIEW_LINES[rt]),
+                        "date": p["date"]}} for p in revd]
+    # the named travel corpus (see TRAVEL_PLACES) rides on the same two files
+    for name, city, cc, lat, lng, mode, when, rating, review, _lst in TRAVEL_PLACES:
+        props = {"location": {"name": name, "country_code": cc, "address": f"{city}"},
+                 "date": when}
+        feat = {"type": "Feature", "geometry": {"type": "Point", "coordinates": [lng, lat]},
+                "properties": props}
+        if mode == "review":
+            props["five_star_rating_published"] = rating
+            props["review_text_published"] = review
+            review_feats.append(feat)
+        else:
+            saved_feats.append(feat)
     w_json(root, "google/Maps (your places)/Saved Places.json",
-           {"type": "FeatureCollection", "features": [
-               {"type": "Feature",
-                "geometry": {"type": "Point", "coordinates": [p["lng"], p["lat"]]},
-                "properties": {"location": {"name": p["name"], "country_code": p["cc"],
-                                            "address": f"{p['city']}"},
-                               "date": p["date"]}} for p in saved]})
+           {"type": "FeatureCollection", "features": saved_feats})
     w_json(root, "google/Maps (your places)/Reviews.json",
-           {"type": "FeatureCollection", "features": [
-               {"type": "Feature",
-                "geometry": {"type": "Point", "coordinates": [p["lng"], p["lat"]]},
-                "properties": {"location": {"name": p["name"], "country_code": p["cc"]},
-                               "five_star_rating_published": r.randint(3, 5),
-                               "review_text_published": "Good light, quiet in the mornings.",
-                               "date": p["date"]}} for p in revd]})
+           {"type": "FeatureCollection", "features": review_feats})
+    # Saved lists (Takeout "Saved/<list>.csv"): the pins grouped the way he grouped them
+    for lst in sorted({p[9] for p in TRAVEL_PLACES if p[9]}):
+        rows = [(name, "", "https://www.google.com/maps/search/" + name.replace(" ", "+"),
+                 "coffee" if lst == "Favourite coffee" else "", "")
+                for name, *_rest, l in TRAVEL_PLACES if l == lst]
+        w_text(root, f"google/Saved/{lst}.csv",
+               csv_rows(["Title", "Note", "URL", "Tags", "Comment"], rows))
+    # the new on-device Timeline: visits only (no raw signals), HOME skipped by the engine
+    by_name = {p[0]: p for p in TRAVEL_PLACES}
+    segs = []
+    for place, start, tz in TIMELINE_VISITS:
+        _n, _c, _cc, lat, lng, *_ = by_name[place]
+        segs.append({"startTime": f"{start}.000{tz}", "endTime": f"{start}.000{tz}",
+                     "visit": {"hierarchyLevel": 0, "probability": 0.9,
+                               "topCandidate": {"placeId": "demo-" + place.split()[0].lower(),
+                                                "semanticType": "UNKNOWN", "probability": 0.8,
+                                                "placeLocation": {"latLng": f"{lat}°, {lng}°"}}}})
+    segs.append({"startTime": "2024-09-01T07:00:00.000-07:00", "endTime": "2024-09-01T07:00:00.000-07:00",
+                 "visit": {"hierarchyLevel": 0, "probability": 0.9,
+                           "topCandidate": {"placeId": "demo-home", "semanticType": "HOME",
+                                            "probability": 0.8,
+                                            "placeLocation": {"latLng": f"{HOME_LATLNG[0]}°, {HOME_LATLNG[1]}°"}}}})
+    w_json(root, "google/Location History (Timeline)/Timeline.json",
+           {"semanticSegments": segs, "rawSignals": [], "userLocationProfile": {}})
 
     # ---- amazon (the ONLY source of purchased_from edges) ----------------------
     w_text(root, "amazon/Retail.OrderHistory.1.csv", csv_rows(
@@ -514,16 +696,34 @@ def gen_john(root, W):
           f"https://reddit.example/r/robotics/{i}") for i, t in enumerate(TOPICS)]))
     w_text(root, "reddit/subscribed_subreddits.csv",
            csv_rows(["subreddit"], [("robotics",), ("automate",), ("trailrunning",)]))
-    w_json(root, "youtube/subscriptions.json",
-           [{"snippet": {"title": f"{t.title()} Channel"}} for t in TOPICS[:8]])
-    w_json(root, "tiktok/user_data.json",
-           {"Activity": {"Favorite Videos": {"FavoriteVideoList": [
-               {"Date": d(-i * 7), "Link": f"https://tiktok.example/v/{i}"}
-               for i in range(12)]}}})
+    # YouTube rides inside the Google Takeout (the standalone youtube adapter stands down
+    # when Maps/Reviews are present, so a separate youtube/ folder would never be claimed)
+    w_text(root, "google/YouTube and YouTube Music/subscriptions/subscriptions.csv", csv_rows(
+        ["Channel Id", "Channel Url", "Channel Title"],
+        [(f"UC{i:022d}", f"https://www.youtube.com/channel/UC{i:022d}", f"{t.title()} Channel")
+         for i, t in enumerate(TOPICS[:8])]))
+    w_text(root, "google/YouTube and YouTube Music/history/search-history.html",
+           "<html><body>" + "".join(
+               f'<div>Searched for <a href="https://www.youtube.com/results?search_query='
+               f'{t.replace(" ", "+")}">{t}</a><br>{d(-i * 9)}</div>'
+               for i, t in enumerate(TOPICS[:10])) + "</body></html>\n")
+    # TikTok: the mapping detects the export by its real filename
+    w_json(root, "tiktok/user_data_tiktok.json",
+           {"Profile": {"Profile Information": {"ProfileMap": {"userName": "johncarter.builds"}}},
+            "Activity": {"Favorite Videos": {"FavoriteVideoList": [
+                {"Date": d(-i * 7), "Link": f"https://tiktok.example/v/{i}"}
+                for i in range(12)]},
+                "Hashtag": {"HashtagList": [{"HashtagName": t.replace(" ", "")} for t in TOPICS[:6]]},
+                "Search History": {"SearchList": [{"Date": d(-i * 11), "SearchTerm": t}
+                                                  for i, t in enumerate(TOPICS[:6])]}}})
+    # WhatsApp: "WhatsApp Chat with <name>.txt", day-first timestamps; bodies never read
     wa = [p for p in P if "whatsapp" in p["extra"]] or P[:12]
-    w_text(root, "whatsapp/chat-with-harbour-runners.txt",
-           "\n".join(f"[{d(-i)}, 07:1{i % 10}] {wa[i % len(wa)]['name']}: "
-                     "message body not imported" for i in range(30)) + "\n")
+    wa_lines = []
+    for i in range(30):
+        x = TODAY - timedelta(days=i)
+        wa_lines.append(f"[{x.day:02d}.{x.month:02d}.{x.year}, 07:1{i % 10}:00] "
+                        f"{wa[i % len(wa)]['name']}: message body not imported")
+    w_text(root, "whatsapp/WhatsApp Chat with Harbour Runners.txt", "\n".join(wa_lines) + "\n")
     w_text(root, "x/tweets.js", "window.YTD.tweets.part0 = " + json.dumps(
         [{"tweet": {"created_at": d(-i * 5),
                     "full_text": f"Shipping notes: {r.choice(TOPICS)}."}}
@@ -544,11 +744,11 @@ def gen_acme(root, W):
     w_text(root, "linkedin_company/EmployeeList.csv", csv_rows(
         ["First Name", "Last Name", "Title", "Profile Url", "Department"],
         [(p["name"].split()[0], " ".join(p["name"].split()[1:]), p["role"],
-          f"https://www.linkedin.com/in/{p['name'].split()[0].lower()}{i}", p["dept"])
+          profile_url(p["name"]), p["dept"])
          for i, p in enumerate(P)]))
     w_text(root, "linkedin_company/PageFollowers.csv", csv_rows(
         ["Name", "Profile Url"],
-        [(c["name"], f"https://www.linkedin.com/in/{c['name'].split()[0].lower()}c{i}")
+        [(c["name"], profile_url(c["name"]))
          for i, c in enumerate(W.customer_contacts)]))
     w_text(root, "linkedin_company/Organization Posts.csv", csv_rows(
         ["Date", "Commentary", "Url"],
@@ -629,21 +829,42 @@ def gen_acme(root, W):
         [(f"701{i:04d}", f"{r.choice(TOPICS).title()} webinar", d(-r.randint(30, 400)))
          for i in range(12)]))
 
-    # ---- lighter company sources ----------------------------------------------
-    w_text(root, "zendesk/tickets.csv", csv_rows(
-        ["Id", "Subject", "Created At", "Requester"],
-        [(i, f"Ticket {i}", d(-r.randint(5, 300)), r.choice(W.customer_contacts)["name"])
-         for i in range(60)]))
-    w_text(root, "jira/issues.csv", csv_rows(
-        ["Key", "Summary", "Assignee", "Created"],
-        [(f"COB-{i}", f"{r.choice(TOPICS)} task", r.choice(P)["name"], d(-r.randint(5, 300)))
-         for i in range(50)]))
-    w_json(root, "notion/pages.json",
-           [{"title": f"{t.title()} runbook", "created_time": d(-r.randint(20, 500))}
-            for t in TOPICS])
-    w_text(root, "confluence/space.xml",
-           "<space><page><title>Onboarding</title></page>"
-           "<page><title>Fleet runbook</title></page></space>\n")
+    # ---- lighter company sources (each shaped the way its adapter detects it) -----
+    # (no Zendesk folder on purpose: the engine indexes files by BASENAME, and Zendesk's
+    # `users`/`tickets` keys collide with Slack's users.json and Workspace's users.csv —
+    # the adapters would read each other's files. Tracked as an engine bug, not papered over.)
+    # jira: the issue-navigator CSV (detected by the "Issue key" header)
+    w_text(root, "jira/jira-issues.csv", csv_rows(
+        ["Issue key", "Issue id", "Summary", "Assignee", "Reporter", "Project name", "Created", "Labels"],
+        [(f"COB-{i}", f"{10000 + i}", f"{r.choice(TOPICS)} task", r.choice(P)["name"],
+          r.choice(P)["name"], r.choice(["Cobot V2", "Fleet Platform", "Field Ops"]),
+          d(-r.randint(5, 300)), r.choice(["safety", "lidar", "fleet", "ui", ""])) for i in range(50)]))
+    # notion: "Export all workspace content" — <Title> <32-hex>.md pages + a database CSV
+    def hexid(s):
+        return f"{zlib.crc32(s.encode('utf-8')):08x}" * 4
+    for t in TOPICS[:10]:
+        title = f"{t.title()} runbook"
+        w_text(root, f"notion/Acme Wiki {hexid('wiki')}/{title} {hexid(title)}.md",
+               f"# {title}\n\nHow we handle {t} on the factory floor: who owns it, what to check first, "
+               f"and when to page engineering.\n")
+    w_text(root, f"notion/Acme Wiki {hexid('wiki')}/Runbooks {hexid('db')}_all.csv", csv_rows(
+        ["Name", "Owner team", "Last reviewed"],
+        [(f"{t.title()} runbook", r.choice(["Engineering", "Support", "Operations"]), d(-r.randint(10, 300)))
+         for t in TOPICS[:10]]))
+    # confluence: an XML space export (entities.xml) — titles + authors only
+    wiki_users = [p for p in P if p["dept"] == "Engineering"][:5]
+    xml = ['<?xml version="1.0" encoding="UTF-8"?><hibernate-generic>',
+           '<object class="Space"><property name="name">Acme Engineering Wiki</property></object>']
+    for i, p in enumerate(wiki_users):
+        xml.append(f'<object class="ConfluenceUserImpl"><id name="key">u{i}</id>'
+                   f'<property name="fullName">{p["name"]}</property></object>')
+    for i, t in enumerate(["Onboarding", "Fleet runbook", "Cobot V2 release notes", "Safety case",
+                           "Customer site checklist", "On-call handbook", "Lidar vendor notes",
+                           "Retrofit kit assembly"]):
+        xml.append(f'<object class="Page"><property name="title">{t}</property>'
+                   f'<property name="creator"><id name="key">u{i % len(wiki_users)}</id></property></object>')
+    xml.append("</hibernate-generic>")
+    w_text(root, "confluence/entities.xml", "\n".join(xml) + "\n")
     w_text(root, "hubspot/hubspot-crm-exports-all-contacts.csv", csv_rows(
         ["First Name", "Last Name", "Company", "Job Title"],
         [(c["name"].split()[0], " ".join(c["name"].split()[1:]), c["company"], c["role"])
@@ -651,9 +872,125 @@ def gen_acme(root, W):
     w_text(root, "teams/TeamsMessagesReport.csv", csv_rows(
         ["Participant", "Date"],
         [(p["name"], d(-r.randint(5, 200))) for p in P[:40]]))
-    w_text(root, "microsoft365/mailbox-usage.csv", csv_rows(
-        ["Display Name", "Last Activity Date"],
-        [(p["name"], d(-r.randint(3, 90))) for p in P[:40]]))
+    # microsoft365: a Purview content-search export = loose .eml files; HEADERS ONLY are
+    # read by the engine (display names + dates), the bodies here are a canary
+    for i in range(36):
+        frm = r.choice(P)
+        to = r.sample([p for p in P if p is not frm], 2)
+        x = TODAY - timedelta(days=r.randint(3, 120))
+        addr = lambda p: f'"{p["name"]}" <{p["name"].split()[0].lower()}@acme-robotics.example>'  # noqa: E731
+        w_text(root, f"microsoft365/Purview Export/Mailbox/message-{i:03d}.eml",
+               f"From: {addr(frm)}\nTo: {addr(to[0])}\nCc: {addr(to[1])}\n"
+               f"Date: {x.strftime('%a, %d %b %Y')} 09:{i % 60:02d}:00 +0000\n"
+               f"Subject: Fleet sync\nMessage-ID: <msg{i}@acme-robotics.example>\n\n"
+               "secret-body-do-not-leak — never imported\n")
+
+
+# ------------------------------------------------------------- the document store
+# A LINKED store, never copied into the entity: `company/acme/git_docs/_SOURCE_LINK.json`
+# points (relatively) at `_docs/acme-handbook/`, which sits at the data root under a `_`
+# name so neither `discover_entities` nor Studio's data index mistakes it for an entity.
+# Every file is fictional; the one credentials file is assembled from pieces so no scanner
+# reads this generator as a leak, and it MUST come out of the build as a metadata-only stub.
+DOCS_STORE = "_docs/acme-handbook"
+DOCS_LINK_ID = "demo2acme2handbook2link2id26"       # fixed: make_link() would use uuid4()
+
+
+def gen_acme_docs(out_root, W):
+    """Write `_docs/acme-handbook/` + the link file. `out_root` is the data root."""
+    store = Path(out_root) / DOCS_STORE
+    people = {p["name"]: p for p in W.acme_people}
+    eng = [p["name"] for p in W.acme_people if p["dept"] == "Engineering"][:6]
+    sales = [p["name"] for p in W.acme_people if p["dept"] == "Sales"][:4]
+    files = {
+        "README.md": ("# Acme Robotics handbook\n\nThe company handbook: how we ship, support and sell "
+                      "collaborative robots. Start with [the launch plan](product/Cobot-V2-Launch-Plan.md) "
+                      "and [the team](company/Team.md).\n"),
+        "company/Team.md": ("# Team\n\n| Name | Role | Department |\n|---|---|---|\n"
+                            + "".join(f"| {n} | {people[n]['role']} | {people[n]['dept']} |\n"
+                                      for n in ["John Carter", "Grace Hopper", "Alan Turing", "Jonas Beck",
+                                                "Dana Reyes", "Maya Chen", "Priya Nair"])
+                            + "\nBoard: Priya Nair (Northwind Capital) advises on the seed round.\n"),
+        "company/Onboarding-Checklist.md": (
+            "# Week-one onboarding\n\n## Goals\n\n- Day 1: laptop, Slack, Workspace; read the fleet runbook.\n"
+            "- Day 3: shadow one customer call with Sales.\n- Day 5: ship one change through CI.\n\n"
+            "## Who to ask\n\n" + "".join(f"- {n} — {people[n]['role']}\n" for n in eng[:3] + sales[:2])),
+        "company/Values.md": "# How we work\n\n1. Safety before speed.\n2. The floor is the customer.\n3. Write it down.\n",
+        "engineering/Cobot-V2-Release-Runbook.md": (
+            "---\nowner: engineering\n---\n# Cobot V2 release runbook\n\n1. Freeze `main` at 17:00 the day before.\n"
+            "2. Run the safety suite on the staging cell.\n3. Roll to one customer line, watch for 48 hours.\n"
+            "4. Fleet-wide roll by region.\n\nOwners: " + ", ".join(eng[:3]) + ".\n"),
+        "engineering/Fleet-Incident-Playbook.md": (
+            "# Fleet incident playbook\n\n## Severity\n\n| Sev | Means | Response |\n|---|---|---|\n"
+            "| 1 | a robot stopped a line | 15 min, page the on-call |\n| 2 | degraded fleet telemetry | 2 h |\n"
+            "| 3 | cosmetic | next sprint |\n\nSee [the runbook](Cobot-V2-Release-Runbook.md).\n"),
+        "engineering/Safety-Certification-Notes.md": (
+            "# Functional safety notes\n\nWhat the certification body asked for, and where each answer lives.\n\n"
+            "- Risk assessment per cell — see the Launch plan.\n- Emergency stop latency — measured at 42 ms.\n"),
+        "engineering/api-spec.yaml": "openapi: 3.0.0\ninfo:\n  title: Acme Fleet API\n  version: 2.1.0\npaths: {}\n",
+        "engineering/System-Architecture.svg": ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">'
+                                                '<rect x="20" y="20" width="220" height="90"/>'
+                                                '<text x="30" y="70">Fleet API</text></svg>\n'),
+        "product/Cobot-V2-Launch-Plan.md": (
+            "---\nowner: product\n---\n# Cobot V2 launch plan\n\n## Goals\n\n"
+            "- Ship Cobot V2 to the first three customer lines between 2026-10-15 and 2026-12-01.\n"
+            "- Retrofit kits for Verge Freight and Saltbox Foods in the same window.\n\n"
+            "## Risks\n\n- Lidar module supply (Ironwood Cloud is the single vendor).\n\n"
+            "Related: [[Pricing-Model]] and [the runbook](../engineering/Cobot-V2-Release-Runbook.md).\n"),
+        "product/Cobot-V2-Launch-Plan-v2.md": "# Cobot V2 launch plan v2\n\nThe revised plan: the retrofit kits move to Q1.\n",
+        "product/Pricing-Model.md": ("# Pricing model\n\n| Tier | Robots | Per robot / month |\n|---|---|---|\n"
+                                     "| Pilot | 1–3 | 1,900 |\n| Line | 4–12 | 1,500 |\n| Fleet | 13+ | custom |\n"),
+        "sales/Customer-QBR-Template.md": ("# Customer QBR template\n\n1. Uptime and interventions.\n"
+                                           "2. What changed on the floor.\n3. Renewal and expansion.\n"),
+        "sales/Verge-Freight-Account-Plan.md": (
+            "# Verge Freight — account plan\n\nTwo warehouse lines live; a third in negotiation (Fleet expansion).\n\n"
+            f"Owner: {sales[0] if sales else 'Sales'}. Exec sponsor on their side: a plant manager.\n"),
+        "support/Escalation-Policy.md": ("# Support escalation\n\nTickets older than 48 hours escalate to the "
+                                         "support lead; a stopped line pages engineering.\n"),
+        "fundraising/Seed-Round-Narrative.md": (
+            "# Seed round narrative\n\nAcme sells collaborative robots to small manufacturers who could never "
+            "afford integration projects. Twelve customers, two renewals, one vendor risk.\n\n"
+            "## Use of funds\n\n- Lidar second-sourcing.\n- Two field engineers.\n\n"
+            "## Do not claim\n\n- recurring revenue figures that are not in the data room\n"),
+        "fundraising/Investor-FAQ.md": ("# Investor FAQ\n\n**Why now?** Cobot V2 cut install time from weeks to days.\n\n"
+                                        "**Who is on the board?** Priya Nair (Northwind Capital), advisor.\n"),
+        "compliance/Data-Handling-Policy.md": ("# Data handling\n\nCustomer floor telemetry stays on the customer's "
+                                               "network. No video leaves the cell.\n"),
+        "compliance/policies/password-policy.md": "# Password policy\n\nPasswords rotate every 90 days.\n",
+        # the one sensitive file: its NAME trips the credentials rule, so the brain gets a
+        # metadata-only stub. The body is deliberately plain prose — a key-shaped string in a
+        # committed demo folder would only set off secret scanners for nothing.
+        "ops/Staging-Access-Credentials.md": ("# Staging access\n\nWho has access to the staging fleet and "
+                                              "how it is granted. The actual credentials live in the team "
+                                              "password manager — never in this repository.\n"),
+        # the company's own mark (fictional, original): the docs pipeline promotes it to the
+        # brain's `_assets/logo.svg`, which Studio's brain switcher and the graph show. A
+        # full-bleed colour square with a bold "A" reads at 24px and survives a cover-fit crop.
+        "assets/acme-logo.svg": (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Acme Robotics">'
+            '<rect width="64" height="64" rx="10" fill="#2f6f4f"/>'
+            '<path d="M15 49 32 17l17 32" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>'
+            '<path d="M24 39h16" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/>'
+            '<circle cx="32" cy="17" r="6" fill="#f2a100" stroke="#2f6f4f" stroke-width="2.5"/>'
+            '</svg>\n'
+        ),
+    }
+    for rel, content in files.items():
+        w_text(store, rel, content)
+    link = {
+        "schema": "sbl-source-link/1", "kind": "git_docs", "id": DOCS_LINK_ID,
+        "label": "Acme handbook (docs repo)",
+        # RELATIVE to the link folder, so the demo works wherever the data folder is copied
+        "root": "../../../" + DOCS_STORE,
+        "mode": "local", "layout": "auto", "include": ["**"], "exclude": [],
+        "vcs": "auto", "copy_files": True,
+        "max_copy_bytes": 25 * 1024 * 1024, "max_total_copy_bytes": 2 * 1024 * 1024 * 1024,
+        "rules": {}, "connector": None,
+        "created": "2026-10-01T09:00:00Z", "created_by": "gen_demo_fixtures",
+    }
+    w_text(Path(out_root), "company/acme/git_docs/_SOURCE_LINK.json",
+           json.dumps(link, indent=2) + "\n")
+    return store
 
 
 # ------------------------------------------------------------------------- main
@@ -668,9 +1005,9 @@ def main():
 
     repo = Path(__file__).resolve().parent.parent
     out = Path(a.out).resolve() if a.out else (repo / "data")
-    john, acme = out / "personal" / "john", out / "company" / "acme"
+    john, acme, docs = out / "personal" / "john", out / "company" / "acme", out / DOCS_STORE
 
-    for p in (john, acme):
+    for p in (john, acme, docs):
         if p.exists() and any(p.iterdir()):
             if not a.force:
                 sys.exit(f"Refusing to overwrite non-empty {p}\n"
@@ -680,11 +1017,12 @@ def main():
     W = World(random.Random(a.seed))
     gen_john(john, W)
     gen_acme(acme, W)
+    gen_acme_docs(out, W)
 
-    for label, p in (("personal/john", john), ("company/acme", acme)):
+    for label, p in (("personal/john", john), ("company/acme", acme), (DOCS_STORE, docs)):
         files = [f for f in p.rglob("*") if f.is_file()]
         kb = sum(f.stat().st_size for f in files) / 1024
-        print(f"  {label:16s} {len(files):4d} files  {kb:8.1f} KB")
+        print(f"  {label:20s} {len(files):4d} files  {kb:8.1f} KB")
     print(f"\nseed {a.seed} · john people {len(W.john_people)} · "
           f"acme people {len(W.acme_people)} · customer contacts "
           f"{len(W.customer_contacts)} · places {len(W.places)}")

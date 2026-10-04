@@ -22,8 +22,11 @@ updated: <YYYY-MM-DD>
   research role wearing a "Head of" title).
 - **Evidence strength:** strong · moderate · thin — how much of the profile genuinely supports
   it. A thin lane gets fewer applications, because the shortlist-likelihood floor filters it.
-- **Headline pattern:** `<target title> · <differentiator in the JD's words>`.
-- **Summary skeleton:** the four sentences — which proof leads, which scale credential closes.
+- **Headline pattern:** `<target title> · <one fact>`, ≤ 80 characters — the posting's title
+  first, then one concrete differentiator. Never a second title or a list of domains.
+- **Summary skeleton:** three or four plain sentences — who this person is for this lane (the
+  current role first for employee lanes), the proof that leads, the scale credential that closes.
+  Never a "<Title> profile:" label or credentials glued with semicolons.
 - **Lead proof points:** the three or four facts from `profile.md` §4/§6 that open this lane's CVs.
 - **Bullet priority:** which roles get depth, which collapse to one line.
 - **Why-angles:** two or three true reasons this person wants roles of this kind — the raw

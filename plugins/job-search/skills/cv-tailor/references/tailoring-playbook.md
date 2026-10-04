@@ -289,8 +289,8 @@ target. **Never reuse a summary between applications.**
 
 ### The formula — three or four sentences, in this order
 
-1. **Target title verbatim + the single strongest proof.** Open with the exact title they wrote,
-   bolded, then the one credential that most makes it believable.
+1. **Who this person is, in one sentence, with the single strongest proof.** The career as a
+   person would say it, aimed at this role — not a title label, not a bolded opener.
 2. **Their #1 requirement, answered with a specific fact.** Not a claim — evidence, with a number
    or a named thing from `profile/profile.md`.
 3. **Scale / leadership credential** — team size, org size or users, from the profile. Short.
@@ -300,17 +300,22 @@ target. **Never reuse a summary between applications.**
 
 | Target | Opening sentence |
 |---|---|
-| Chief Architect | *"**Chief Architect** profile: 15 years of hands-on software architecture in product companies, including **CTO of a B2B SaaS platform**…"* |
-| Principal AI/ML Engineer | *"A **pragmatic builder** who leads AI/ML work by shipping it…"* |
-| CPTO | *"**Chief Product & Technology Officer** who owns the roadmap and still writes the code…"* |
-| Director of PM, Security | *"**Director of Product** who owns security product strategy and can argue the details with engineering rather than approve what they propose."* |
+| Chief Architect | *"Fifteen years designing software in product companies, the last four as CTO of a B2B SaaS platform with 400 enterprise customers."* |
+| Principal AI/ML Engineer | *"Builds AI features that reach production, and has done so on three products since 2021."* |
+| CPTO | *"Has owned the roadmap and the engineering behind it at two companies, and still writes code."* |
+| Director of PM, Security | *"Product leader in security software who can argue the details with engineering rather than approve what they propose."* |
 
-The last one lifts the JD's own phrasing — they wrote *"argue the details with engineering, not just
-approve what they propose"*. Quoting a JD's distinctive line back is the strongest signal available
-that the CV was written for them, and it costs nothing in truth.
+Each one says who the person is in a sentence a human would say aloud. The last lifts the JD's
+own phrasing — they wrote *"argue the details with engineering, not just approve what they
+propose"*. Quoting a JD's distinctive line back is the strongest signal available that the CV was
+written for them, and it costs nothing in truth.
 
 ### Rules
-- **Target title verbatim in sentence 1**, and bolded. Both ATS and humans look here.
+- **The headline carries the target title.** The summary may use it once, naturally, but never
+  as a bolded opener or a "<Title> profile:" label — that is a template tell. The summary says who
+  this person is and why they fit this role, in sentences a person would say.
+- **Not credentials glued together.** Semicolon chains ("At X, …; at Y, …") and verbless
+  fragments ("Ships AI inside products.") read as generated. Full sentences, uneven lengths.
 - **Every claim carries evidence.** "Deep AI experience" is noise; a version, a count and a
   timing — "v0 to v1.4, one maintainer, 12 connectors" — is a fact. Take every number from
   `profile/profile.md` §6; never invent one to make the sentence land.
@@ -358,7 +363,7 @@ uneven. Break the pattern deliberately:
 | # | Tell | Rule |
 |---|---|---|
 | 1 | **Every bullet opening with `**Bold lead-in:** …`** — the loudest one | **At most half** the bullets in any role may use a bold lead-in, and never more than three in a row anywhere on the page. The others open with a plain verb (*Rebuilt…*, *Took the platform from…*) or with the number itself (*12 source integrations, one minute per build…*). |
-| 2 | **A wall of `·`-separated keywords** under Core Competencies | Use the `kv` block: four or five labelled groups, ≤ 7 terms each. Same ATS coverage, a fraction of the noise. |
+| 2 | **A skills block at the top** — a `·` wall or a grid of labelled skill groups | Neither. Skills are one plain comma-separated line at the end; the keywords that matter are in the bullets. Same ATS coverage, and the work history moves up the page. |
 | 3 | **Em-dashes everywhere** | **Two per page, maximum.** Everywhere else use a comma, a full stop, or a colon. Count them before building. |
 | 4 | **Every sentence the same length** (18–24 words) | Vary it. Put at least one sentence under nine words in the summary. Short sentences carry weight; a page of even ones reads as filler. |
 | 5 | **The abstract tricolon** — "scalability, resilience and observability" | Once per CV at most. Prefer two concrete things to three abstract ones. |
@@ -388,7 +393,7 @@ Replace each with the specific thing it is standing in for. "Spearheaded the mig
 1. Count bold lead-ins per role. More than half? Rewrite the surplus to open with a verb.
 2. Count em-dashes on the page. More than two? Replace the rest.
 3. Read the first three words of every bullet in a role down the page. Do they rhyme? Break them up.
-4. Is Core Competencies a `kv` block with labelled groups? If it is one paragraph, convert it.
+4. Is there a skills block above the work history? Move it to one plain line at the end.
 5. Any phrase from the banned list? Any round number? Any "not just X but Y"?
 6. Read the summary aloud. If every sentence lands the same way, cut one in half.
 
@@ -401,19 +406,52 @@ sentence. Read each one back after changing it.
 **What this does not license.** Varying the writing never varies the facts. Everything in §0 still
 holds: no invented title, no invented metric, no claim not in `profile/profile.md`.
 
+## 3f. The bullet test — every bullet, every time
+
+A recruiter reads a bullet in two seconds and decides whether it is about *this* person. Before a
+bullet goes on the page, it passes all five:
+
+1. **Only-you.** Could this exact sentence sit on another candidate's CV? *"Built and led the
+   engineering team that delivered booking engines"* could; *"Built the engineering team behind
+   one booking API over hundreds of airline and hotel suppliers"* could not. The anchor is a
+   number or a name — a product, a market, a standard, a customer type, a system. (`lint_cv.py`
+   flags every bullet in the three most recent roles that has neither.)
+2. **So what.** It says what changed, and for whom, before how. If the reader would ask "and?",
+   the result is missing.
+3. **Read aloud.** A senior person would say it this way to another person. No label-colon lists,
+   no stacked nouns, no vendor plumbing the posting did not ask about.
+4. **Serves the posting.** It answers a row of `fit.md`'s bullet plan. A true, impressive bullet
+   that answers nothing is cut.
+5. **One idea.** One bullet, one point. Two results joined by "and" are two bullets, or one cut.
+
+If a bullet cannot pass truthfully, **cut it** — a role with two strong bullets beats one with four
+where two are filler.
+
+## 3g. Consistency — the page reads as one hand
+
+A recruiter who notices *organise* next to *authorize*, *CTO* next to *Chief Technology Officer*, or
+*Leads* in a role that ended in 2022 reads a page assembled from parts. `lint_cv.py` fails each:
+- **One spelling system** — British or American, matching the posting (and the market).
+- **One form of each title** — `CTO` everywhere or `Chief Technology Officer` everywhere.
+- **Tense** — past for ended roles; present or past for current ones, but one per role.
+- **Punctuation** — every bullet ends with a full stop (or none does). One dash in date ranges.
+- **Date format** — `MM/YYYY` or `YYYY`, one throughout.
+- **Capitalisation** — role-line descriptors in Title Case; section headings as the template has them.
+- **Numbers** — the same style for the same kind of thing (*30+ developers* and *20+ developers*,
+  not *thirty* and *20+*).
+
 ## 4. Keyword strategy (the ATS gate)
 
 ATS and AI screeners rank by (a) title match, (b) required-keyword coverage,
 (c) recency of those keywords, (d) years of experience. So:
 
 1. Build the keyword list from §1.5–1.7. Aim to place EVERY must-have keyword
-   at least twice: once in Core Competencies, once inside a role bullet where
-   it is true. Nice-to-haves once.
+   in a role bullet where it is true, and in the Skills line. Nice-to-haves once.
 2. Use both forms on first use: spell the term out and put the acronym in
    brackets ("Service Level Objective (SLO)"). Screeners tokenise differently;
    humans skim differently.
 3. Put the most important keywords in the top third of page 1 (headline,
-   summary, competencies, first role). Recency-weighted parsers reward this.
+   summary, first role). Recency-weighted parsers reward this.
 4. Mirror the JD's exact phrasing where truthful ("built and scaled", "owned
    the roadmap", "hands-on", "0→1", "enterprise customers"). Do not paraphrase
    a must-have into a synonym the parser won't match.
@@ -421,17 +459,16 @@ ATS and AI screeners rank by (a) title match, (b) required-keyword coverage,
    "10+ years in X", make sure X is visibly ≥10 years in the timeline.
 6. No keyword stuffing in white text, no hidden blocks — modern parsers flag
    it and humans hate it. Density comes from truthful bullets.
-7. Core Competencies section: a `kv` block — four or five labelled groups, at most seven terms
-   each (§3e tell #2). JD must-haves first, within and across groups.
-8. **Seed must-have keywords into the BULLETS, not only the competencies list.** Many screeners
-   weight body text above a keyword block, and a human discounts a list of terms that never appear
-   in the evidence. Every must-have should be visible **once in Core Competencies and once inside a
-   bullet where it is genuinely true** — that is what "at least twice" in rule 1 means.
+7. Skills: one plain comma-separated line, the last section, 12–18 terms, JD must-haves first
+   (§3e tell #2). Never a grid of labelled groups, never at the top.
+8. **Seed must-have keywords into the BULLETS.** Many screeners weight body text above a keyword
+   list, and a human discounts a term that never appears in the evidence. Every must-have should
+   be visible **inside a bullet where it is genuinely true**, and again in the Skills line.
 9. **Check keyword recency.** A parser that weights recent experience wants the must-haves in the
    top two roles, not only in a job from 2010. If a key term only appears in an old role, find the
    true recent instance of it and lead with that instead.
 10. **Run `check_pdf.py` with the JD's must-haves and fix every "missing" and every "weak".** A weak
-    (1×) keyword usually means it is in Core Competencies but nowhere in the evidence — put it in a
+    (1×) keyword usually means it is in the Skills line but nowhere in the evidence — put it in a
     bullet. This catches a missing must-have keyword before the CV goes out.
 
 ## 5. Human gate — the six-second read
@@ -449,7 +486,9 @@ answer "is this person exactly what we asked for?"
   glance instead of searching for it. Only a live site: check it responds before using it — a dead
   or parked domain is worse than none. Leave them off household names and off companies with no
   site; never a URL the profile does not record.
-- Role lines fit on one line: title | employer · a descriptor of four to six words. A descriptor
+- Role lines fit on one line: title | employer · a descriptor of four to six words, in **Title
+  Case** like the rest of the role line (`Meridian Labs · Composable Commerce Platform`); short words
+  (a, an, and, for, of, the, to, in, on) stay lower case, acronyms keep their form (`SaaS`, `AI`). A descriptor
   that wraps the role line onto two lines is too long.
 - Bullets = outcome-first, "Verb + what + scale/number + why it mattered".
   A bold lead-in on at most half the bullets of a role, used for the ones that answer a
@@ -461,6 +500,11 @@ answer "is this person exactly what we asked for?"
   something being hidden, and parsers compute tenure from order.
 - Most recent 2–3 roles get 3–5 bullets; older roles 1–2; roles more than ten years back get
   one merged entry unless the JD is about that work.
+- **The merged entry is `#### Earlier Experience`, written role-first**: the title held and the
+  work done (*"CEO of two software companies (2003 – 2017), grown to 30+ developers…"*). For an
+  employee-track application never call it "ventures", and never lead with *founded* /
+  *co-founded*: a page that says "founder" four times profiles the candidate as an entrepreneur
+  who will leave, before the reader reaches the work.
 - Never more than 2 pages. Page 1 must stand alone.
 - Remove anything that raises a question you can't answer in the CV (e.g.
   concurrent ventures for a full-time employer target — collapse or frame as
@@ -478,6 +522,11 @@ per application, and not improvised:
   below the work history: one line naming the project and the licence, one or two bullets. For
   employee-track archetypes the default is the second: a founder title as the current full-time
   role, directly above a job application, is the loudest "will leave" signal a CV can send.
+- **Compound founder titles on employee-track CVs.** Where the profile allows it, a role held as
+  `Co-Founder & CTO` is written as the function alone — `CTO` — on a CV for an employed role, and
+  keeps the compound on startup and founder-programme CVs. The function is the true title; the
+  co-founder half is ownership, and on an employee CV it repeats the "will leave" signal on every
+  role line. Only when the profile's allowed-title list includes the plain form.
 - **An employer that was acquired** is one continuous entry, with the start date of the original
   employment: `Title | New Owner (formerly Old Name) · short descriptor`, and the meta line says
   `<Old Name> acquired by <New Owner> in MM/YYYY`. Both names on the role line, because the
@@ -517,7 +566,7 @@ per application, and not improvised:
 
 Put the open source **on the employer line, not buried in the descriptor**:
 `Founder & CTO | <Your Project> · open-source AI context layer (MIT)`. These companies read the
-licence as a credential. Reinforce it with a Core Competencies group of its own, and where it is
+licence as a credential. Name it in the Skills line too, and where it is
 true, name the company's own open-core model as a precedent they already cite — that reads as
 someone who has thought about their business, not someone who skimmed the careers page.
 

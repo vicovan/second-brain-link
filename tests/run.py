@@ -977,6 +977,16 @@ Porto, Portugal
                                                            'headline: "Engineering leader · platform teams"'),
         "level echo": good.replace("Rebuilt the release process.", "Director-level scope over the release process."),
         "mixed date formats": good.replace("*01/2016 – 12/2020*", "*2016 – 2020*"),
+        "mixed British and American spelling": good.replace("Rebuilt the release process.",
+            "Rebuilt the release process and organised the on-call rota for the analyzer team."),
+        "mixed title forms": good.replace("### Engineering Manager | Harbor Freight Data",
+            "### Chief Technology Officer | Harbor Freight Data").replace("### VP Engineering | Tidewater Labs", "### CTO | Tidewater Labs"),
+        "present tense in an ended role": good.replace("- Cut build time by 37% for the data platform.",
+            "- Cuts build time by 37% for the data platform."),
+        "generic bullets": good.replace("- Grew the platform team to 42 engineers across two sites.\n- Rebuilt the release process.",
+            "- Improved the engineering culture.\n- Rebuilt the release process."),
+        "skills grid above the work history": good.replace("## Work Experience",
+            "## Core Competencies\n<!-- blocks: kv -->\n\n- **Platform:** Kafka · Kubernetes\n\n## Work Experience"),
     }
     for label, text in bad_cases.items():
         cv.write_text(text, encoding="utf-8")
