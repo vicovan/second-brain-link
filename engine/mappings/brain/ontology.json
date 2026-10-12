@@ -1,0 +1,671 @@
+{
+ "_comment": "Brain ontology: the object types and relations a built brain exposes, derived deterministically from a note's frontmatter (type + category + kind). No AI decides anything here. graphdata.py counts real nodes/edges against this file to emit graph.json `ontology`; Studio and the website draw from that block. First matching object wins, so specific rules (category/kind) come before generic ones. `subject` limits an object to personal or company brains; omit it for both. Relations describe the DIRECTION and human label of an existing graph.json edge type; stored edges stay undirected (retrieval parity). Override with --mappings <dir>/brain/ontology.json. Plan: second-brain-link-docs/docs-ontology/.",
+ "version": 1,
+ "meta_types": [
+  "note",
+  "moc",
+  "catalog",
+  "guide",
+  "health",
+  "structure",
+  "dashboard",
+  "coverage",
+  "document-index",
+  "document-category",
+  "synthesis",
+  "goal",
+  "routine",
+  "run",
+  "report",
+  "memory",
+  "correlation-person",
+  "correlation-org",
+  "correlation-edges",
+  "correlation-documents",
+  "interests",
+  "reactions",
+  "saved",
+  "voice",
+  "reputation",
+  "outreach-draft",
+  "search"
+ ],
+ "meta_layers": [
+  "jobs",
+  "fundraising",
+  "travel",
+  "agentwork",
+  "goals",
+  "memory"
+ ],
+ "objects": [
+  {
+   "id": "organization",
+   "label": "Organization",
+   "subject": "company",
+   "match": {
+    "type": "organization"
+   },
+   "meaning": "The company this brain is about — everything else links back here.",
+   "color_var": "--t-organization",
+   "icon": "building",
+   "also": [
+    {
+     "type": "company",
+     "category": "self"
+    }
+   ]
+  },
+  {
+   "id": "me",
+   "label": "Me",
+   "subject": "personal",
+   "match": {
+    "type": "identity"
+   },
+   "meaning": "You — profile, roles, skills; the root of the brain.",
+   "color_var": "--t-identity",
+   "icon": "user"
+  },
+  {
+   "id": "person",
+   "label": "Person",
+   "match": {
+    "type": "person"
+   },
+   "meaning": "Someone in this company's world: employee, contact or partner. However many exports named them, one note.",
+   "meaning_person": "Someone you know. Every platform that knows them points at this one note.",
+   "color_var": "--t-person",
+   "icon": "user"
+  },
+  {
+   "id": "account",
+   "label": "Account",
+   "subject": "company",
+   "match": {
+    "type": "company",
+    "category": "customer"
+   },
+   "meaning": "A customer. Its deals, contacts and documents link here.",
+   "color_var": "--t-company",
+   "icon": "briefcase"
+  },
+  {
+   "id": "team",
+   "label": "Team",
+   "subject": "company",
+   "match": {
+    "type": "company",
+    "category": "department"
+   },
+   "meaning": "A department or group; its members link in.",
+   "color_var": "--t-company",
+   "icon": "users"
+  },
+  {
+   "id": "channel",
+   "label": "Channel",
+   "subject": "company",
+   "match": {
+    "type": "company",
+    "category": "channel"
+   },
+   "meaning": "A room a team talks in — who is in it, never what was said.",
+   "color_var": "--t-company",
+   "icon": "hash"
+  },
+  {
+   "id": "project",
+   "label": "Project",
+   "subject": "company",
+   "match": {
+    "type": "company",
+    "category": "project"
+   },
+   "meaning": "A body of tracked work and the people on it.",
+   "color_var": "--t-company",
+   "icon": "kanban"
+  },
+  {
+   "id": "wiki-space",
+   "label": "Wiki space",
+   "subject": "company",
+   "match": {
+    "type": "company",
+    "category": "wiki-space"
+   },
+   "meaning": "A knowledge space and who writes in it.",
+   "color_var": "--t-company",
+   "icon": "book"
+  },
+  {
+   "id": "company",
+   "label": "Company",
+   "match": {
+    "type": "company"
+   },
+   "meaning": "An organization named somewhere in your data.",
+   "meaning_person": "A company you worked at, follow, or know people at.",
+   "color_var": "--t-company",
+   "icon": "building"
+  },
+  {
+   "id": "campaign",
+   "label": "Campaign",
+   "subject": "company",
+   "match": {
+    "type": "deal",
+    "kind": "campaign"
+   },
+   "meaning": "A marketing campaign and the accounts it reached.",
+   "color_var": "--t-deal",
+   "icon": "megaphone"
+  },
+  {
+   "id": "deal",
+   "label": "Deal",
+   "subject": "company",
+   "match": {
+    "type": "deal"
+   },
+   "meaning": "An opportunity: stage, value, account.",
+   "color_var": "--t-deal",
+   "icon": "handshake"
+  },
+  {
+   "id": "post",
+   "label": "Post",
+   "match": {
+    "type": "post"
+   },
+   "meaning": "Something published — by the company, or about it.",
+   "meaning_person": "Something you published.",
+   "color_var": "--t-post",
+   "icon": "pen"
+  },
+  {
+   "id": "meeting",
+   "label": "Meeting",
+   "match": {
+    "type": "meetings"
+   },
+   "meaning": "Who met whom, and when — signal, not content.",
+   "color_var": "--t-meetings",
+   "icon": "calendar"
+  },
+  {
+   "id": "event",
+   "label": "Event",
+   "match": {
+    "type": "events"
+   },
+   "meaning": "Events attended or hosted.",
+   "color_var": "--t-events",
+   "icon": "calendar"
+  },
+  {
+   "id": "document",
+   "label": "Document",
+   "match": {
+    "type": "document"
+   },
+   "meaning": "A file from a linked store, filed by area.",
+   "color_var": "--t-document",
+   "icon": "file"
+  },
+  {
+   "id": "place",
+   "label": "Place",
+   "match": {
+    "type": "place"
+   },
+   "meaning": "A location: offices, venues, saved places.",
+   "color_var": "--t-place",
+   "icon": "pin"
+  },
+  {
+   "id": "purchase",
+   "label": "Purchase",
+   "subject": "personal",
+   "match": {
+    "type": "purchase"
+   },
+   "meaning": "Something bought, and from whom.",
+   "color_var": "--t-purchase",
+   "icon": "cart"
+  },
+  {
+   "id": "market-view",
+   "label": "Market view",
+   "match": {
+    "type": "mirror"
+   },
+   "meaning": "How platforms and their algorithms see you.",
+   "color_var": "--t-mirror",
+   "icon": "eye"
+  },
+  {
+   "id": "career",
+   "label": "Career",
+   "subject": "personal",
+   "match": {
+    "type": "career"
+   },
+   "meaning": "Roles, applications, and the path between them.",
+   "color_var": "--t-career",
+   "icon": "briefcase"
+  }
+ ],
+ "relations": [
+  {
+   "edge_type": "works_at",
+   "from": [
+    "person"
+   ],
+   "to": [
+    "organization",
+    "account",
+    "company"
+   ],
+   "label": "works at",
+   "inverse": "employs"
+  },
+  {
+   "edge_type": "member_of",
+   "from": [
+    "person"
+   ],
+   "to": [
+    "team",
+    "channel",
+    "project",
+    "wiki-space",
+    "account",
+    "organization",
+    "company"
+   ],
+   "label": "member of",
+   "inverse": "has member",
+   "label_by_to": {
+    "account": "contact at",
+    "organization": "listed by"
+   }
+  },
+  {
+   "edge_type": "account_of",
+   "from": [
+    "deal",
+    "campaign"
+   ],
+   "to": [
+    "account",
+    "company"
+   ],
+   "label": "deal for",
+   "inverse": "has deal"
+  },
+  {
+   "edge_type": "published_by",
+   "from": [
+    "post"
+   ],
+   "to": [
+    "organization",
+    "company",
+    "me"
+   ],
+   "label": "posted by",
+   "inverse": "posted"
+  },
+  {
+   "edge_type": "attended",
+   "from": [
+    "person",
+    "me"
+   ],
+   "to": [
+    "meeting",
+    "event"
+   ],
+   "label": "attended",
+   "inverse": "attended by"
+  },
+  {
+   "edge_type": "authored",
+   "from": [
+    "document"
+   ],
+   "to": [
+    "person"
+   ],
+   "label": "authored by",
+   "inverse": "authored"
+  },
+  {
+   "edge_type": "mentions",
+   "from": [
+    "document"
+   ],
+   "to": [
+    "person",
+    "account",
+    "company"
+   ],
+   "label": "mentions",
+   "inverse": "mentioned in"
+  },
+  {
+   "edge_type": "about",
+   "from": [
+    "document"
+   ],
+   "to": [
+    "account",
+    "company",
+    "person"
+   ],
+   "label": "about",
+   "inverse": "documented in"
+  },
+  {
+   "edge_type": "in_category",
+   "from": [
+    "document"
+   ],
+   "to": [
+    "document"
+   ],
+   "label": "filed under",
+   "inverse": "contains"
+  },
+  {
+   "edge_type": "purchased_from",
+   "from": [
+    "purchase",
+    "me"
+   ],
+   "to": [
+    "company"
+   ],
+   "label": "bought from",
+   "inverse": "sold to"
+  },
+  {
+   "edge_type": "correlated",
+   "from": [
+    "person"
+   ],
+   "to": [
+    "person"
+   ],
+   "label": "same person as",
+   "inverse": "same person as"
+  },
+  {
+   "edge_type": "linked",
+   "from": [],
+   "to": [],
+   "label": "linked to",
+   "inverse": "linked from"
+  }
+ ],
+ "source_objects": {
+  "_comment": "Which objects each source can produce (pre-build: brain_structure.json ontology_suggested). A source's own subject (personal/company) follows its adapter package.",
+  "linkedin": [
+   "me",
+   "person",
+   "company",
+   "post",
+   "career"
+  ],
+  "facebook": [
+   "me",
+   "person",
+   "company",
+   "post",
+   "event",
+   "place",
+   "market-view"
+  ],
+  "instagram": [
+   "me",
+   "person",
+   "post",
+   "place"
+  ],
+  "google": [
+   "person",
+   "event",
+   "place"
+  ],
+  "amazon": [
+   "purchase",
+   "post",
+   "market-view"
+  ],
+  "x": [
+   "me",
+   "person",
+   "post"
+  ],
+  "whatsapp": [
+   "person"
+  ],
+  "github": [
+   "me",
+   "person",
+   "post"
+  ],
+  "youtube": [
+   "post"
+  ],
+  "strava": [
+   "me",
+   "event",
+   "place",
+   "company"
+  ],
+  "reddit": [
+   "post"
+  ],
+  "spotify": [
+   "market-view"
+  ],
+  "tiktok": [
+   "me",
+   "person"
+  ],
+  "linkedin_company": [
+   "organization",
+   "person",
+   "team",
+   "post",
+   "market-view"
+  ],
+  "google_workspace": [
+   "organization",
+   "person",
+   "team",
+   "meeting"
+  ],
+  "slack": [
+   "organization",
+   "person",
+   "channel"
+  ],
+  "notion": [
+   "post"
+  ],
+  "confluence": [
+   "wiki-space",
+   "post"
+  ],
+  "jira": [
+   "project",
+   "person"
+  ],
+  "salesforce": [
+   "account",
+   "person",
+   "deal",
+   "campaign"
+  ],
+  "hubspot": [
+   "account",
+   "person",
+   "deal"
+  ],
+  "zendesk": [
+   "account",
+   "person"
+  ],
+  "email": [
+   "person"
+  ],
+  "microsoft365": [
+   "person"
+  ],
+  "teams": [
+   "person",
+   "channel"
+  ],
+  "git_docs": [
+   "document",
+   "person"
+  ],
+  "google_drive": [
+   "document",
+   "person"
+  ]
+ },
+ "questions": [
+  {
+   "t": "Accounts by pipeline",
+   "short": "Accounts by pipeline",
+   "q": "Which accounts have the most deals, and what is their total value?",
+   "requires": [
+    "account",
+    "deal"
+   ],
+   "subject": "company"
+  },
+  {
+   "t": "Who knows this account",
+   "short": "Who knows our customers",
+   "q": "For our top accounts, who on our side has the strongest connection to each?",
+   "requires": [
+    "account",
+    "person"
+   ],
+   "subject": "company"
+  },
+  {
+   "t": "Team map",
+   "short": "Summarize our teams",
+   "q": "Summarize our teams and channels: who is in each, and who bridges them?",
+   "requires": [
+    "person",
+    "team"
+   ],
+   "subject": "company"
+  },
+  {
+   "t": "Single points of knowledge",
+   "short": "Single points of knowledge",
+   "q": "Which people are the only link to an account, channel or project?",
+   "requires": [
+    "person",
+    "channel"
+   ],
+   "subject": "company"
+  },
+  {
+   "t": "Campaign reach",
+   "short": "Which campaigns reached accounts",
+   "q": "Which campaigns are linked to accounts that later had deals?",
+   "requires": [
+    "campaign",
+    "account"
+   ],
+   "subject": "company"
+  },
+  {
+   "t": "What we wrote",
+   "short": "What we've published",
+   "q": "What have we published, and which topics come up most?",
+   "requires": [
+    "post"
+   ],
+   "subject": "company"
+  },
+  {
+   "t": "Documents by area",
+   "short": "Our documents by area",
+   "q": "What documents do we have, by area, and which accounts do they mention?",
+   "requires": [
+    "document"
+   ],
+   "subject": "company"
+  },
+  {
+   "t": "Strongest relationships",
+   "short": "My strongest relationships",
+   "q": "Who are my strongest relationships across every platform?",
+   "requires": [
+    "person"
+   ],
+   "subject": "personal"
+  },
+  {
+   "t": "Companies in my network",
+   "short": "Where my network works",
+   "q": "Which companies do the most people in my network work at?",
+   "requires": [
+    "person",
+    "company"
+   ],
+   "subject": "personal"
+  },
+  {
+   "t": "Places I meant to go",
+   "short": "Places I saved",
+   "q": "Which places have I saved but never visited?",
+   "requires": [
+    "place"
+   ],
+   "subject": "personal"
+  }
+ ],
+ "metrics": [
+  {
+   "id": "people",
+   "label": "People",
+   "count_of": "person"
+  },
+  {
+   "id": "accounts",
+   "label": "Accounts",
+   "count_of": "account"
+  },
+  {
+   "id": "deals",
+   "label": "Deals",
+   "count_of": "deal"
+  },
+  {
+   "id": "channels",
+   "label": "Channels",
+   "count_of": "channel"
+  },
+  {
+   "id": "documents",
+   "label": "Documents",
+   "count_of": "document"
+  },
+  {
+   "id": "merged",
+   "label": "Resolved across sources",
+   "merged": true
+  }
+ ]
+}

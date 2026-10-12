@@ -31,8 +31,9 @@ unrelated lanes in the same week is itself a signal recruiters read.
 | 5 | **Geography and work mode** | 10 | Where the job is and how it is worked, against the profile's mode table. A knock-out (right to work, must-be-based-in, required language) never reaches scoring — `knockout.py` removed it. |
 | 6 | **Company quality and stage** | 10 | Funding, product reality, investor credibility. An agency repost for an unnamed client scores at the bottom regardless of the title. |
 
-Freshness and a confirmed direct application form are **gates**, not points: a stale repost or an
-account wall does not reach the shortlist (workflow step 5b).
+Freshness is a **gate**, not points: a stale repost does not reach the shortlist. An account wall
+is decided by criteria `walled:` — with `surface` (the default) it reaches the shortlist as a
+hand-off row and scores like any other; with `drop` it does not (workflow step 5b).
 
 ### Shortlist likelihood — the 30 points that decide interviews
 

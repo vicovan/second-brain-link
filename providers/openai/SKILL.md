@@ -127,6 +127,11 @@ the mirror emit). The full self-improvement loop is in step 6b.
    `.obsidian/graph.json`, writes a `.bak`), and `copilot-prompts/` (`/warm-intro`,
    `/investor-paths`, `/reconnect`, `/job-fit`, `/ask-my-network`, **`/mine`**, **`/for-me`**).
    Then act on the prompts in the user's voice.
+   **Read `graph.json` → `ontology` first** (object types + labelled relations + counts,
+   `merged` = 2+ sources; nodes carry `object`, merged people/orgs `field_sources`), and get
+   every number from `scripts/query.py --ask objects|relations|accounts-by-deals|top-by` —
+   never estimate. Before a build, show `brain_structure.md`'s **Before you build** ontology and ask
+   "Does this read right?".
    **Answer questions by traversing `graph.json`** (schema sbl-graph/1, at every brain
    root): nodes (id = note path sans `.md`) + TYPED weighted edges (`works_at`/`member_of`/
    `attended`/`purchased_from`/`correlated`/`linked`, `w` ∈ (0,1]) + ordered layers.

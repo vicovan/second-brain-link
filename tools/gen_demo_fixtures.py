@@ -986,7 +986,9 @@ def gen_acme_docs(out_root, W):
         # RELATIVE to the link folder, so the demo works wherever the data folder is copied
         "root": "../../../" + DOCS_STORE,
         "mode": "local", "layout": "auto", "include": ["**"], "exclude": [],
-        "vcs": "auto", "copy_files": True,
+        # "none": the demo docs folder lives INSIDE the website/studio repositories, so the
+        # local repository history would bring THEIR commit authors (a real person) into the demo.
+        "vcs": "none", "copy_files": True,
         "max_copy_bytes": 25 * 1024 * 1024, "max_total_copy_bytes": 2 * 1024 * 1024 * 1024,
         "rules": {}, "connector": None,
         "created": "2026-10-01T09:00:00Z", "created_by": "gen_demo_fixtures",

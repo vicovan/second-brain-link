@@ -1,16 +1,28 @@
 {
   "name": "fundraising",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Run a raise from Claude Code or from inside Second Brain Studio: screen and verify funds and programs against your own filter chain, build a dated funding plan, draft applications and investor emails, and track every conversation as an indexed layer of your Second Brain. Emails are drafted, never sent.",
-  "author": {"name": "Second Brain Link", "url": "https://secondbrainlink.com"},
+  "author": {
+    "name": "Second Brain Link",
+    "url": "https://secondbrainlink.com"
+  },
   "homepage": "https://secondbrainlink.com",
   "license": "MIT",
-  "keywords": ["fundraising", "investors", "accelerators", "venture", "pitch", "second-brain", "obsidian"],
+  "keywords": [
+    "fundraising",
+    "investors",
+    "accelerators",
+    "venture",
+    "pitch",
+    "second-brain",
+    "obsidian"
+  ],
   "network": {
     "required": true,
-    "why": "Research reads public fund and program pages; applications are filled through the user's own browser; email is written as Gmail drafts, never sent. The Second Brain Link engine itself stays zero-network; this plugin is a separate distribution surface and declares its access here.",
+    "why": "Research reads public fund and program pages and public discussion threads (read only — nothing is ever posted); applications are filled through the user's own browser; email is written as Gmail drafts, never sent. The Second Brain Link engine itself stays zero-network; this plugin is a separate distribution surface and declares its access here.",
     "endpoints": [
       "fund and accelerator websites reached by WebSearch / WebFetch",
+      "public discussion pages (LinkedIn posts, X, Hacker News, Reddit) reached by WebSearch / WebFetch — read only; never logged in to, never posted to",
       "program application forms (typeform.com, tally.so, fillout.com, docs.google.com/forms, program portals) through the Chrome integration",
       "gmailmcp.googleapis.com via the Gmail connector — draft creation only, never send"
     ]

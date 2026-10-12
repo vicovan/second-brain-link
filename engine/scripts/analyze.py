@@ -34,6 +34,7 @@ tags (set by the builder), which power the dashboard's by-source tables, the gra
 colors, and the field-enrichment-by-source matrix in _DATA_POINTS.md.
 """
 import argparse
+import json
 import re
 import shutil
 from collections import Counter, defaultdict
@@ -391,6 +392,7 @@ def build_data_catalog(brain: Path, people):
     subject, lay = brain_layout(brain)
     PPL, ORG, PLC = lay["people"], lay["orgs"], lay["places"]
     VOI, MIR, SRCH, LRN = lay["voice"], lay["mirror"], lay["search"], lay["learning"]
+    onto = _graph_ontology(brain)
     ppl_n, ppl_src, ppl_fields = scan_layer(brain, PPL)
     org_n, org_src, _ = scan_layer(brain, ORG)
     plc_n, plc_src, _ = scan_layer(brain, PLC, exclude=("places.md",))
@@ -448,8 +450,9 @@ def build_data_catalog(brain: Path, people):
          ] + ([("Documents", f"{doc_n} ({doc_stub} metadata-only)", f"`{DOC}/`",
                 "title, category, doc_type, entity, authors, updated, version, sensitivity")]
               if doc_n else []), ["Node type", "Count", "Where", "Key fields"]), "",
+         ] + _ontology_section(onto) + [
          "## Relations (edges)", "",
-         _table([
+         _table(_ontology_relation_rows(onto) if (subject == "company" and onto.get("relations")) else [
              ("person —works_at→ org", works_at, "`#person` `company`", "people with a company"),
              ("you —knows→ person", f"{warm}/{dormant}/{cold}", "`status`", "warm / dormant / cold"),
              ("you —messaged→ person", corr, "`last_contact`", "people you've actually contacted"),
@@ -499,7 +502,12 @@ def build_data_catalog(brain: Path, people):
         L += ["_No files are awaiting a mapping — coverage is clean._"]
     L += [""]
 
-    # schema graph
+    # schema graph — a company brain draws its ONTOLOGY (objects + labelled relations)
+    if subject == "company" and onto.get("objects"):
+        L += ["## Schema (Mermaid)", ""] + _ontology_mermaid(onto) + ["", "## Mineable questions", ""]
+        L += [f"- {q['q']}" for q in onto.get("questions", [])] or ["- Who knows whom, across which tools?"]
+        L += ["", "_See `95-goals/` for ready plays._"]
+        return "\n".join(L)
     L += ["## Schema (Mermaid)", "", "```mermaid", "graph LR",
           "  YOU((You))", "  YOU --> P[People]", "  YOU --> V[Voice: posts/comments/reactions]",
           "  YOU --> I[Interests]", "  YOU --> PL[Places]", "  YOU --> E[Events]",
@@ -513,6 +521,54 @@ def build_data_catalog(brain: Path, people):
           "- Which places cluster geographically (open Map View)?",
           "", "_See `95-goals/data-mining.md` for ready plays, and the `/mine` Copilot command._"]
     return "\n".join(L)
+
+
+def _graph_ontology(brain: Path):
+    """graph.json's `ontology` block (object types + labelled relations, counted by
+    graphdata.py from mappings/brain/ontology.json), or {} on an older brain."""
+    try:
+        g = json.loads((Path(brain) / "graph.json").read_text(encoding="utf-8"))
+        return g.get("ontology") or {}
+    except Exception:
+        return {}
+
+
+def _ontology_section(onto):
+    """`## Ontology` — the object types the brain holds, merged counts and sources."""
+    objs = onto.get("objects") or []
+    if not objs:
+        return []
+    rows = [(o["label"], o["count"], o.get("merged") or "",
+             ", ".join(f"{s} ({n})" for s, n in list((o.get("sources") or {}).items())[:4]) or "—",
+             o.get("meaning", "")) for o in objs]
+    return ["## Ontology — what this brain is made of", "",
+            "What this brain is made of: every object type, how many, how many were "
+            "**resolved** from two or more sources (matched by name), and where they came from. "
+            "Counted from the notes by `graphdata.py` (`graph.json` → `ontology`); Studio's "
+            "**Ontology** tab draws the same thing.", "",
+            _table(rows, ["Object", "Count", "Resolved", "Sources", "Meaning"]), ""]
+
+
+def _ontology_relation_rows(onto):
+    lab = {o["id"]: o["label"] for o in onto.get("objects", [])}
+    return [(f"{lab.get(r['from'], r['from'])} —{r['label']}→ {lab.get(r['to'], r['to'])}",
+             r["count"], f"`{r['edge_type']}`",
+             f"{r.get('cross_source', 0)} link across sources" if r.get("cross_source") else "")
+            for r in onto.get("relations", []) if r.get("edge_type") != "linked" or r["count"] >= 3]
+
+
+def _ontology_mermaid(onto):
+    ids = {o["id"]: f"O{i}" for i, o in enumerate(onto.get("objects", []))}
+    out = ["```mermaid", "flowchart LR"]
+    for o in onto.get("objects", []):
+        merged = f" · merged {o['merged']}" if o.get("merged") else ""
+        label = re.sub(r'[\[\]()"|<>]', " ", f"{o['label']} · {o['count']}{merged}")
+        out.append(f'  {ids[o["id"]]}["{label}"]')
+    for r in onto.get("relations", []):
+        if r["from"] in ids and r["to"] in ids and r["from"] != r["to"] and (r.get("edge_type") != "linked" or r["count"] >= 3):
+            out.append(f'  {ids[r["from"]]} -->|{r["label"]} · {r["count"]}| {ids[r["to"]]}')
+    out.append("```")
+    return out
 
 
 def _read_places(brain: Path):

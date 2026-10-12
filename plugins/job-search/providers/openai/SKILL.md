@@ -110,8 +110,11 @@ nothing; add `--dry-run` to see it first.
 - **Never invent a fact.** Not in the profile → ask.
 - **Never write a job title the user did not hold.** The profile carries a closed list
   of allowed variants per role; the CV may not go outside it.
-- **Never touch LinkedIn.** Its User Agreement forbids automated access and enforcement
-  lands on the user's account. Discovery is the public Greenhouse/Lever/Ashby APIs and
-  web search.
+- **LinkedIn: read its public job list only, and only if the user turned it on**
+  (`search-criteria.md` §3b `linkedin-public`). `scripts/linkedin_jobs.py` uses the no-login
+  search — no account, slow, capped, stops when throttled. Never apply, message or log in to
+  LinkedIn; resolve each posting to the employer's own site. Codex has no browser, so the
+  signed-in and Chrome-read routes are unavailable here; boards that block reading go through
+  web search instead.
 - **Never write outside `45-jobs/`** in the vault, except the report mirror that
   `scripts/publish_report.py` places in `_notes/job-pipeline/`.

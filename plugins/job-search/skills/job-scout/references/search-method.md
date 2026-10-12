@@ -17,13 +17,27 @@ the *sources* to reach it is expected — another ATS board, a remote-flagged pa
 *lanes* or lower the floor to reach a number: a padded list is how a week of applications goes out
 to roles the candidate was never going to be shortlisted for. Say plainly how thin the day was.
 
-## 2. Source order — open boards before aggregators
+## 2. Source order — market, then companies, then their own sites
 
-Sweep **open ATS boards first** (`ats_pool.py`), then LinkedIn's public guest search, then targeted
-web search for what neither covers. This ordering is not cosmetic: it is the difference between a
-shortlist that can be applied to and one that cannot. Sweeping an aggregator first surfaces jobs
-that turn out to sit behind account walls; sourcing from open boards makes the shortlist applyable
-by construction.
+1. **Discovery, per market** (`sources.md` Tier 0, `regional-sources.md`): LinkedIn's public
+   search, the market's regional boards and recruiters, search engines — all limited to what was
+   posted since the last run (`scout_state.py since-seconds`).
+2. **The company registry** (Tier 1): every company discovery named, swept at its own careers
+   board — the full list, the real posting date, the real apply link.
+3. **The open ATS pool** and Y Combinator (Tier 1b, Tier 3) for US and EU tech.
+
+Then `scout_state.py merge` collapses the same job seen on several sources into one row and marks
+what is new since the last run, and `scout_state.py coverage` decides whether every market was
+actually searched.
+
+**Never conclude a market is empty from one source.** The open ATS boards cover US and EU tech
+well and the Gulf hardly at all; a sweep that used only them once reported "zero" in a market with
+hundreds of live roles. The coverage gate exists so that cannot happen silently: a market with no
+in-lane rows from fewer than three sources is a failure to widen, not a result to report.
+
+**Applyability comes after discovery, not instead of it.** A walled portal (Workday,
+SuccessFactors) is surfaced with the portal named when criteria `walled: surface` — it is a role
+the user applies to themselves, not a role to hide.
 
 ## 3. Exclude before you score
 
@@ -53,11 +67,11 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-apply/scripts/detect_portal.py "<url>" 
 | Result | What to do |
 |---|---|
 | `linkedin` | **Resolve it first** — find the employer's own board (`site:job-boards.greenhouse.io "<company>"`, the company's `/careers` page). Classify the resolved URL, never the aggregator mirror. |
-| `walled` | An account wall. Claude cannot create accounts, so **drop it from the shortlist** and list it under "excluded — account wall". |
+| `walled` | An account wall. Claude cannot create accounts. Criteria `walled: surface` (the default): keep and rank it, Apply column `⛔ <portal> — you apply`. `walled: drop`: list it under "excluded — account wall". |
 | `fillable` | Keep, and **record the real apply URL in the report** so the apply step does not have to rediscover it. |
 | `unknown` | Fetch the page and look for an account wall (*create an account · sign up to apply · register to apply · log in to apply · set a password*). Treat as walled only if found. |
 
-The report's Apply column carries `✅ direct form (<ats>)` · `⛔ account wall` · `✉️ email only` ·
+The report's Apply column carries `✅ direct form (<ats>)` · `⛔ <portal> — you apply` · `✉️ email only` ·
 `? unverified`. This costs a few fetches per run and saves the user discovering the wall themselves
 after reading a role they liked. It is not optional.
 

@@ -133,8 +133,10 @@ Oracle HCM, Avature, Eightfold, Phenom, Cornerstone). For an unknown site, treat
 as a wall: *create an account, sign up to apply, register to apply, log in to apply, set a password,
 confirm password, create a candidate account*.
 
-On a wall: log the job as `skipped_walled`, tell the user the company, the role and the URL in one line,
-and move to the next. Do not spend further tokens on it.
+On a wall: never register. With criteria `walled: drop`, log the job as `skipped_walled`, tell the
+user the company, the role and the URL in one line, and move on. With `walled: surface` (the
+default), prepare the CV and answers and hand off at the portal (job-apply step 7b,
+`handoff_portal`).
 
 ## 6b. HOW to fill a field so it actually registers — learned the hard way
 

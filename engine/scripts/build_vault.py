@@ -120,6 +120,34 @@ def _yaml_scalar(v):
         return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
     return s
 
+def _company_asks(col):
+    """Three starter questions for a Company Brain's Home, picked from the ontology's
+    question set by the objects this brain's sources produce (mappings/brain/ontology.json);
+    the founders/customers/docs trio is the fallback."""
+    fallback = ["Who are our founders, board and team, and what does each of them own?",
+                "Summarise what we've committed to each customer, with the documents behind it.",
+                "Which documents should a new hire read first, and in what order?"]
+    try:
+        import ontology as _ontology
+        objs = {o["id"] for o in _ontology.suggest(sorted(col.sources), "company")["objects"]}
+        if getattr(col, "documents", None):
+            objs.add("document")
+        qs = [q["q"] for q in _ontology.questions_for(objs, "company", limit=3)]
+    except Exception:
+        qs = []
+    return (qs + fallback)[:3]
+
+
+def _field_sources(rec):
+    """`field_sources:` — which export supplied each merged field ("company: slack"),
+    rendered ONLY when the entity was merged from 2+ sources (a single-source note
+    needs no attribution). Read by graphdata.py → graph.json node.field_sources."""
+    prov = rec.get("prov") or {}
+    if len(rec.get("sources") or ()) < 2 or not prov:
+        return {}
+    return {"field_sources": [f"{f}: {s}" for f, s in sorted(prov.items()) if s]}
+
+
 def fm(d):
     """Render a dict as an Obsidian YAML frontmatter block (between `---` fences).
 
@@ -388,7 +416,7 @@ ARTIFACT_ROLES = [
     ("_SUMMARY.md", "Seed counts — per-layer note counts + the coverage line (+ goal layer once analyzed)."),
     ("_COVERAGE.md", "Per-file coverage: mapped / routed / harvested / uncategorized / quarantined, + a 'Needs a mapping' backlog."),
     ("_BUILD_REPORT.md", "What this build detected/extracted (sources, notes, log)."),
-    ("graph.json", "Machine-readable typed graph (sbl-graph/1): nodes + weighted edges + layers — what the Studio Neural view / retrieval and agents traverse. (NOT `.obsidian/graph.json`, which is Obsidian's own graph-styling config.)"),
+    ("graph.json", "Machine-readable typed graph (sbl-graph/1): nodes + weighted edges + layers + the ontology (object types, labelled relations, merged counts) — what the Studio Neural view / retrieval and agents traverse. (NOT `.obsidian/graph.json`, which is Obsidian's own graph-styling config.)"),
     ("_assets/", "Bundled media copied from the export (avatars under `_assets/avatars/`); nothing is ever fetched."),
     ("Dashboard.md", "Live Dataview tables (warm/dormant ties, clusters, by-source) — written by analyze.py."),
     ("_DATA_POINTS.md", "Catalog of every node type + relation + which source enriched each field — written by analyze.py."),
@@ -682,6 +710,7 @@ class VaultWriter:
             for f_ in ("company", "role"):
                 if alt.get(f_):
                     fmd[f"alt_{f_}"] = [f"{v} ({src})" for v, src in alt[f_]]
+            fmd.update(_field_sources(r))
             note = fm(fmd)
             sub = f"{r.get('role','')}{' at ' + link(comp) if comp else ''}".strip()
             alt_lines = ""
@@ -738,7 +767,10 @@ class VaultWriter:
                    "industry": meta.get("industry", ""),
                    "size": meta.get("size", ""),
                    "domain": meta.get("domain", ""),
-                   "known_contacts": counts.get(name, 0),
+                   # LinkedIn's connection count when the export has it; otherwise the
+                   # people this brain actually links to the org (a company brain's
+                   # CRM contacts / employees) — never a hard 0 beside a full list
+                   "known_contacts": counts.get(name, 0) or len(people_by_org.get(nk(name), [])),
                    "location": meta.get("location", "")}
             fmd.update(self._geo(meta.get("location", "")))
             lb = (getattr(self.col, "org_logos", {}) or {}).get(name)
@@ -748,6 +780,7 @@ class VaultWriter:
             for f_ in ("industry", "location"):
                 if alt_o.get(f_):
                     fmd[f"alt_{f_}"] = [f"{v} ({src})" for v, src in alt_o[f_]]
+            fmd.update(_field_sources(meta))
             note = fm(fmd)
             details = _details_block(meta)
             # Declutter: a "thin" org (few references AND no metadata) goes to a
@@ -1767,6 +1800,7 @@ class VaultWriter:
             if getattr(self, "_docs_count", 0):
                 starts.append("- [[Documents]] — every document, by area")
             starts.append("- [[network-map]] — the people and organizations around the company")
+            asks = "\n".join(f'> - "{q}"' for q in _company_asks(c))
             body = f"""{fm({"type": "moc", "tags": ["moc", "home"], "title": "Home",
                         "sources": sorted(c.sources)})}
 
@@ -1775,9 +1809,7 @@ class VaultWriter:
 The Company Brain of **{name}**, built from **{srcs}**. Start here, then ask your AI anything.
 
 > [!tip] Try asking your AI
-> - "Who are our founders, board and team, and what does each of them own?"
-> - "Summarise what we've committed to each customer, with the documents behind it."
-> - "Which documents should a new hire read first, and in what order?"
+{asks}
 
 ## Start here
 {chr(10).join(starts)}

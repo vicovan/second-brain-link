@@ -1,20 +1,37 @@
 {
   "name": "job-search",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Run a whole job hunt from Claude Code or from inside Second Brain Studio: sweep the market against your own criteria, tailor a CV per role, fill the application, and keep the results as an indexed layer of your Second Brain.",
-  "author": {"name": "Second Brain Link", "url": "https://secondbrainlink.com"},
+  "author": {
+    "name": "Second Brain Link",
+    "url": "https://secondbrainlink.com"
+  },
   "homepage": "https://secondbrainlink.com",
   "license": "MIT",
-  "keywords": ["jobs", "job-search", "cv", "resume", "ats", "second-brain", "obsidian"],
+  "keywords": [
+    "jobs",
+    "job-search",
+    "cv",
+    "resume",
+    "ats",
+    "second-brain",
+    "obsidian"
+  ],
   "network": {
     "required": true,
-    "why": "Job discovery reads public, unauthenticated job-board APIs. The Second Brain Link engine itself stays zero-network; this plugin is a separate distribution surface and declares its access here.",
+    "why": "Job discovery reads public job listings: open job-board APIs, the employers' own careers boards, and — only if the user turns it on in their search criteria — LinkedIn's public, no-login job search. It never logs in to a job board. The Second Brain Link engine itself stays zero-network; this plugin is a separate distribution surface and declares its access here.",
     "endpoints": [
       "boards-api.greenhouse.io",
       "api.lever.co",
       "api.ashbyhq.com",
+      "api.smartrecruiters.com",
+      "<company>.recruitee.com",
+      "<company>.jobs.personio.de",
+      "<company>.teamtailor.com",
+      "<tenant>.myworkdayjobs.com",
+      "www.linkedin.com (public job search only, when enabled in the user's criteria)",
       "www.ycombinator.com",
-      "employer career pages reached by WebFetch on a specific posting"
+      "employer career pages and job boards reached by WebFetch"
     ]
   }
 }

@@ -140,6 +140,26 @@ fence; Office text extracted); stubs carry only a warning callout + metadata tab
 re-imported archives can't inflate strength. **Bodies are never read** — this is
 the entire representation of every chat/inbox in the vault.
 
+## 2b. The ontology (object types + relations)
+Notes are typed by frontmatter; the **ontology** names what they ARE for a reader.
+`engine/mappings/brain/ontology.json` maps `(type, category, kind)` → an object
+(`company`+`customer` → **Account**, `company`+`department` → **Team**, `company`+`channel`
+→ **Channel**, `company`+`project` → **Project**, `company`+`wiki-space` → **Wiki space**,
+`company`+`self` → **Organization**, `deal`+`kind: campaign` → **Campaign**, `deal` → **Deal**,
+`person`, `post`, `meetings` → **Meeting**, `events` → **Event**, `document`, `place`,
+`purchase`, `mirror` → **Market view**, `career`), and gives each graph.json edge type a
+direction + label (`account_of`: Deal → Account "deal for"; `member_of` to an Account reads
+"contact at"). `source_objects` says which objects each source can produce (the pre-build
+suggestion). Meta notes (MOCs, reports, aggregates) and plugin/harness layers are never
+objects. **Resolved** = an entity seen in 2+ exports and matched by name into one note; such people/org notes carry
+`field_sources: ["company: slack", …]` (which export supplied each field — `alt_*` keeps the
+losing claims). Ticket volume is a metric on Account, not an object (ticket text is never read).
+Outputs: `graph.json` → `ontology{objects, relations, questions, metrics, merged_nodes}` +
+node `object`/`category`/`kind`/`field_sources`; `brain_structure.json` →
+`ontology_suggested`; `_DATA_POINTS.md` → "Ontology — object types" (company brains also get
+ontology-worded relations + schema); Home.md's company prompts; `query.py --ask
+objects|relations|accounts-by-deals|top-by`. Studio's **Ontology** tab and the website draw it.
+
 ## 3. Generated artifacts (brain root)
 `Home.md` (MOC, subject-aware layer legend) · `CLAUDE.md`/`AGENTS.md` (agent
 guide) · `_STRUCTURE.md` (per-subject role map) · `_SUMMARY.md` · `_COVERAGE.md`
@@ -175,6 +195,9 @@ A new source/field must register at every hop, or it silently disappears:
 2. **Adapter/mapping** — pass the field (mappings support `extra: {…}` capture).
 3. **Renderer** (`build_vault.py`) — frontmatter + body, via `self.L(key)` folders.
 4. **analyze read-back** (`read_people` / `scan_layer` / `_read_places`).
-5. **Studio** — `TYPE_LABEL`/colors if a new note type.
-6. **This document + SOURCES.md** — the row for it.
+5. **Ontology** (`mappings/brain/ontology.json`) — a new note type/category becomes an
+   object (or a `meta_types` entry), a new edge type gets a relation label, and the source
+   lists the objects it produces under `source_objects`.
+6. **Studio** — `TYPE_LABEL`/colors if a new note type (`brain-ontology.ts` OBJECT_COLOR for a new object).
+7. **This document + SOURCES.md** — the row for it.
 Tests must cover: extraction, render, privacy sweep, refresh stability.

@@ -240,7 +240,8 @@ sweep is a correct result — never lower the floor or relax the criteria to fil
   `max-submits-per-run` (a cap on *submits*, so building more than it is expected — the gates
   stop some). Say which ones you are taking in one line, and stop submitting the moment
   `learn.py target` shows the target met. Skip
-  anything the scout marked walled, excluded, disqualified or knock-out, and never two roles at
+  anything the scout marked excluded, disqualified or knock-out (a walled row is a hand-off —
+  job-apply step 7b — when criteria `walled: surface`), and never two roles at
   the same company.
 
 Each chosen job then passes three more gates on its way to submit, whatever the level: the

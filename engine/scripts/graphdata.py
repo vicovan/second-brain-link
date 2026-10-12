@@ -101,7 +101,8 @@ def _parse_front(text):
         if m:
             key = m.group(1)
             val = m.group(2).strip()
-            fmd[key] = _unquote(val) if val else ""
+            # `key: []` is an empty YAML flow list, not the source/tag "[]"
+            fmd[key] = [] if val == "[]" else (_unquote(val) if val else "")
         elif key and re.match(r"^\s+-\s", line):
             item = _unquote(re.sub(r"^\s+-\s*", "", line).strip())
             if not isinstance(fmd.get(key), list):
@@ -227,6 +228,15 @@ def build_graph_json(brain_root, subject=None, entity=""):
                     node[f_num] = float(v) if "." in str(v) else int(float(v))
                 except (TypeError, ValueError):
                     pass
+        # ontology inputs: a company note's category (customer/channel/department…)
+        # and a deal's kind (deal/campaign) decide its object type
+        for f_str in ("category", "kind"):
+            v = fmd.get(f_str)
+            if isinstance(v, str) and v and node["type"] != "place":
+                node[f_str] = v
+        fs = fmd.get("field_sources")
+        if isinstance(fs, list) and fs:
+            node["field_sources"] = [str(x) for x in fs if str(x).strip()]
         for f_str in ("avatar", "avatar_url", "status", "relationship"):
             v = fmd.get(f_str)
             if isinstance(v, str) and v:
@@ -357,12 +367,29 @@ def build_graph_json(brain_root, subject=None, entity=""):
         return bool(sa) and bool(sb) and not (sa & sb)
 
     node_list = [notes[k] for k in sorted(notes)]
-    return {"schema": SCHEMA, "subject": subject,
+    # ---- ontology: object types + labelled relations, counted (no AI) ------
+    onto = {}
+    try:
+        import ontology as _ontology
+        spec = _ontology.load()
+        for n in node_list:
+            o = _ontology.object_of(n, subject, spec)
+            if o:
+                n["object"] = o
+        onto = _ontology.build(node_list, edge_list, subject, spec)
+    except Exception:
+        onto = {}
+    out = {"schema": SCHEMA, "subject": subject,
             "entity": entity or root.name.replace("-brain", ""),
             "generated": datetime.now().strftime("%Y-%m-%d"),
             "layers": layers, "nodes": node_list, "edges": edge_list,
             "stats": {"nodes": len(node_list), "edges": len(edge_list),
-                      "cross_source_edges": sum(1 for e in edge_list if _cross(e))}}
+                      "cross_source_edges": sum(1 for e in edge_list if _cross(e)),
+                      "merged_nodes": sum(1 for n in node_list
+                                          if len(n.get("sources") or []) > 1)}}
+    if onto:
+        out["ontology"] = onto
+    return out
 
 
 def write_graph_json(brain_root, subject=None, entity="", write_fn=None):

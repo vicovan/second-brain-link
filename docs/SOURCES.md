@@ -371,3 +371,39 @@ availability: Google Contacts vCard `PHOTO` → per-person avatars; LinkedIn con
 exports carry **no** photos; Facebook/Instagram carry your own profile media only;
 Slack/Workspace exports carry avatar **URLs** (`image_512`); most other sources carry none —
 the Studio's initials chips are the designed default, not a failure state.
+
+## Ontology objects per source
+
+What each source contributes to the brain's **ontology** (`engine/mappings/brain/ontology.json`
+→ `source_objects`; shown before a build as *Before you build — the ontology these exports will make* in `brain_structure.md`).
+An object fed by two or more sources is **merged** by name.
+
+| Source | Objects |
+|---|---|
+| `linkedin` | Me, Person, Company, Post, Career |
+| `facebook` | Me, Person, Company, Post, Event, Place, Market view |
+| `instagram` | Me, Person, Post, Place |
+| `google` | Person, Event, Place |
+| `amazon` | Purchase, Post, Market view |
+| `x` | Me, Person, Post |
+| `whatsapp` | Person |
+| `github` | Me, Person, Post |
+| `youtube` | Post |
+| `strava` | Me, Event, Place, Company |
+| `reddit` | Post |
+| `spotify` | Market view |
+| `tiktok` | Me, Person |
+| `linkedin_company` | Organization, Person, Team, Post, Market view |
+| `google_workspace` | Organization, Person, Team, Meeting |
+| `slack` | Organization, Person, Channel |
+| `notion` | Post |
+| `confluence` | Wiki space, Post |
+| `jira` | Project, Person |
+| `salesforce` | Account, Person, Deal, Campaign |
+| `hubspot` | Account, Person, Deal |
+| `zendesk` | Account, Person |
+| `email` | Person |
+| `microsoft365` | Person |
+| `teams` | Person, Channel |
+| `git_docs` | Document, Person |
+| `google_drive` | Document, Person |

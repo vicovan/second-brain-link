@@ -490,6 +490,14 @@ def brain_structure(catalog, sources, quarantine_keys, stem="export"):
                                   for e in catalog)]
                      for ent, pairs in ENTITY_SOURCES.items()},
     }
+    # the pre-build "before you build": the objects each detected
+    # source will produce, which would merge across sources, and the possible
+    # relations — from the mappings alone (mappings/brain/ontology.json)
+    try:
+        import ontology as _ontology
+        spec["ontology_suggested"] = _ontology.suggest(list(sources))
+    except Exception:
+        spec["ontology_suggested"] = {}
 
     # ---- markdown (mermaid tree, styled like the mindmap) ----
     out = []
@@ -536,6 +544,38 @@ def brain_structure(catalog, sources, quarantine_keys, stem="export"):
     if has_quar:
         out.append("### 🔒 `_quarantine/` — catalogued, never imported")
         out.append("  - " + ", ".join(sorted(e["file"] for e in groups["_quarantine"])))
+        out.append("")
+
+    onto = spec.get("ontology_suggested") or {}
+    if onto.get("objects"):
+        out.append("## Before you build — the ontology these exports will make")
+        out.append("")
+        out.append("Before anything is built: the object types these exports will produce, "
+                   "which will be **resolved** into one note across sources (matched by name — a wrong "
+                   "merge is worse than a miss), and how they will connect. Build when it reads "
+                   "right. When it doesn't, exclude a source or adapt a mapping first.")
+        out.append("")
+        out.append("```mermaid")
+        out.append("flowchart LR")
+        ids = {o["id"]: f"O{i}" for i, o in enumerate(onto["objects"])}
+        for o in onto["objects"]:
+            badge = " · resolved" if o.get("merge_candidate") else ""
+            src = ", ".join(o["sources"])
+            out.append(f'  {ids[o["id"]]}["{_mm(o["label"])}{badge}<br/><small>{_mm(src)}</small>"]')
+        seen_rel = set()
+        for r in onto.get("relations", []):
+            k = (r["from"], r["to"])
+            if k in seen_rel:
+                continue
+            seen_rel.add(k)
+            out.append(f'  {ids[r["from"]]} -->|{_mm(r["label"])}| {ids[r["to"]]}')
+        out.append("```")
+        out.append("")
+        out.append("| Object | Meaning | From | Resolved |")
+        out.append("|---|---|---|---|")
+        for o in onto["objects"]:
+            out.append(f"| {o['label']} | {o['meaning']} | {', '.join(o['sources'])} | "
+                       f"{'yes' if o.get('merge_candidate') else ''} |")
         out.append("")
 
     # ---- canvas (same tree) ----

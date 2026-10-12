@@ -94,7 +94,9 @@ RESULTS = ["none", "rejected", "screen", "interview", "offer"]
 # recorded with `set-result` and live in RESULTS below.)
 # skipped_knockout = knockout.py said STOP (right to work, location, language, pay floor…).
 # skipped_review   = the independent recruiter review said reject.
-STATUSES = ["applied", "filled", "not_started", "drafted_linkedin", "skipped_walled",
+# handoff_portal = an account-walled portal (Workday, SuccessFactors…): CV and answers are
+#                  prepared, the user creates the account and applies there themselves.
+STATUSES = ["applied", "filled", "not_started", "drafted_linkedin", "handoff_portal", "skipped_walled",
             "skipped_policy", "skipped_knockout", "skipped_review", "disqualified", "excluded",
             "abandoned", "prior_external"]
 POSITIVE = {"screen", "interview", "offer"}
@@ -497,7 +499,7 @@ YIELD_WINDOW_DAYS = 14
 SHORTLIST_CAP = 30       # beyond this the day is sourcing-bound, not shortlist-bound
 # every state a SHORTLISTED role can end in once it was picked — the denominator of the yield
 ATTEMPTED = {"applied", "filled", "skipped_walled", "skipped_knockout", "skipped_review",
-             "skipped_policy", "abandoned", "drafted_linkedin"}
+             "skipped_policy", "abandoned", "drafted_linkedin", "handoff_portal"}
 
 
 def _setting(name, default):

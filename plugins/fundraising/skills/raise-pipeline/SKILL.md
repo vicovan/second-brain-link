@@ -31,6 +31,7 @@ autonomous:  profile → research → plan → pick by tier+deadline → apply �
 | The Funding Plan | `raise-plan` |
 | Program forms | `raise-apply` |
 | Emails, intros, follow-ups | `raise-outreach` |
+| Public threads worth a comment | `raise-engage` |
 | Memory | `scripts/ledger.py` (in raise-research) |
 
 Invoke them with the Skill tool (`fundraising:<skill>`). Never re-implement one here.
@@ -58,6 +59,8 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts/ledger.py due --days
 | "Draft this week's emails" | `raise-outreach` for Tier 2 records in `verified`/`queued` without a draft |
 | "Prepare this week's packages" | `raise-outreach` package flow for Tier 2 targets without a PASS package: brief → fit → draft → lint → investor review → buttons; report the Ready-to-send count |
 | "I sent the <Name> email" (the ✓ button) | the founder's own confirmation → `ledger.py sent <key>` at once, re-render, one line back — the only way a record becomes `contacted` |
+| "Threads to comment on" / a pasted post / the engagement routine | `raise-engage`: unposted drafts first, then find → score → draft ≤ `max_per_run` comments; nothing is posted |
+| "I posted the comment on t-…" (the ✓ button) | the founder's own confirmation → `threads.py posted <id>`, re-render, one line back |
 | "What's due?" | `ledger.py due`; draft the due follow-ups (`raise-outreach`); flag deadlines ≤ 7 days |
 | "Record a reply" / pasted email | the outcome flow below |
 | weekly run (the nudge) | due → re-verify stale dated claims on Tier 1–2 → rebuild the plan → report |

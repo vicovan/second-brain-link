@@ -14,6 +14,18 @@ Subcommands:
     mark-run             stamp today as run
     snooze               stamp today as skipped
     window               print how many days back to search (since last run, 1..14)
+    since-seconds        seconds back to search for time-filtered sources (LinkedIn's f_TPR):
+                         since the last completed run plus one day of overlap; 14 days on a
+                         first run; never more than 30 days
+    merge [filters] F... combine every source's JSON into one list: keep in-lane rows (the
+                         profile's own regexes, passed in), collapse the same job found on
+                         several sources into ONE row that lists every source and URL (the
+                         employer's own date and link win), mark each row new / already seen,
+                         and write coverage.json. Filters: --titles --domain --exclude-titles
+                         --regions, and --markets "PT=lisbon|porto|portugal;ES=madrid|spain".
+    coverage             print coverage.json as a table, with a verdict per market: a market
+                         with zero in-lane rows from fewer than 3 sources is a COVERAGE FAILURE
+                         (widen the sweep), never "a thin market". Exit 1 on any failure.
     filter-seen          stdin JSON list -> stdout only the rows never seen before
     gate                 stdin JSON list (the FINAL shortlist) -> stdout only the rows the
                          ledger allows; every dropped row and its reason on stderr. Drops
@@ -100,7 +112,7 @@ def applied_pairs():
 # Statuses that mean the user has already acted on a posting — it must not come back.
 # `skipped_policy` is absent on purpose: it is the company rule talking, and gate()
 # re-applies that rule on its own dates, so the role returns when the company is eligible.
-ACTED = {"applied", "filled", "prior_external", "drafted_linkedin",
+ACTED = {"applied", "filled", "prior_external", "drafted_linkedin", "handoff_portal",
          "skipped_knockout", "skipped_walled", "skipped_review"}
 # Statuses that start the one-application-per-company clock.
 SENT = {"applied", "filled", "prior_external"}
@@ -176,6 +188,152 @@ def seen_applied(row, done):
     return False
 
 
+COVERAGE = ROOT / "coverage.json"
+# Sources whose date and link are the employer's own — they win over an aggregator's copy.
+EMPLOYER = {"greenhouse", "lever", "ashby", "smartrecruiters", "recruitee", "personio",
+            "teamtailor", "workday", "careers"}
+
+
+def _flag(args, name, default=""):
+    if name in args:
+        i = args.index(name)
+        v = args[i + 1] if i + 1 < len(args) else default
+        del args[i:i + 2]
+        return v
+    return default
+
+
+def _city(loc):
+    return norm((loc or "").split(",")[0].split("/")[0])
+
+
+def merge(args):
+    """Combine sources -> in-lane, de-duplicated rows with every source kept, plus coverage."""
+    args = list(args)
+    titles = _flag(args, "--titles"); domain = _flag(args, "--domain")
+    excl = _flag(args, "--exclude-titles"); regions = _flag(args, "--regions")
+    markets = [m.split("=", 1) for m in _flag(args, "--markets").split(";") if "=" in m]
+    out = _flag(args, "--out")
+    rx = lambda p: re.compile(p, re.I) if p else None
+    T, D, X, R = rx(titles), rx(domain), rx(excl), rx(regions)
+    M = [(name.strip(), re.compile(pat, re.I)) for name, pat in markets]
+
+    def market_of(r):
+        blob = f"{r.get('location', '')} {r.get('market', '')}"
+        for name, pat in M:
+            if pat.search(blob):
+                return name
+        return r.get("market") or "other"
+
+    rows = []
+    for f in args:
+        try:
+            got = json.load(open(f, encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            print(f"! {f}: {e}", file=sys.stderr)
+            continue
+        for r in got if isinstance(got, list) else []:
+            r = dict(r)
+            r["source"] = r.get("source") or r.get("ats") or os.path.basename(f)
+            r["market"] = market_of(r)
+            t = r.get("title", "")
+            r["in_lane"] = bool((not T or T.search(t)) and (not D or D.search(t))
+                                and not (X and X.search(t))
+                                and (not R or R.search(f"{r.get('location', '')} {r.get('market', '')}")))
+            rows.append(r)
+
+    cov = {name: {} for name, _ in M}      # every declared market appears, even with no rows
+    def bump(r, field):
+        c = cov.setdefault(r["market"], {}).setdefault(r["source"], {"raw": 0, "in_lane": 0, "new": 0})
+        c[field] += 1
+    for r in rows:
+        bump(r, "raw")
+
+    # Collapse the same job across sources: same normalised title and company (by containment,
+    # since a board slug and a display name differ), and the same city when both give one.
+    buckets, merged = {}, []
+    for r in rows:
+        if not r["in_lane"]:
+            continue
+        bump(r, "in_lane")
+        tk, ck, city = norm(r.get("title")), norm(r.get("company")), _city(r.get("location"))
+        hit = None
+        for m in buckets.get(tk, []):
+            mc = norm(m.get("company"))
+            if ck and mc and (ck in mc or mc in ck) and (not city or not m["_city"] or city == m["_city"]):
+                hit = m
+                break
+        if hit is None:
+            m = dict(r, sources=[r["source"]], urls=[r.get("url", "")], _city=city)
+            buckets.setdefault(tk, []).append(m)
+            merged.append(m)
+            continue
+        if r["source"] not in hit["sources"]:
+            hit["sources"].append(r["source"])
+        if r.get("url") and r["url"] not in hit["urls"]:
+            hit["urls"].append(r["url"])
+        if r["source"] in EMPLOYER and hit.get("source") not in EMPLOYER:
+            for f in ("url", "posted", "location", "comp", "ats"):     # the employer's own copy wins
+                if r.get(f):
+                    hit[f] = r[f]
+            hit["source"] = r["source"]
+        elif r.get("posted") and (not hit.get("posted") or r["posted"] < hit["posted"]) \
+                and hit.get("source") not in EMPLOYER:
+            hit["posted"] = r["posted"]
+
+    seen, done = load_seen(), applied_pairs()
+    ids = {posting_id(d.get("url")) for d in ledger()} - {None}
+    for m in merged:
+        m.pop("_city", None)
+        known = any(key(dict(m, url=u)) in seen for u in m["urls"]) or key(m) in seen
+        applied = seen_applied(m, done) or any(posting_id(u) in ids for u in m["urls"])
+        m["new"] = not known and not applied
+        m["already_applied"] = applied
+        if m["new"]:
+            bump(dict(m, source=m["sources"][0]), "new")
+
+    COVERAGE.write_text(json.dumps({"date": TODAY, "markets": cov}, indent=2), encoding="utf-8")
+    text = json.dumps(merged, indent=2, ensure_ascii=False)
+    if out:
+        open(out, "w", encoding="utf-8").write(text)
+    else:
+        print(text)
+    new = sum(1 for m in merged if m["new"])
+    print(f"{len(rows)} rows from {len(args)} files -> {sum(r['in_lane'] for r in rows)} in lane -> "
+          f"{len(merged)} distinct jobs ({new} new since last run, {len(merged) - new} already seen "
+          f"or applied); coverage -> {COVERAGE}", file=sys.stderr)
+
+
+def coverage():
+    try:
+        cov = json.loads(COVERAGE.read_text(encoding="utf-8"))["markets"]
+    except (OSError, ValueError, KeyError):
+        print("no coverage.json — run `scout_state.py merge` first")
+        return 1
+    bad = 0
+    print(f"{'market':14} {'source':16} {'raw':>5} {'in lane':>8} {'new':>5}")
+    for mk in sorted(cov):
+        srcs = cov[mk]
+        for s, c in sorted(srcs.items(), key=lambda x: -x[1]["raw"]):
+            print(f"{mk:14} {s:16} {c['raw']:>5} {c['in_lane']:>8} {c['new']:>5}")
+        lane = sum(c["in_lane"] for c in srcs.values())
+        n = sum(1 for c in srcs.values() if c["raw"])
+        if mk == "other":
+            continue
+        if lane and n < 3:
+            print(f"  -> {mk}: {lane} in lane, but from only {n} source{'s' if n != 1 else ''} — "
+                  f"partial coverage; run the rest of its regional pack before calling the list complete")
+        elif lane:
+            print(f"  -> {mk}: OK ({lane} in lane from {n} sources)")
+        elif n >= 3:
+            print(f"  -> {mk}: thin, verified — 0 in lane across {n} sources")
+        else:
+            bad += 1
+            print(f"  -> {mk}: COVERAGE FAILURE — 0 in lane from only {n} source(s). Widen before "
+                  f"calling this market thin (next regional source, title synonyms, company boards).")
+    return 1 if bad else 0
+
+
 def main():
     cmd = sys.argv[1] if len(sys.argv) > 1 else "stats"
     ROOT.mkdir(parents=True, exist_ok=True)
@@ -199,6 +357,22 @@ def main():
         except ValueError:
             d = 14                                    # first ever run: cast wide
         print(max(1, min(14, d or 1))); return
+
+    if cmd == "since-seconds":
+        last = read(LAST)
+        now = datetime.datetime.now()
+        try:
+            start = datetime.datetime.combine(datetime.date.fromisoformat(last), datetime.time())
+            secs = int((now - start).total_seconds()) + 86400        # one day of overlap
+        except ValueError:
+            secs = 14 * 86400                                        # first ever run
+        print(max(86400, min(30 * 86400, secs))); return
+
+    if cmd == "merge":
+        return merge(sys.argv[2:])
+
+    if cmd == "coverage":
+        return sys.exit(coverage())
 
     if cmd == "report-path":
         REPORTS.mkdir(parents=True, exist_ok=True)

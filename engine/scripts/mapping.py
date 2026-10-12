@@ -490,3 +490,19 @@ def load_brain_layout(extra_dirs=None):
             except Exception:
                 pass
     return layout
+
+
+def load_brain_ontology(extra_dirs=None):
+    """Load the brain ontology JSON (object types + relation labels). Override
+    dirs win, like load_brain_layout. Returns {} when no file is readable."""
+    paths = [MAPPINGS_DIR / "brain" / "ontology.json"]
+    for d in (extra_dirs or []):
+        paths += [Path(d) / "brain" / "ontology.json", Path(d) / "ontology.json"]
+    onto = {}
+    for p in paths:
+        if p.is_file():
+            try:
+                onto = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+    return onto

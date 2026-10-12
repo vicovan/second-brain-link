@@ -104,8 +104,10 @@ never treat silence as consent, and never chain past a gate.
    never treat a missing or unreadable settings file as permission: that case is `supervised`.
 2. **Never create an account and never type a credential.** See `field-policy.md` §1 —
    passwords, passport or national identity numbers, payment details, DOB. These halt the run.
-3. **Account-walled portals are skipped** (their standing choice): Workday, Taleo, SuccessFactors,
-   iCIMS, BrassRing, Oracle HCM, Avature, Eightfold, Phenom, Cornerstone.
+3. **Account-walled portals are a hand-off** (criteria `walled:`): Workday, Taleo, SuccessFactors,
+   iCIMS, BrassRing, Oracle HCM, Avature, Eightfold, Phenom, Cornerstone. With `surface` (the
+   default) build the CV and every answer, then hand the user the portal — they create the account
+   and apply. With `drop`, skip it.
 4. **Never automate LinkedIn.** LinkedIn's User Agreement forbids it and enforcement lands on the
    user's own account, not ours. Prepare the CV and every answer, hand them the ready tab, stop.
 5. **Never invent an answer.** Not in the master profile or `profile/application-answers.md` → ask them.
@@ -137,11 +139,13 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/learn.py show
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-apply/scripts/detect_portal.py "<url>" --fetch
 ```
-- `walled` → log it skipped, tell them in one line, **stop**:
+- `walled` → criteria `walled: drop`: log it skipped, tell them in one line, **stop**:
   ```bash
   python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/learn.py log-outcome --company C --role R \
       --url U --status skipped_walled --portal <ats> --source <src> --score N
   ```
+  `walled: surface` (the default): **continue through the CV, answers and recruiter review**, never
+  touch the portal's account flow, and finish at step 7b (portal hand-off).
 - `aggregator` → find the employer's own posting, re-run step 1.
 - `linkedin` → **do not hand off yet — run step 1b first.**
 - `fillable` / `unknown` → continue.
@@ -483,6 +487,12 @@ do what they say; never submit.
 Build the CV and all answers, save them to the application folder, and give them: the job URL, the
 CV path, and the answers as copy-pasteable text. One line: *"LinkedIn is yours to submit — CV and
 answers are ready."* Log with `--status drafted_linkedin`.
+
+### 7b. Portal hand-off — an account-walled employer site
+Same as the LinkedIn hand-off: the CV and every answer are built and saved, the gates are green,
+and the user gets the portal URL, the CV path and the answers as copy-pasteable text. One line:
+*"<Portal> needs an account — CV and answers are ready; create the account and paste them in."*
+Never create the account, never type a credential. Log with `--status handoff_portal --portal <ats>`.
 
 ### 8. Log the outcome
 

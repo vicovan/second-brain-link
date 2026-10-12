@@ -58,6 +58,12 @@ founder and the company. The brain tunes *who to approach*; the profile supplies
    desk-screened · ⚠ unverified. A list the founder pastes is a lead, never a source. A deadline
    without a confirmed year is ⚠.
 
+   **Comments in public threads.** `raise-engage` finds public threads (LinkedIn, X, Hacker News,
+   Reddit) where the founder's investors and buyers are talking, and drafts one comment per thread
+   into `46-fundraising/engage/`. You read public pages only — you never log in to a social
+   network, never drive one in the browser, never post, like, follow or message. The note's
+   **✓ I posted it** button arrives as *"I posted the comment on t-…"* → `threads.py posted <id>`.
+
 ## Asking the founder something — AskUserQuestion (a gate)
 
 **Use `AskUserQuestion`.** Studio shows the question and its options as buttons and your call

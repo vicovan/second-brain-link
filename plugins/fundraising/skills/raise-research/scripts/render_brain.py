@@ -30,6 +30,22 @@ import ledger as L  # noqa: E402
 import founder_profile as prof  # noqa: E402
 from lint_claims import gates_ok  # noqa: E402
 
+
+def _threads():
+    """The engagement ledger (raise-engage) — a sibling skill in Claude's packaging, the same
+    folder in Codex's. Absent is fine: the dashboard just has no Threads section."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    for cand in (here, os.path.join(here, "..", "..", "raise-engage", "scripts")):
+        if os.path.isfile(os.path.join(cand, "threads.py")):
+            if cand not in sys.path:
+                sys.path.insert(0, os.path.abspath(cand))
+            try:
+                import threads  # noqa: E402
+                return threads
+            except Exception:
+                return None
+    return None
+
 MANIFEST = "_FUNDRAISE_GENERATED.json"
 DASHBOARD = "Fundraising Dashboard.md"
 KPI = "Fundraising KPI.md"
@@ -299,6 +315,24 @@ def dashboard(recs, known, packages=()):
         for p in waiting:
             r = next(x for x in recs if x["key"] == p["key"])
             out.append(f"| [[{title_of(r)}]] | {p['score'] or '—'} | {cell(p['why'])[:120]} |")
+    T = _threads()
+    if T is not None:
+        trs = list(T.load().values())
+        todo = [t for t in trs if t["status"] == "drafted"]
+        if trs:
+            out.append(f"\n## Threads to comment on\n")
+            if todo:
+                out.append("Open the thread, paste the comment, post it yourself — then press ✓ in the note.\n")
+                out.append("| Thread | Fit | Comment | Open |\n|---|---|---|---|")
+                for t in sorted(todo, key=lambda t: (-(t.get("fit") or 0), t["id"])):
+                    note = pathlib.Path(t["note"]).stem if t.get("note") else ""
+                    out.append(f"| {cell(T.note_title(t))[:80]} | {t.get('fit') or '—'} | "
+                               + (f"[[{note}]]" if note else "—") + f" | [↗ thread]({t['url']}) |")
+            else:
+                out.append("No unposted comments.")
+            posted = sum(1 for t in trs if t["status"] == "posted")
+            out.append(f"\n{posted} posted · {sum(1 for t in trs if t['status'] == 'found')} found, not drafted · "
+                       f"{sum(1 for t in trs if t['status'] == 'skipped')} skipped")
     due = L.due_items(14)
     out.append("\n## Due\n")
     if due:

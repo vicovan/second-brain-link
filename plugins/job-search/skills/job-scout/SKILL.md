@@ -38,18 +38,22 @@ output is the shortlist; the CV skill turns one item on it into a PDF.
 |---|---|
 | `profile/search-criteria.md` | ALWAYS. What they are looking for — lanes, geography, comp, red flags. |
 | `references/sources.md` | ALWAYS. Which sources work, the exact commands, and what not to retry. |
+| `references/regional-sources.md` | ALWAYS. Where each market posts, and the route to read each board. |
 | `references/scoring-rubric.md` | Before ranking. The 100-point scale, shortlist likelihood, the apply floor, the disqualifiers. |
 | `profile/archetypes.md` | Before scoring. The lanes the user targets and each lane's trigger keywords — a job matching no lane is dropped. |
 | `${CLAUDE_PLUGIN_ROOT}/skills/job-apply/scripts/knockout.py` | Step 5 — every fetched posting is knock-out screened before it is scored. |
 | `<brain>/45-jobs/profile/profile.md` | ALWAYS. The **only** source of facts about the user. Never copy it here. |
-| `scripts/ats_pool.py` | Tier-0 bulk probe of many companies' open ATS boards → JSON. |
-| `scripts/ats_fetch.py` | Tier-1 drill-down into one company's Greenhouse/Lever/Ashby board. |
-| `scripts/scout_state.py` | Daily gate, search window, dedupe, report path. |
+| `scripts/linkedin_jobs.py` | Tier 0 — LinkedIn's public, no-login job search, time-filtered (only if criteria §3b turns it on). |
+| `scripts/companies.py` | Tier 1 — the company registry: every employer seen hiring, its careers board, when it was last swept. |
+| `scripts/ats_fetch.py` | Tier 1 — read one company's own board: Greenhouse, Lever, Ashby, SmartRecruiters, Recruitee, Personio, Teamtailor, Workday. |
+| `scripts/ats_pool.py` | Tier 1b — bulk probe of many companies' open Greenhouse/Lever/Ashby boards → JSON. |
+| `scripts/scout_state.py` | Daily gate, `since-seconds` window, `merge` (cross-source dedupe, new vs seen), `coverage` gate, report path. |
 | `scripts/learn.py` | The shared feedback loop — `show` at step 0, `add-lesson` at the end. |
 | `<state root>/lessons.md` | **Step 0, always.** Rules earned from real outcomes. |
 
 State lives in `<state root>/` — outside the skill folder, so it never lands in
-a zip: `last-run.txt`, `snooze.txt`, `seen.json`, `reports/YYYY-MM-DD.md`.
+a zip: `last-run.txt`, `snooze.txt`, `seen.json`, `companies.jsonl`, `coverage.json`,
+`reports/YYYY-MM-DD.md`.
 
 ## Workflow
 
@@ -179,49 +183,92 @@ Read `profile/search-criteria.md` and `profile/profile.md` before searching, not
 named a focus in their message ("remote only", "AI architect roles", "founder programmes"),
 narrow to it and say so. Otherwise sweep all three lanes.
 
-### 2. Sweep — Tier 0, the open ATS boards
-Start where the forms are open by construction, so shortlist slots are not spent on roles
-behind account walls. Two passes, both of them:
+### 2. Sweep — discovery, every market (Tier 0)
+**Older profiles** may lack criteria §3a Markets and §3b Sources. Build the markets from §3,
+treat every §3b setting as its default (`linkedin-public: off`, `chrome-boards: off`,
+`walled: surface`), run, and say once at the end that `/job-search:onboard` → "upgrade my
+profile" adds them.
+
+**Market first, then companies, then their own sites.** Build the query grid from the profile:
+every lane title plus its common synonyms (criteria §1) × every market (criteria §3). Then, for
+each market, run **every source in its pack** in `references/regional-sources.md`, limited to what
+was posted since the last run:
 ```bash
-# (a) bulk-probe every known company board, concurrently
+SINCE=$(python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py since-seconds)
+# LinkedIn's public, no-login search — only if criteria §3b turns it on
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/linkedin_jobs.py --since-seconds "$SINCE" \
+        --keywords "<title>" --keywords "<synonym>" ... --location "<market>" ... \
+        --out /tmp/scout-linkedin.json          # add --remote for a remote-only market
+```
+Regional boards and recruiters follow their route in the pack: `fetch` with WebFetch; `chrome`
+in the user's browser **only when criteria §3b allows it**, read-only — never sign in, apply or
+register; `search` with `site:` queries otherwise. Write each source's rows to
+`/tmp/scout-<source>.json` with `company`, `title`, `location`, `posted`, `url`, `source`,
+`market`. On Codex (no browser) the `chrome` route falls back to `search`; say so in coverage.
+
+If LinkedIn throttles (`linkedin_jobs.py` says so and stops), do not retry today. Report it and
+lean on the other sources.
+
+### 2b. Sweep — the companies' own boards (Tier 1)
+Every company discovery named goes into the registry, and every company that is hiring is then
+read **at its own careers board** — the full list (roles the aggregators never showed), the
+employer's own posting date, and the real apply link:
+```bash
+# the in-lane rows discovery found, one per job (the same filters as step 4)
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py merge \
+        --titles "<criteria §1 seniority>" --domain "<criteria §1 discipline>" \
+        --exclude-titles "<criteria §5>" --markets "<as in step 4>" \
+        --out /tmp/discovered.json /tmp/scout-*.json
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/companies.py add < /tmp/discovered.json
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/companies.py unresolved
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/companies.py batch > /tmp/boards.txt
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/ats_fetch.py --batch /tmp/boards.txt \
+        --filter "<lane regex>" --out /tmp/scout-careers.json
+```
+For each `unresolved` company (most hits first, at least the top 15): `WebSearch "<company> careers"`,
+classify the page (`job-apply/scripts/detect_portal.py`), record it with
+`companies.py set "<company>" --ats <type> --slug <slug>`, or `--careers <url>` for a board no
+adapter reads, which you then read with WebFetch (or Chrome, if §3b allows) into
+`/tmp/scout-careers-<company>.json`. Stamp what you swept: `companies.py swept "<company>" ...`.
+
+### 2c. Sweep — the open ATS pool and Y Combinator (Tier 1b, Tier 3)
+```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/ats_pool.py \
         --out /tmp/scout-ats.json \
-        --titles "<seniority band, criteria §1>" \
-        --domain "<discipline, criteria §1>" \
-        --regions "<geographies to keep, criteria §3>" \
-        --exclude-titles "<exclusions, criteria §5>"
+        --titles "<seniority band, criteria §1>" --domain "<discipline, criteria §1>" \
+        --regions "<geographies to keep, criteria §3>" --exclude-titles "<exclusions, criteria §5>"
 ```
-`ats_pool.py` ships **neutral** defaults on purpose — it filters on nothing but job-type
-noise until you pass the profile's own criteria in. Never leave the flags off and never
-hardcode a lane here; an empty-handed run returns the whole market, which is the honest
-failure rather than silently applying someone else's rules.
+`ats_pool.py` ships **neutral** defaults — pass the profile's own criteria in, never hardcode a
+lane. It covers US and EU tech companies on Greenhouse, Lever and Ashby well and other markets
+hardly at all, which is why it is one source among several, not the first. Include
+`ycombinator.com/jobs` (see `sources.md` Tier 3; its apply flow needs a workatastartup.com login,
+so those rows are `⛔ YC login — you apply`).
 
-(b) then a site-restricted `WebSearch` pass across `jobs.lever.co`, `job-boards.greenhouse.io`,
-`jobs.ashbyhq.com` and `jobs.smartrecruiters.com`, building the titles from criteria §1 and the
-geographies from §3 — never from a list hardcoded in this skill. Search indexes go stale, so
-confirm each hit is still live on the board before it reaches a shortlist.
+### 3. Sweep — WebSearch for what the boards miss (Tier 2)
+Founder programmes and EIR tracks, niche boards, and `site:` passes over boards that block reading.
+Query patterns are in `sources.md` §Tier 2.
 
-### 2b. Sweep — Y Combinator
-Include `ycombinator.com/jobs` every run — see `sources.md` Tier 3. AI-native, well-funded,
-remote-friendly companies. Note the apply flow needs a workatastartup.com login, so mark those
-rows `⛔ YC login` in the Apply column and ask the user whether they are signed in.
-
-### 3. Sweep — Tier 2, WebSearch
-Cover what the ATS boards miss: founder programmes and EIR tracks, aggregators that block
-direct fetching, and anything niche. Query patterns are in `sources.md` §Tier 2.
-
-### 4. Merge and dedupe
-Combine every source into one JSON list, then drop what they have already seen:
+### 4. Merge, dedupe, and check coverage
+One command combines every source, keeps the in-lane rows (the profile's own regexes), collapses
+the same job found on several sources into **one row** listing all of them (the employer's own date
+and link win), and marks each row **new since the last run** or already seen:
 ```bash
-python3 - <<'PY' > /tmp/scout-all.json
-import json,glob
-rows=[r for f in glob.glob('/tmp/scout-*.json') for r in json.load(open(f))]
-json.dump(rows,__import__('sys').stdout,indent=2,ensure_ascii=False)
-PY
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py filter-seen < /tmp/scout-all.json > /tmp/scout-new.json
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py merge \
+        --titles "<criteria §1 seniority>" --domain "<criteria §1 discipline>" \
+        --exclude-titles "<criteria §5>" \
+        --markets "<Market A>=<city|country regex>;<Market B>=<regex>" \
+        --out /tmp/scout-merged.json /tmp/scout-*.json
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py coverage
 ```
-The count it prints to stderr ("N in, M new") is worth reporting — it tells the user whether
-the market moved.
+**`coverage` is a gate.** A market with no in-lane rows from fewer than three sources is a
+**coverage failure**, not a thin market: widen before going further — the next source in its
+regional pack, a title-synonyms pass, the boards of companies hiring nearby — and run `merge` and
+`coverage` again. Only a market that comes back empty across three or more sources may be reported
+as thin. Paste the coverage table into the report, and lead the report with one line:
+*"Scanned N postings from M sources across K markets — P new since the last run."*
+
+Score the **new** rows. Rows already seen stay in the report's "still open" section with their
+earlier score; do not re-read them unless the posting changed.
 
 ### 4b. Screen out the exclusions BEFORE scoring
 Drop anything matching the user's own exclusions in `profile/search-criteria.md` §2
@@ -259,15 +306,17 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-apply/scripts/detect_portal.py "<url>" 
 - `linkedin` → **resolve it first** (ATS board · `site:job-boards.greenhouse.io "<company>"` ·
   the company's own /careers page). Classify the resolved URL, not the LinkedIn mirror.
 - `walled` (Workday, Taleo, SuccessFactors, iCIMS, **join.com**, BrassRing, Oracle HCM, Avature,
-  Eightfold, Phenom, Cornerstone) → **drop it from the shortlist.** Claude cannot create accounts
-  and the user has said they do not want these. List them in an "excluded — account wall" line, do not
-  rank them.
+  Eightfold, Phenom, Cornerstone) → follow criteria `walled:` (§3b). **`surface` (the default):**
+  keep it and rank it like any other row, Apply column `⛔ <portal> — you apply`. Claude cannot
+  create the account, so the application is a hand-off (job-apply prepares the CV and answers).
+  In some markets most senior roles sit behind these portals, and hiding them empties the list.
+  **`drop`:** leave it out and list it in an "excluded — account wall" line.
 - `fillable` → keep, and **record the real apply URL in the report** so the apply step does not
   have to rediscover it.
 - `unknown` → fetch the page and look for an account wall (*create an account · sign up to apply ·
   register to apply · log in to apply · set a password*). Treat as walled if found.
 
-The report's shortlist table carries an **Apply** column: `✅ direct form (<ats>)` · `⛔ account wall` ·
+The report's shortlist table carries an **Apply** column: `✅ direct form (<ats>)` · `⛔ <portal> — you apply` ·
 `✉️ email only` · `? unverified`. **A row must not say `?` in a delivered report** — verify it or
 leave the job out.
 
@@ -324,6 +373,14 @@ the whole shortlist with scores, reasoning, red flags and apply links, the line
 `Target: <valid today>/<daily target> · shortlist <n> of <shortlist target>`, then a short "also seen / near
 misses" section. Replace the `## Status` line with the final summary.
 
+Three more sections, every run:
+- **Opening line:** *"Scanned N postings from M sources across K markets — P new since the last
+  run."* (the counts `merge` printed).
+- **`## Coverage`** — the table `scout_state.py coverage` printed, with its verdict per market. A
+  market that ended as a coverage failure says what was tried and what will be tried next run.
+- **`## Still open (seen before)`** — in-lane roles from earlier runs that are still live, one line
+  each with their earlier score, so a good role is not lost because it was first seen yesterday.
+
 **The report shows the CURRENT list ONLY.** Never append "Run 2", "Run 3"
 sections — a second sweep the same day **replaces** the list, it does not stack onto it. Rewrite
 the file, carrying forward only the statuses of jobs already actioned. Permanent history lives in
@@ -332,8 +389,8 @@ the file, carrying forward only the statuses of jobs already actioned. Permanent
 **The shortlist table MUST have a `Status` column as its second column**, every row starting at
 `⬜ not started`, followed by this legend line:
 
-> **Legend:** ✅ applied · 🟡 filled, awaiting submit · ⬜ not started · ⛔ skipped ·
-> ❌ disqualified · 🚫 excluded by criteria · 🔵 replied · 🎯 interview
+> **Legend:** ✅ applied · 🟡 filled, awaiting submit · 🟠 ready — you apply (portal or LinkedIn) ·
+> ⬜ not started · ⛔ skipped · ❌ disqualified · 🚫 excluded by criteria · 🔵 replied · 🎯 interview
 
 **The table needs a `Status detail` column.** The emoji alone does not tell them
 what is happening. Every row carries one plain sentence, rewritten each time the state changes —

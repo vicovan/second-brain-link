@@ -86,7 +86,8 @@ CV_NAME_RE = re.compile(r"(^|[_\s-])CV([_\s-]|$)", re.I)
 
 STATUS_GLYPH = {"applied": "✅", "filled": "🟡", "not_started": "⬜", "skipped": "⛔",
                 "disqualified": "❌", "excluded": "🚫", "screen": "🔵", "interview": "🎯",
-                "prior_external": "📁", "skipped_knockout": "⛔", "skipped_review": "⛔"}
+                "prior_external": "📁", "skipped_knockout": "⛔", "skipped_review": "⛔",
+                "drafted_linkedin": "🟠", "handoff_portal": "🟠"}
 
 
 # ---------------------------------------------------------------- small helpers
@@ -535,7 +536,7 @@ def dashboard_note(rows, reports, dest, profile_src, known=frozenset()):
                  f"| [[{title}]] | {r.get('score') or ''} | {r.get('portal') or ''} "
                  f"| {r.get('date') or ''} | {r.get('result') or '—'} "
                  f"| {'[[' + cv[0] + ']]' if cv else '—'} |\n")
-    b.append("\n> **Legend:** ✅ applied · 🟡 filled, awaiting submit · ⬜ not started · "
+    b.append("\n> **Legend:** ✅ applied · 🟡 filled, awaiting submit · 🟠 ready — you apply · ⬜ not started · "
              "⛔ skipped · ❌ disqualified · 🚫 excluded · 🔵 replied · 🎯 interview · "
              "📁 applied before this system\n\n")
 

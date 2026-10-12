@@ -1,7 +1,7 @@
 {
   "id": "fundraising",
   "label": "Fundraising Agent",
-  "blurb": "Screens funds and programs against your own filter, builds a dated funding plan, drafts applications and investor emails — never sends them — and tracks every conversation.",
+  "blurb": "Screens funds and programs against your own filter, builds a dated funding plan, drafts applications, investor emails and comments for the threads your investors are in — never sends or posts them — and tracks every conversation.",
   "icon": "rocket",
   "grounding": "studio/grounding.md",
   "entrySkill": "raise-pipeline",
@@ -61,6 +61,13 @@
       "when": "has-work",
       "short": "One package per Tier 2 target — brief, fit, draft, lint, independent review. Drafts only; I press Send.",
       "q": "Draft this week's investor emails as packages: for each Tier 2 target, build the brief, score the fit, draft the email with a hook from something verified on their own site, lint it against my facts, run the independent investor review, and give me the Open-in-Mail buttons for everything that passes — plus a Gmail draft when that tool is available. Do not send anything; I press Send."
+    },
+    {
+      "t": "Threads to comment on",
+      "stage": "do",
+      "when": "onboarded",
+      "short": "Find this week's public threads where my investors and buyers are talking, and draft one useful comment each. I post.",
+      "q": "Find public threads worth a comment — LinkedIn posts, X threads, Hacker News, Reddit — where the investors and operators I want to reach are discussing my space. Show my unposted drafts first, then draft one useful comment per new thread that answers what the thread is asking, checked against my facts. Never post, like or message anyone; I post them myself."
     },
     {
       "t": "What's due?",

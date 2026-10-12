@@ -362,7 +362,15 @@ are the developer tools.
 `_correlations/graph.json`): the machine-readable typed graph — `nodes` (id = note path
 sans `.md`, layer/type/sources/strength/geo/avatar), weighted `edges`
 (`works_at`/`member_of`/`attended`/`purchased_from`/`correlated`/`linked`, `w` ∈ (0,1]),
-ordered `layers`. Built by `scripts/graphdata.py` (pure scan of the rendered vault; called
+ordered `layers`, and an **`ontology`** block — object types (Person / Account / Team /
+Channel / Deal / Campaign / Document…) with counts + `merged` (2+ sources), labelled directed
+relations ("Deal —deal for→ Account"), starter `questions` and `metrics` — matched and counted by
+`scripts/ontology.py` from **`mappings/brain/ontology.json`** (data, not code; no AI). Nodes carry
+`object` (+ `category`/`kind`, and `field_sources` on merged people/orgs). The same file drives the
+pre-build `brain_structure.json` → `ontology_suggested` ("Before you build … does this read right?"), company `_DATA_POINTS.md`
+wording, Home.md's company prompts and `query.py --ask objects|relations|accounts-by-deals|top-by`;
+Studio's **Ontology** tab + the /company page draw it (plan: second-brain-link-docs/docs-ontology/).
+Built by `scripts/graphdata.py` (pure scan of the rendered vault; called
 from `_build_one` before `manifest_end`, so `--refresh` manages it; retrofit any old vault
 via `analyze.py <brain> --graph-data`). This is what the Studio Neural view + retrieval and
 any agent traverse (workflow documented in `_GRAPH.md`). Do NOT confuse with

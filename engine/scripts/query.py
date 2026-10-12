@@ -11,10 +11,14 @@ the numbers, then writes the prose.
     query.py <brain> --ask dormant-strong            strong ties that went quiet
     query.py <brain> --ask orgs-by-people            organisations ranked by how many people link to them
     query.py <brain> --ask runs                      Harness runs by routine and status
+    query.py <brain> --ask objects                   ontology object types: count + resolved (found in 2+ sources)
+    query.py <brain> --ask relations                 labelled relations between object types, counted
+    query.py <brain> --ask accounts-by-deals         accounts ranked by deals linked to them (+ total value)
+    query.py <brain> --ask top-by "account_of"       notes ranked by how many edges of that type touch them
     query.py <brain> --sql "SELECT type, COUNT(*) FROM notes GROUP BY type"     read-only
     query.py <brain> --schema                         the tables and columns
 
-Tables: notes(id, title, type, layer, path, deg, strength, status, sources)
+Tables: notes(id, title, type, object, layer, path, deg, strength, status, sources, nsources)
         edges(a, b, type, w, src)        fm(id, key, value)   — every frontmatter scalar
 """
 from __future__ import annotations
@@ -57,14 +61,20 @@ def _scalars(text: str) -> dict:
 def connect(brain: pathlib.Path) -> sqlite3.Connection:
     g = json.loads((brain / "graph.json").read_text(encoding="utf-8"))
     db = sqlite3.connect(":memory:")
-    db.execute("CREATE TABLE notes (id TEXT PRIMARY KEY, title TEXT, type TEXT, layer TEXT, path TEXT, deg INTEGER, "
-               "strength INTEGER, status TEXT, sources TEXT)")
+    db.execute("CREATE TABLE notes (id TEXT PRIMARY KEY, title TEXT, type TEXT, object TEXT, layer TEXT, path TEXT, "
+               "deg INTEGER, strength INTEGER, status TEXT, sources TEXT, nsources INTEGER)")
+    onto = g.get("ontology") or {}
+    db.execute("CREATE TABLE relations (edge_type TEXT, src_object TEXT, dst_object TEXT, label TEXT, n INTEGER)")
+    for r in onto.get("relations", []):
+        db.execute("INSERT INTO relations VALUES (?,?,?,?,?)",
+                   (r.get("edge_type"), r.get("from"), r.get("to"), r.get("label"), r.get("count")))
     db.execute("CREATE TABLE edges (a TEXT, b TEXT, type TEXT, w REAL, src TEXT)")
     db.execute("CREATE TABLE fm (id TEXT, key TEXT, value TEXT)")
     for n in g.get("nodes", []):
-        db.execute("INSERT OR REPLACE INTO notes VALUES (?,?,?,?,?,?,?,?,?)",
-                   (n["id"], n.get("title"), n.get("type"), n.get("layer"), n.get("path"), n.get("deg"),
-                    n.get("strength"), n.get("status"), ", ".join(n.get("sources") or [])))
+        srcs = [s for s in (n.get("sources") or []) if s and s != "[]"]
+        db.execute("INSERT OR REPLACE INTO notes VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                   (n["id"], n.get("title"), n.get("type"), n.get("object"), n.get("layer"), n.get("path"),
+                    n.get("deg"), n.get("strength"), n.get("status"), ", ".join(srcs), len(srcs)))
         p = brain / str(n.get("path") or (n["id"] + ".md"))
         try:
             for k, v in _scalars(p.read_text(encoding="utf-8", errors="replace")[:6000]).items():
@@ -97,6 +107,17 @@ CANNED = {
                        "FROM notes o JOIN edges e ON (e.a=o.id OR e.b=o.id) "
                        "JOIN notes p ON p.id = CASE WHEN e.a=o.id THEN e.b ELSE e.a END AND p.type='person' "
                        "WHERE o.type IN ('company','organization','org') GROUP BY o.id ORDER BY people DESC, o.title LIMIT 50", ()),
+    "objects": ("SELECT object, COUNT(*) AS count, SUM(nsources > 1) AS merged FROM notes "
+                "WHERE object IS NOT NULL AND object != '' GROUP BY object ORDER BY count DESC", ()),
+    "relations": ("SELECT src_object || ' —' || label || '→ ' || dst_object AS relation, edge_type, n "
+                  "FROM relations ORDER BY n DESC", ()),
+    "accounts-by-deals": ("SELECT a.title AS account, COUNT(d.id) AS deals, "
+                          "ROUND(SUM(CAST(COALESCE((SELECT value FROM fm WHERE fm.id=d.id AND key='value'),'0') AS REAL)), 2) AS total_value "
+                          "FROM notes a JOIN edges e ON (e.a=a.id OR e.b=a.id) AND e.type='account_of' "
+                          "JOIN notes d ON d.id = CASE WHEN e.a=a.id THEN e.b ELSE e.a END AND d.type='deal' "
+                          "WHERE a.object='account' GROUP BY a.id ORDER BY deals DESC, total_value DESC, a.title LIMIT 50", ()),
+    "top-by": ("SELECT n.title, n.object, COUNT(*) AS edges FROM notes n JOIN edges e ON (e.a=n.id OR e.b=n.id) "
+               "WHERE e.type = ? GROUP BY n.id ORDER BY edges DESC, n.title LIMIT 50", ("arg",)),
     "runs": ("SELECT COALESCE(NULLIF(routine,''),'(chat)') AS routine, status, COUNT(*) AS runs, MAX(started) AS last "
              "FROM runs GROUP BY routine, status ORDER BY last DESC", ()),
 }
@@ -126,7 +147,7 @@ def main(argv=None) -> int:
     g.add_argument("--schema", action="store_true")
     ap.add_argument("arg", nargs="?", default="")
     ap.add_argument("--json", action="store_true")
-    a = ap.parse_args(argv)
+    a = ap.parse_intermixed_args(argv)  # `--ask people-at "Acme"`: the arg follows the option
     brain = pathlib.Path(a.brain).expanduser()
     if not (brain / "graph.json").is_file():
         print("query: no graph.json in that brain", file=sys.stderr)

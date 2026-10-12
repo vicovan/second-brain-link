@@ -879,6 +879,103 @@ def test_layout_v2():
 
 
 
+def _job_search_sourcing(js):
+    """Market -> companies -> careers sites: LinkedIn public-search parsing, the cross-source
+    merge, the coverage gate, the freshness window, the company registry and every ATS adapter.
+    Synthetic, fictional data only; nothing here touches the network."""
+    import subprocess as _sp, tempfile as _tf, json as _js, os as _os, pathlib, sys, importlib.util
+    sc = js / "skills/job-scout/scripts"
+    run = lambda *a, **kw: _sp.run([sys.executable, *map(str, a)], capture_output=True, text=True, **kw)
+    tmp = pathlib.Path(_tf.mkdtemp(prefix="sbl-src-"))
+    env = dict(_os.environ, JOB_SEARCH_HOME=str(tmp / "state"))
+
+    # LinkedIn public search: cards -> rows
+    card = lambda jid, t, c, loc, d: (
+        f'<li><div class="base-card" data-entity-urn="urn:li:jobPosting:{jid}">'
+        f'<h3 class="base-search-card__title">\n  {t}\n</h3>'
+        f'<h4 class="base-search-card__subtitle"><a href="#">{c}</a></h4>'
+        f'<span class="job-search-card__location">{loc}</span>'
+        f'<time class="job-search-card__listdate" datetime="{d}">2 days ago</time></div></li>')
+    page = tmp / "li.html"
+    page.write_text(card("4100000001", "Head of Engineering", "Northwind Data", "Lisbon, Portugal", "2026-10-08")
+                    + card("4100000002", "VP Product &amp; Engineering", "Meridian Labs", "Madrid, Spain", "2026-10-07"),
+                    encoding="utf-8")
+    r = run(sc / "linkedin_jobs.py", "--fixture", page)
+    rows = _js.loads(r.stdout or "[]")
+    check("linkedin_jobs: parses every public result card", len(rows) == 2, r.stderr)
+    check("linkedin_jobs: title, company, location, date, canonical URL",
+          rows and rows[1]["title"] == "VP Product & Engineering" and rows[0]["company"] == "Northwind Data"
+          and rows[0]["posted"] == "2026-10-08" and rows[0]["url"].endswith("/jobs/view/4100000001"), str(rows[:1]))
+
+    # merge: the same job on LinkedIn and on the employer's board is ONE row, employer's copy wins
+    li = tmp / "scout-linkedin.json"
+    li.write_text(_js.dumps([dict(rows[0], market="Portugal"),
+                             {"source": "linkedin", "company": "Harbor Hotels", "title": "Chief Engineer",
+                              "location": "Lisbon, Portugal", "posted": "2026-10-08",
+                              "url": "https://www.linkedin.com/jobs/view/4100000003"}]), encoding="utf-8")
+    gh = tmp / "scout-careers.json"
+    gh.write_text(_js.dumps([{"source": "greenhouse", "ats": "greenhouse", "company": "northwinddata",
+                              "title": "Head of Engineering", "location": "Lisbon", "posted": "2026-10-05",
+                              "url": "https://job-boards.greenhouse.io/northwinddata/jobs/7000001"}]), encoding="utf-8")
+    out = tmp / "merged.json"
+    r = run(sc / "scout_state.py", "merge", "--titles", "head of|vp|chief technology",
+            "--domain", "engineering", "--markets", "Portugal=lisbon|porto|portugal;Spain=madrid|spain",
+            "--out", out, li, gh, env=env)
+    m = _js.loads(out.read_text()) if out.exists() else []
+    check("merge: one row per job across sources", len(m) == 1, r.stderr)
+    check("merge: every source and URL kept", m and set(m[0]["sources"]) == {"linkedin", "greenhouse"}
+          and len(m[0]["urls"]) == 2, str(m[:1]))
+    check("merge: the employer's own date and link win", m and m[0]["posted"] == "2026-10-05"
+          and "greenhouse" in m[0]["url"], str(m[:1]))
+    check("merge: off-lane rows dropped", not any("Chief Engineer" == x["title"] for x in m))
+    check("merge: new since last run is marked", m and m[0]["new"] is True)
+    r = run(sc / "scout_state.py", "coverage", env=env)
+    check("coverage: a declared market with no rows is a COVERAGE FAILURE",
+          r.returncode == 1 and "Spain: COVERAGE FAILURE" in r.stdout, r.stdout[-400:])
+
+    # freshness window
+    r = run(sc / "scout_state.py", "since-seconds", env=env)
+    check("since-seconds: first run looks back 14 days", r.stdout.strip() == str(14 * 86400), r.stdout)
+    run(sc / "scout_state.py", "mark-run", env=env)
+    r = run(sc / "scout_state.py", "since-seconds", env=env)
+    check("since-seconds: after a run, since then plus a day of overlap",
+          86400 <= int(r.stdout.strip() or 0) <= 2 * 86400, r.stdout)
+
+    # company registry: harvest, resolve, and hand ats_fetch the display name
+    r = run(sc / "companies.py", "add", input=out.read_text(), env=env)
+    run(sc / "companies.py", "set", "Northwind Data", "--ats", "workday", "--slug", "northwind.wd3/Careers", env=env)
+    r = run(sc / "companies.py", "batch", env=env)
+    check("companies: batch lines carry provider, slug and display name",
+          "workday northwind.wd3/Careers Northwind Data" in r.stdout, r.stdout)
+
+    # every ATS adapter normalises its provider's shape
+    spec = importlib.util.spec_from_file_location("ats_fetch_t", sc / "ats_fetch.py")
+    af = importlib.util.module_from_spec(spec); spec.loader.exec_module(af)
+    samples = {
+        "smartrecruiters": [{"id": "9001", "name": "Director of Engineering",
+                             "location": {"city": "Lisbon", "country": "pt"}, "releasedDate": "2026-10-01T09:00:00Z"}],
+        "recruitee": {"offers": [{"id": 5, "title": "Head of Product", "location": "Madrid, Spain",
+                                  "careers_url": "https://x.example/o/head", "published_at": "2026-10-02 10:00:00 UTC"}]},
+        "personio": "<workzag-jobs><position><id>77</id><office>Porto</office><name>VP Engineering</name>"
+                    "<createdAt>2026-10-03T08:00:00+00:00</createdAt></position></workzag-jobs>",
+        "teamtailor": "<rss><channel><item><title>CTO</title><link>https://x.teamtailor.com/jobs/123-cto</link>"
+                      "<pubDate>Sat, 04 Oct 2026 10:00:00 +0000</pubDate><tt:location><tt:city>Lisbon</tt:city>"
+                      "<tt:country>Portugal</tt:country></tt:location></item></channel></rss>",
+        "workday": [{"title": "Chief Architect", "locationsText": "Madrid", "postedOn": "Posted 3 Days Ago",
+                     "externalPath": "/job/Madrid/Chief-Architect_R123"}],
+    }
+    for prov, raw in samples.items():
+        slug = "northwind.wd3/Careers" if prov == "workday" else "northwind"
+        got = af.norm(prov, slug, raw)
+        check(f"ats_fetch: {prov} adapter yields title, location, url, date",
+              len(got) == 1 and got[0]["title"] and got[0]["location"] and got[0]["url"].startswith("http")
+              and len(got[0]["posted"]) == 10, str(got))
+    import datetime as _dt
+    check("ats_fetch: Workday 'Posted N Days Ago' becomes a date",
+          af._workday_posted("Posted 3 Days Ago", _dt.date(2026, 10, 10)) == "2026-10-07"
+          and af._workday_posted("Posted Yesterday", _dt.date(2026, 10, 10)) == "2026-10-09")
+
+
 def _job_search_gates(js):
     """The gates that stop an application being sent: knock-out screen, CV lint, answers lint,
     and learn.py refusing `applied` without them. All synthetic — a fictional candidate."""
@@ -1229,11 +1326,76 @@ def _fundraising_checks(fr):
               "[site](https://x.example)" in itxt and "](../YC" not in itxt and "`../YC/FACTS.md`" in itxt
               and (tmp / "46-fundraising" / "profile" / "materials" / "list.csv").is_file(), r.stdout + r.stderr[-200:])
 
+        # --- v0.3: raise-engage — public threads, drafted comments, never posted by the agent ---
+        TH = fr / "skills/raise-engage/scripts/threads.py"
+        today = __import__("datetime").date.today().isoformat()
+        r = brun(TH, "add", "--url", "https://www.example.com/posts/thread-1?utm_source=x#c", "--platform", "hn",
+                 "--author", "Jane Doe", "--title", "Memory vs docs", "--posted", today, "--topic", "agent memory",
+                 "--question", "How do docs stay fresh?", "--fit", "80")
+        tid = _js.loads(r.stdout)["id"] if r.returncode == 0 else ""
+        r2 = brun(TH, "add", "--url", "https://example.com/posts/thread-1/", "--platform", "hn")
+        check("fundraising: threads add dedupes one post reached by two links",
+              tid and r2.returncode == 0 and _js.loads(r2.stdout)["id"] == tid and not _js.loads(r2.stdout)["new"], r.stderr[-200:])
+        a1 = brun(TH, "add", "--url", "https://news.example.com/item?id=1", "--platform", "hn")
+        a2 = brun(TH, "add", "--url", "https://news.example.com/item?id=2&utm_source=x", "--platform", "hn")
+        check("fundraising: a query that names the thread keeps two threads apart",
+              a1.returncode == 0 and a2.returncode == 0 and _js.loads(a1.stdout)["id"] != _js.loads(a2.stdout)["id"])
+        r = brun(TH, "add", "--url", "https://example.com/old", "--platform", "x", "--posted", "2020-01-01")
+        check("fundraising: a thread outside the window is refused", r.returncode != 0)
+        bad = tmp / "bad.txt"
+        bad.write_text("Great post! Check out Co, DM me. Co does this. 4,000 users love it.", encoding="utf-8")
+        r = brun(TH, "check", "--file", str(bad))
+        res = _js.loads(r.stdout) if r.stdout.strip().startswith("{") else {}
+        check("fundraising: comment check reds a pitch, a double product mention and an unprofiled number",
+              r.returncode == 1 and any("check out" in x for x in res.get("red", []))
+              and any("named 2 times" in x for x in res.get("red", []))
+              and any("4,000" in x for x in res.get("red", [])), r.stdout[-400:])
+        good = tmp / "good.txt"
+        good.write_text("We hit the same staleness problem: hand-written docs drift. What fixed it for us was "
+                        "rebuilding them from the source exports with a link to where each fact came from — "
+                        "do you version the docs with the code?", encoding="utf-8")
+        r = brun(TH, "draft", tid, "--file", str(good))
+        note = tmp / "46-fundraising" / (_js.loads(r.stdout)["note"] if r.returncode == 0 else "x")
+        ntxt = note.read_text(encoding="utf-8") if note.is_file() else ""
+        check("fundraising: draft writes a comment note with the thread link and the ✓ button",
+              "[↗ Open the thread](https://example.com/posts/thread-1)" in ntxt and "sbl-ask:I%20posted" in ntxt
+              and "status: drafted" in ntxt, r.stdout + r.stderr[-300:])
+        check("fundraising: threads due counts the unposted draft", brun(TH, "due", "--count").stdout.strip() == "1")
+        brun(S / "render_brain.py", "--quiet")
+        dash = (tmp / "46-fundraising" / "Fundraising Dashboard.md").read_text(encoding="utf-8")
+        check("fundraising: the dashboard lists threads to comment on", "## Threads to comment on" in dash and "[↗ thread]" in dash)
+        r = brun(TH, "posted", tid)
+        check("fundraising: posted flips the note and sets a check-replies date",
+              r.returncode == 0 and "status: posted" in note.read_text(encoding="utf-8")
+              and brun(TH, "due", "--count").stdout.strip() == "0", r.stderr[-200:])
+        check("fundraising: posting twice is refused", brun(TH, "posted", tid).returncode != 0)
+        brun(TH, "mark-run")
+        check("fundraising: mark-run stamps the routine gate",
+              (tmp / ".plugins" / "fundraising" / "engage-run.txt").read_text(encoding="utf-8").strip() == today)
+
+    # every plugin must recognise a COMPANY brain (00-org/organization.md), not only a person's
+    import importlib.util as _iu2, tempfile as _tf2
+    with _tf2.TemporaryDirectory() as cb:
+        (Path(cb) / "00-org").mkdir()
+        (Path(cb) / "00-org" / "organization.md").write_text("---\ntitle: Acme\n---\n", encoding="utf-8")
+        for pp in (fr / "skills/raise-research/scripts/paths.py",
+                   fr.parent / "job-search/skills/job-scout/scripts/paths.py",
+                   fr.parent / "travel-planner/skills/trip-planner/scripts/paths.py"):
+            sp = _iu2.spec_from_file_location("sbl_paths_" + pp.parts[-5].replace("-", "_"), pp)
+            mod = _iu2.module_from_spec(sp); sp.loader.exec_module(mod)
+            check(f"plugins: {pp.parts[-5]} paths.is_brain recognises a company brain", mod.is_brain(cb))
+
     # shipped defaults and rails
     tmpl = (fr / "skills/raise-onboarding/references/answers-template.md").read_text(encoding="utf-8")
     check("fundraising: answers template defaults to supervised",
           "level: supervised" in tmpl and "level: autonomous" not in tmpl)
     sj = _json_load(fr / "studio.json")
+    eng = (fr / "skills/raise-engage/SKILL.md").read_text(encoding="utf-8")
+    check("fundraising: raise-engage never grants itself the browser and says it never posts",
+          "mcp__claude-in-chrome" not in eng.split("---")[1] and "Nothing is posted" in eng)
+    rt = (fr / "harness/routines/Threads worth a comment.md").read_text(encoding="utf-8")
+    check("fundraising: the engagement routine ships off and gated on its own stamp",
+          "enabled: false" in rt and "engage-run.txt" in rt and "skill: raise-engage" in rt)
     check("fundraising: studio tools never include a send-capable wildcard",
           not any("gmail" in t.lower() and t.endswith("*") for t in sj.get("tools", [])))
     # Personal needles are NOT listed here — this file is public, and a list of words to
@@ -1321,6 +1483,7 @@ def test_plugins():
               "level: supervised" in tmpl and "level: autonomous" not in tmpl.split("```")[1])
 
         _job_search_gates(js)
+        _job_search_sourcing(js)
 
     # --- fundraising specifics ------------------------------------------------
     fr = plugins / "fundraising"
@@ -2290,6 +2453,104 @@ def test_multi_entity_and_correlation():
         check("multi: PII sweep clean across all brains", not leaks, str(leaks[:3]))
 
 
+def test_ontology_mapping_integrity():
+    """mappings/brain/ontology.json is data the engine and both Studios read: every
+    relation names a real graph.json edge type, every object matches a note type the
+    builder writes, ids are unique, and specific rules precede the generic one."""
+    import json as _json
+    sys.path.insert(0, str(SCRIPTS))
+    import graphdata
+    spec = _json.loads((SCRIPTS.parent / "mappings" / "brain" / "ontology.json")
+                       .read_text(encoding="utf-8"))
+    etypes = set(graphdata._W_DEFAULT)
+    bad = [r["edge_type"] for r in spec["relations"] if r["edge_type"] not in etypes]
+    check("ontology.json: relations name real edge types", not bad, str(bad))
+    ids = [o["id"] for o in spec["objects"]]
+    check("ontology.json: object ids unique", len(ids) == len(set(ids)))
+    written = {"organization", "identity", "person", "company", "deal", "post",
+               "meetings", "events", "document", "place", "purchase", "mirror", "career"}
+    odd = [o["id"] for o in spec["objects"] if o["match"].get("type") not in written]
+    check("ontology.json: objects match types the builder writes", not odd, str(odd))
+    seen_generic, late = set(), []
+    for o in spec["objects"]:
+        m = o["match"]
+        if len(m) == 1:
+            seen_generic.add(m["type"])
+        elif m["type"] in seen_generic:
+            late.append(o["id"])
+    check("ontology.json: specific rules come before the generic one", not late, str(late))
+    known = set(ids)
+    dangling = [(r["edge_type"], x) for r in spec["relations"]
+                for x in r.get("from", []) + r.get("to", []) if x not in known]
+    check("ontology.json: relation endpoints are declared objects", not dangling,
+          str(dangling))
+    check("ontology.json: every question requires declared objects",
+          all(set(q.get("requires", [])) <= known for q in spec["questions"]))
+
+
+def test_ontology_reconciliation_traps():
+    """The globex fixtures carry deliberate reconciliation traps: one person in two CRMs
+    (Salesforce "Initech" / HubSpot "Initech GmbH", two different titles). The person
+    MERGES (2 sources, field_sources records who said what, the losing claim is kept as
+    alt_*); the two company spellings do NOT merge (name-only, precision-biased). Also:
+    the pre-build suggested ontology, the company _DATA_POINTS wording, the Home prompts
+    and the query.py ontology asks."""
+    import json as _json
+    with tempfile.TemporaryDirectory() as d:
+        out = Path(d) / "g"
+        src = FIXTURES / "company" / "globex"
+        r = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"), str(src), "-o", str(out)],
+                           capture_output=True, text=True)
+        check("traps: globex builds", r.returncode == 0, r.stderr[-300:])
+        people = list(out.rglob("Bill Lumbergh.md"))
+        txt = people[0].read_text(encoding="utf-8") if people else ""
+        check("traps: one merged person note across two CRMs",
+              len(people) == 1 and "hubspot" in txt and "salesforce" in txt, str(people))
+        check("traps: field_sources says which export supplied each field",
+              "field_sources:" in txt and re.search(r"company: (hubspot|salesforce)", txt), txt[:600])
+        check("traps: the conflicting company claim is kept, not lost",
+              "Initech GmbH" in txt)
+        orgs = {p.stem for p in out.rglob("*.md") if p.stem.startswith("Initech")}
+        check("traps: 'Initech' and 'Initech GmbH' are NOT merged (name-only)",
+              {"Initech", "Initech GmbH"} <= orgs, str(orgs))
+        g = _json.loads((out / "graph.json").read_text(encoding="utf-8"))
+        node = next((n for n in g["nodes"] if n["title"] == "Bill Lumbergh"), {})
+        check("traps: graph.json node carries field_sources + object",
+              node.get("object") == "person" and node.get("field_sources"), str(node)[:300])
+        accts = {o["id"]: o for o in g.get("ontology", {}).get("objects", [])}
+        check("traps: CRM customers become Account objects", "account" in accts, str(list(accts)))
+        home = (out / "Home.md").read_text(encoding="utf-8")
+        check("traps: Home prompts come from the ontology (accounts + deals)",
+              "Which accounts have the most deals" in home, home[:500])
+        # analyze: company-worded relations + ontology section
+        subprocess.run([sys.executable, str(SCRIPTS / "analyze.py"), str(out), "--goals", "onboarding"],
+                       capture_output=True, text=True)
+        dp = (out / "_DATA_POINTS.md").read_text(encoding="utf-8")
+        check("traps: _DATA_POINTS has the ontology section", "## Ontology — what this brain is made of" in dp)
+        check("traps: company relations are ontology-worded, not 'you —knows→'",
+              "you —knows→" not in dp and "→" in dp)
+        q = subprocess.run([sys.executable, str(SCRIPTS / "query.py"), str(out), "--ask", "objects", "--json"],
+                           capture_output=True, text=True)
+        rows = _json.loads(q.stdout or "[]")
+        check("traps: query.py --ask objects counts people with merged",
+              any(r_["object"] == "person" and r_["merged"] >= 1 for r_ in rows), q.stdout[:300])
+        q2 = subprocess.run([sys.executable, str(SCRIPTS / "query.py"), str(out), "--ask", "people-at", "Initech"],
+                            capture_output=True, text=True)
+        check("traps: query.py takes the --ask argument", q2.returncode == 0 and "Lumbergh" in q2.stdout,
+              q2.stderr[-200:])
+        # pre-build suggestion
+        prof = Path(d) / "prof"
+        subprocess.run([sys.executable, str(SCRIPTS / "profile_export.py"), str(src), "--out", str(prof)],
+                       capture_output=True, text=True)
+        bs = _json.loads((prof / "brain_structure.json").read_text(encoding="utf-8"))
+        sug = {o["id"]: o for o in bs.get("ontology_suggested", {}).get("objects", [])}
+        check("traps: pre-build suggested ontology marks Account as a merge candidate",
+              sug.get("account", {}).get("merge_candidate") is True, str(sug.get("account")))
+        md = (prof / "brain_structure.md").read_text(encoding="utf-8")
+        check("traps: brain_structure.md shows the suggested ontology",
+              "Before you build" in md and "flowchart LR" in md)
+
+
 def test_graphdata_and_avatars():
     """graph.json (sbl-graph/1) sidecar + avatar extraction: emitted for personal
     AND company brains + _correlations, edges typed/weighted with endpoints that
@@ -2334,6 +2595,33 @@ def test_graphdata_and_avatars():
                   for e in _json.loads(corr_g.read_text())["edges"]))
         check("graphdata: PII sweep (no emails in graph.json)",
               not EMAIL.search(ada_g.read_text() + acme_g.read_text()))
+        # ontology: object types + labelled relations, counted from the brain
+        onto_c, onto_a = gc.get("ontology") or {}, ga.get("ontology") or {}
+        objs_c = {o["id"]: o for o in onto_c.get("objects", [])}
+        check("ontology: company graph.json carries objects + relations",
+              bool(objs_c) and bool(onto_c.get("relations")), str(list(objs_c)))
+        check("ontology: acme has Person and a company-category object",
+              "person" in objs_c and ({"team", "channel", "self", "organization"} & set(objs_c)),
+              str(list(objs_c)))
+        check("ontology: personal brain has Person, no company-only objects",
+              "person" in {o["id"] for o in onto_a.get("objects", [])}
+              and not ({"account", "deal", "channel"}
+                       & {o["id"] for o in onto_a.get("objects", [])}))
+        check("ontology: every relation has a label and a count",
+              all(r.get("label") and r.get("count", 0) > 0
+                  for r in onto_c.get("relations", []) + onto_a.get("relations", [])))
+        check("ontology: object counts match node.object tags",
+              all(o["count"] == sum(1 for n in gc["nodes"] if n.get("object") == o["id"])
+                  for o in onto_c.get("objects", [])))
+        check("ontology: merged count = nodes with 2+ sources",
+              all(o["merged"] == sum(1 for n in gc["nodes"] if n.get("object") == o["id"]
+                                     and len([s for s in n.get("sources", []) if s != "[]"]) > 1)
+                  for o in onto_c.get("objects", [])))
+        check("ontology: questions only for objects present",
+              all(q.get("q") for q in onto_c.get("questions", [])))
+        check("ontology: no meta notes (Home/MOC/reports) as objects",
+              not any(n.get("object") for n in gc["nodes"]
+                      if n["type"] in ("moc", "structure", "catalog", "guide", "note")))
         # avatar: owner's vCard photo → _assets/avatars/ + frontmatter + graph node
         owner = out / "personal" / "owner-brain"
         av = owner / "_assets" / "avatars" / "Ada Byron.jpg"
@@ -3316,6 +3604,8 @@ def main():
     test_geocoder()
     test_sibling_split_and_providers()
     test_multi_entity_and_correlation()
+    test_ontology_mapping_integrity()
+    test_ontology_reconciliation_traps()
     test_graphdata_and_avatars()
     test_mapping_engine()
     test_places_and_mappings_build()

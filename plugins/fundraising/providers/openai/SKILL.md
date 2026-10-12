@@ -29,6 +29,7 @@ drafts in the vault, never sent, exactly as on Claude.
 | The plan | `references/raise-plan.md` | "build my funding plan" |
 | Applying | `references/raise-apply.md` | a program is picked — up to the form, then hand off |
 | Outreach | `references/raise-outreach.md` | emails, intros, follow-ups |
+| Engage | `references/raise-engage.md` | public threads worth a comment — drafts only, never posts |
 | End to end | `references/raise-pipeline.md` | "run my raise", "what's due", "record a reply" |
 
 Supporting references: `verification.md`, `filter-chain.md`, `sources.md`, `email-playbook.md`,

@@ -81,7 +81,9 @@ def work_root():
 def is_brain(d):
     """A directory is a brain if it has an identity note under either subject's root."""
     b = pathlib.Path(d)
-    return any((b / _LAYERS[s]["root"] / "identity.md").is_file() for s in _LAYERS)
+    # a person's brain roots on 00-me/identity.md, a company's on 00-org/organization.md
+    return any((b / _LAYERS[s]["root"] / n).is_file()
+               for s in _LAYERS for n in ("identity.md", "organization.md"))
 
 
 def brain_at_cwd(start=None):

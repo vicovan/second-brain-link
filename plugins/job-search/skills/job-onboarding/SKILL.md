@@ -116,7 +116,9 @@ untouched, then list what was added:
    Read the public record from a LinkedIn data export (`Positions.csv`) or text the user pastes —
    never by fetching LinkedIn. Where the internal dates and the public record differ, say so role
    by role and record which the CV uses; check each company site responds before recording it.
-7. If a legacy state folder with applications exists, offer
+7. `search-criteria.md` §3a **Markets** and §3b **Sources** — ask as in Step 3. Without them the
+   scout cannot build its query grid or check coverage, and searches only the open ATS boards.
+8. If a legacy state folder with applications exists, offer
    `learn.py import-legacy <folder>` (it copies; the source is untouched).
 
 ## Step 1 — Look before you ask
@@ -188,6 +190,16 @@ Ask only what you could not find, and ask in one pass per file rather than one a
 - **Compensation floor**: the number below which you would decline. Base, or total?
 - **Hard exclusions** — sectors, company stages, or arrangements you will not consider.
 - **Company size/stage** you do best in.
+- **Sources (§3b)** — ask each in one line, with the honest caveat:
+  *"Should I read LinkedIn's public job search (no login, so nothing touches your account —
+  though LinkedIn's terms discourage automated reading)?"* · *"And when you ask for a deep look,
+  may I read LinkedIn in your signed-in Chrome? That one is your account."* · *"Some boards block
+  automated reading — may I open their public lists in your Chrome, read-only?"* · *"Jobs on
+  portals that need an account (Workday, SuccessFactors): show them with the CV and answers
+  ready for you to apply there, or leave them out?"* Defaults if they have no view:
+  `linkedin-public: off`, `linkedin-signed-in: never`, `chrome-boards: off`, `walled: surface`.
+- **Markets (§3a)** — for each place they named, the cities and country names a job location
+  would carry. These drive the query grid and the coverage gate.
 
 **`application-answers.md`** (each is asked on nearly every form)
 - **How much should I do on my own?** Ask this one plainly and first, because it decides

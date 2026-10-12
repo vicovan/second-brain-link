@@ -1,18 +1,68 @@
 # Sources — where to look, in order, and what actually works
 
-Ordered by yield. Everything here uses **public, unauthenticated endpoints**: no login,
-no scraping of a signed-in session, no browser automation for discovery. Sources that were
-tried and do not work are listed at the bottom so nobody wastes a run on them.
+**The sweep runs market → companies → careers sites.** Discovery finds who is hiring in every
+target market, from several independent sources; the company registry remembers each employer
+and its careers board; the careers-site sweep pulls the full list at the source, where the real
+posting date and apply link live. **Which sources serve which market is in
+`regional-sources.md`** — read it for every market in the user's criteria §3. A market that
+comes back empty from one source has not been searched (`scout_state.py coverage`).
 
-> **On LinkedIn.** This plugin does not search LinkedIn. Its User Agreement forbids
-> automated access, and enforcement lands on the user's own account rather than on us —
-> so the trade is a bad one to make on someone else's behalf. A LinkedIn posting that
-> reaches you another way is still worth reading, and step 1b of `job-apply` resolves it
-> to the employer's own ATS, which is where the application should be made anyway.
+Everything here reads **public listings**. Nothing logs in to a job board, creates an account,
+or applies through an aggregator — the application is always made at the employer's own site.
+Sources that were tried and do not work are listed at the bottom.
+
+> **On LinkedIn — the user's choice, recorded in criteria §3b Sources.**
+> - **Public search (`linkedin_jobs.py`)** reads LinkedIn's no-login job search: the list anyone
+>   sees logged out. No account is used, so nothing can land on the user's account. LinkedIn's
+>   terms still discourage automated access even to public pages, so the script is slow on
+>   purpose (≥1.5 s between requests), capped per run, identifies itself honestly, and stops at
+>   the first throttle (HTTP 429/999) instead of pushing through it. Onboarding asks before
+>   turning it on.
+> - **Signed-in browser read** — only when the user asks for a deep look, only if criteria §3b
+>   allows it, and only read-only result pages in their own Chrome: never apply, message, connect
+>   or "Easy Apply". Any enforcement here would land on the user's own account; say so when asked.
+> - Either way, a LinkedIn posting is **resolved to the employer's own careers site**
+>   (`job-apply` step 1b) before it is scored for applyability.
 
 ---
 
-## Tier 0 — search the open ATS boards first ⭐ the highest-yield source
+## Tier 0 — discovery: who is hiring, in every target market
+
+Run the query grid — every lane title and its synonyms (criteria §1) × every market (criteria §3)
+— against every source in that market's pack (`regional-sources.md`), time-limited to what was
+posted since the last run:
+
+```bash
+SINCE=$(python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py since-seconds)
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/linkedin_jobs.py --since-seconds "$SINCE" \
+        --keywords "<lane title>" --keywords "<synonym>" ... \
+        --location "<market>" ... --out /tmp/scout-linkedin.json
+```
+Regional boards that block automated reading (`chrome` / `search` routes) are read in the user's
+browser when criteria §3b allows it, otherwise through `site:` searches; write what they give into
+`/tmp/scout-<board>.json` in the same row shape (`company`, `title`, `location`, `posted`, `url`,
+`source`, `market`).
+
+## Tier 1 — the company registry: every employer's own board
+
+Every company discovery names goes into the registry, which remembers its careers board:
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/companies.py add < /tmp/scout-merged.json
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/companies.py unresolved   # find + `set` their boards
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/companies.py batch > /tmp/boards.txt
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/ats_fetch.py --batch /tmp/boards.txt \
+        --filter "<lane regex>" --out /tmp/scout-careers.json
+```
+For an unresolved company: `WebSearch "<company> careers"`, classify the page with
+`job-apply/scripts/detect_portal.py`, then `companies.py set "<company>" --ats <type> --slug <slug>`
+(or `--careers <url>` for a board no adapter reads — then `WebFetch` / Chrome it). The registry
+compounds: by the second week most hiring companies in a market are one API call away.
+
+**Walled boards are read, not skipped.** Reading a Workday or SuccessFactors job list needs no
+account; only applying does. With criteria `walled: surface` (the default) such rows stay on the
+shortlist with the portal named, for the user to apply there.
+
+## Tier 1b — the open ATS pool (US and EU tech)
 
 **The problem this solves:** a broad job-board sweep finds good roles and *then* discovers
 half of them sit behind Workday / Eightfold / Phenom account walls the user cannot use. That
@@ -63,6 +113,11 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/ats_fetch.py --batch comp
 | Greenhouse | `boards-api.greenhouse.io/v1/boards/<slug>/jobs?content=true` | ✅ |
 | Lever | `api.lever.co/v0/postings/<slug>?mode=json` | ✅ |
 | Ashby | `api.ashbyhq.com/posting-api/job-board/<slug>` | ✅ |
+| SmartRecruiters | `api.smartrecruiters.com/v1/companies/<CompanyId>/postings` | ✅ |
+| Recruitee | `<slug>.recruitee.com/api/offers/` | ✅ |
+| Personio | `<slug>.jobs.personio.de/xml` | ✅ |
+| Teamtailor | `<slug>.teamtailor.com/jobs.rss` | ✅ |
+| Workday | `POST <tenant>.<wdN>.myworkdayjobs.com/wday/cxs/<tenant>/<site>/jobs` | ⚠️ built to the published contract; unverified (Workday was in maintenance when added) — on failure, `WebFetch` / Chrome the careers page |
 
 Use this as a **drill-down**, not a sweep: when another tier surfaces an interesting company,
 pull its whole board to see everything else open there.
@@ -116,6 +171,8 @@ it is the expensive step.
 | `jobs.ashbyhq.com/<company>` (HTML) | JS-rendered, returns nothing — use the Ashby **API** above |
 | `remoterocketship.com` | HTTP 403 to WebFetch |
 | Indeed / Glassdoor direct fetch | bot-walled; reach them through WebSearch results instead |
+| Bayt, GulfTalent direct fetch | HTTP 403 — read them in the user's Chrome (criteria §3b) or via `site:` search |
+| Workable public API | no public listing API — `WebFetch` `apply.workable.com/<slug>` or search |
 
 ## Rate and etiquette rules
 

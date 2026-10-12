@@ -64,7 +64,7 @@ Write the profiler outputs into the **vault** (a `_profile/` subfolder), so the 
 - `<source>_mindmap.md` + `.canvas` — an **exhaustive mindmap**: every file → every column, grouped by target layer, plus a correlations diagram (which files feed Person / Organization / Skill / Job / Activity / Profile-URL, and on what join field). 🔒 marks sensitive files (catalogued, never imported); ❓ marks unmapped files.
 - `brain_structure.md` + `.canvas` + `.json` — the **designed brain folder/note tree** (fixed canonical layers, pruned to what this export actually has). The `.json` is the build-spec consumed in step 5.
 
-Show the user the mindmap and brain-structure (both render in Obsidian and GitHub) before building, so they can see the data points and the planned layout.
+Show the user the mindmap and brain-structure (both render in Obsidian and GitHub) before building, so they can see the data points and the planned layout. `brain_structure.md` ends with **"Before you build — the ontology these exports will make"**: the object types these exports will produce (Person, Account, Channel, Deal…), which will be **resolved** into one note across sources (by name), and how they connect (`brain_structure.json` → `ontology_suggested`). Ask the user **"Does this read right?"** before building; if an object is wrong, exclude that source or adapt a mapping first.
 
 ### 4. Adapt — only if the map flags unknowns
 If nothing is flagged, skip to step 5. Otherwise write `<work-dir>/mapping_overrides.json` to route unknown files into the right layer (reasoning over the small map, not the data):
@@ -141,7 +141,15 @@ intros/asks/recommendations in the user's voice.
 2. **The typed graph (`graph.json`, schema sbl-graph/1)** — every brain root carries a
    machine-readable graph: nodes (id = note path sans `.md`), TYPED weighted edges
    (`works_at`/`member_of`/`attended`/`purchased_from`/`correlated`/`linked`, `w` ∈ (0,1])
-   and ordered layers. **Answer questions by traversing it, never by reading all notes:**
+   and ordered layers, plus an **`ontology`** block (`mappings/brain/ontology.json`, counted
+   by `scripts/ontology.py`): `objects` (Person / Account / Team / Channel / Deal / Campaign /
+   Document… with count, `merged` = found in 2+ sources, per-source counts), `relations`
+   (labelled + directed: "Deal —deal for→ Account", "Person —contact at→ Account"),
+   `questions` and `metrics`. Every node carries `object`; merged people/orgs carry
+   `field_sources` ("company: slack"). **Read `ontology` first** to know what the brain holds.
+   **Never estimate a number**: count with `scripts/query.py <brain> --ask objects|relations|
+   accounts-by-deals|top-by <edge_type>` (or `--sql`) and quote those counts.
+   **Answer questions by traversing it, never by reading all notes:**
    resolve the question's entities to node ids by title → follow `correlated`/`works_at`
    first, then high-`w` edges 1–2 hops → read ONLY those notes (frontmatter first) → cite
    what you used as `[[wikilinks]]`. This is spreading activation over the real graph —

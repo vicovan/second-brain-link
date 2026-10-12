@@ -159,11 +159,17 @@ Run `python3 skills/job-scout/scripts/paths.py` to see every decision it made.
   could invent.
 - **It never writes a job title you did not hold.** Your profile carries a closed list of allowed
   variants per role, and the CV builder may not go outside it.
-- **It never touches LinkedIn.** Its User Agreement forbids automated access and enforcement lands
-  on your account, so this plugin does not search it at all. Job URLs that reach you another way
-  are resolved to the employer's own form first, which is where you should apply anyway.
-- **It never creates an account**, so portals that require one are excluded from your shortlist
-  rather than wasting a slot in it.
+- **LinkedIn only if you turn it on.** Onboarding asks. With it on, the scout reads LinkedIn's
+  public, no-login job search — no account is used, so nothing touches yours — slowly, with a
+  request cap, stopping when throttled; LinkedIn's terms discourage automated reading, which is why
+  it is your choice. It never applies, messages or logs in there: every posting is resolved to the
+  employer's own site, which is where you should apply anyway.
+- **It searches each market where that market posts** — LinkedIn, regional boards and recruiters,
+  then every hiring company's own careers board — and a coverage check refuses to call a market
+  empty until several sources agree.
+- **It never creates an account.** Jobs on portals that need one (Workday, SuccessFactors) are kept
+  on your shortlist with the CV and answers ready for you to apply there — or left out, if you
+  prefer (`walled: drop`).
 - **It identifies itself honestly** to every endpoint it calls, and only calls public ones.
 
 ## Requirements
