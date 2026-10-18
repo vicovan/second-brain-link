@@ -14,7 +14,7 @@ request cap, and stops at the first sign of throttling rather than pushing throu
 
     python3 linkedin_jobs.py --keywords "Head of Engineering" --keywords "CTO" \
             --location "United Arab Emirates" --location "Switzerland" \
-            --since-seconds 259200 --out /tmp/scout-linkedin.json
+            --since-seconds 259200 --out $SCRATCH/scout-linkedin.json
 
     --since-seconds N   only postings from the last N seconds (scout_state.py since-seconds)
     --days D            the same, in days (ignored when --since-seconds is given)
@@ -25,6 +25,11 @@ request cap, and stops at the first sign of throttling rather than pushing throu
     --fixture FILE      parse a saved results page instead of fetching (tests)
 
 Rows use the same shape as ats_pool.py, plus `source`, `market` and `query`.
+
+This reads result LISTS only. A job's own guest page (jobs-guest/jobs/api/jobPosting/<id>)
+throttles much sooner - HTTP 429 after roughly 15-20 reads per IP even with a few seconds
+between them - so budget about 15 full-posting reads a run, never retry a 429, and read the
+rest of each description from the employer's own board (job-apply step 1b).
 Zero network outside linkedin.com; stdlib only.
 """
 import argparse, html, json, os, re, ssl, sys, time, urllib.error, urllib.parse, urllib.request

@@ -26,6 +26,12 @@ Usage:
     cat posting.txt | knockout.py --jd -
 
 Exit code: 0 PASS or FLAG, 1 STOP, 2 usage/profile error.
+
+Two salary lines are read from the profile: `salary_floor` (the drop line: a PUBLISHED band
+whose top is below it is a STOP) and the optional `salary_target` (the rank line: a band below
+it is only a FLAG). Text after an aggregator's "similar jobs" / "other people also applied"
+marker is cut before scanning, so another listing's salary or nationality line cannot kill
+the role being screened.
 """
 import argparse, json, os, pathlib, re, sys
 
@@ -86,16 +92,37 @@ FX = {"USD": 1.0, "$": 1.0, "EUR": 1.10, "€": 1.10, "GBP": 1.30, "£": 1.30, "
 # Profile
 # ------------------------------------------------------------------------------------------
 
+TRIED = []
+
+
 def _answers_path(explicit):
+    """The answers file: --answers, else this surface's profile, else the other surface's,
+    else the user's brain as find_brain.py resolves it. Run from /tmp or a subagent's scratch
+    folder, the cwd-derived surface is wrong; falling back here keeps the gate armed."""
     if explicit:
         return pathlib.Path(explicit)
+    cands = []
     try:
-        from paths import profile_dir
-        p = pathlib.Path(profile_dir()) / "application-answers.md"
-        if p.exists():
-            return p
+        from paths import profile_dir, other_profile_dir, layer
+        cands.append(pathlib.Path(profile_dir()))
+        o = other_profile_dir()
+        if o:
+            cands.append(pathlib.Path(o))
+        import find_brain
+        for fn in (find_brain.from_env, find_brain.from_cwd, find_brain.remembered):
+            try:
+                b = fn()
+            except Exception:
+                b = None
+            if b:
+                cands.append(pathlib.Path(b) / layer(b, "jobs") / "profile")
     except Exception:
         pass
+    for d in cands:
+        p = d / "application-answers.md"
+        TRIED.append(str(p))
+        if p.exists():
+            return p
     return None
 
 
@@ -138,14 +165,23 @@ def load_profile(path):
         "degrees": " ".join(lst("degrees")).lower(),
         "clearances": lst("clearances"),
         "years": int(re.sub(r"\D", "", raw.get("years_experience", "0")) or 0),
-        "floor_usd": 0,
+        "floor_usd": _usd(raw.get("salary_floor", "")),
+        "target_usd": _usd(raw.get("salary_target", "")),
         "raw": raw,
     }
-    f = re.match(r"([A-Z]{3}|[$€£])\s*([\d,.]+)\s*(k)?", raw.get("salary_floor", "").strip(), re.I)
-    if f:
-        amt = float(f.group(2).replace(",", "")) * (1000 if f.group(3) else 1)
-        prof["floor_usd"] = amt * FX.get(f.group(1).upper(), FX.get(f.group(1), 1.0))
     return prof
+
+
+def _usd(value):
+    """'USD 120000' / 'EUR 150k' -> annual USD, 0 when unset. A '/month' suffix is annualised."""
+    v = value.strip()
+    f = re.match(r"([A-Z]{3}|[$€£])\s*([\d,.]+)\s*(k)?", v, re.I)
+    if not f:
+        return 0
+    amt = float(f.group(2).replace(",", "")) * (1000 if f.group(3) else 1)
+    if re.search(r"/\s*mo|month", v, re.I):
+        amt *= 12
+    return amt * FX.get(f.group(1).upper(), FX.get(f.group(1), 1.0))
 
 
 # ------------------------------------------------------------------------------------------
@@ -188,12 +224,29 @@ BASED = re.compile(r"(?:must|should|need to|needs to|required to|will need to|ha
                    r"(?:are you|do you (?:currently )?(?:live|reside)|currently (?:based|located|living))", re.I)
 NATIONALITY = re.compile(r"\b(?:nationals? only|citizens? only|citizenship (?:is )?required|must be a "
                          r"(?:\w+ )?(?:national|citizen)|(?:emirati|saudi|qatari|gcc|uae|british|us|u\.s\.) "
-                         r"(?:nationals?|citizens?(?:hip)?)|emiratisation|emiratization|saudi[sz]ation|"
-                         r"nationali[sz]ation)\b", re.I)
+                         r"(?:nationals?|citizens?(?:hip)?))\b", re.I)
+# Localisation programmes ("support Emiratisation objectives", "Saudization targets") are
+# usually a team-building duty, not a citizenship gate. FLAG them; only the explicit
+# "<X> nationals only" wording above is a STOP.
+LOCALISATION = re.compile(r"\b(?:emiratisation|emiratization|saudi[sz]ation|omani[sz]ation|"
+                          r"qatari[sz]ation|nationali[sz]ation)\b", re.I)
 CLEARANCE = re.compile(r"\b(?:security clearance|SC clearance|DV clearance|NV1|NV2|TS/SCI|top secret|"
                        r"eligible for (?:security )?clearance|BPSS)\b", re.I)
 REQUIRED = re.compile(r"\b(?:required|requirement|must|mandatory|essential|fluent|fluency|native|"
                       r"business[- ]level|professional (?:working )?proficiency|C1|C2)\b", re.I)
+# "Swedish is not required", "no degree needed" — the requirement word is negated.
+NEGATED = re.compile(r"\b(?:not|no|isn['’]t|aren['’]t|never)\s+(?:\w+\s+){0,2}(?:required|necessary|needed|"
+                     r"mandatory|essential|a (?:requirement|must))\b|\bnot a (?:requirement|must)\b|"
+                     r"\bno (?:\w+\s+){0,2}(?:required|needed|necessary)\b|\bwithout (?:any )?\w+ skills\b", re.I)
+# Benefit lines that carry money but are not base pay.
+BENEFIT = re.compile(r"commut|allowance|stipend|budget|reimburs|per diem|equipment|wellness|gym|"
+                     r"pension|insurance|learning|training|home[- ]office|relocation (?:package|assistance|"
+                     r"support|bonus)|signing bonus|referral", re.I)
+PAYWORD = re.compile(r"salary|\bbase\b|compensation|pay (?:range|band)|\bOTE\b|salary band", re.I)
+# Where an aggregator / recruiter page stops describing THIS job and starts listing others.
+SIDEBAR = re.compile(r"^\s*(?:#+\s*)?(?:similar jobs|related jobs|recommended jobs|more jobs (?:like this|from)|"
+                     r"other (?:people|users|candidates) (?:also )?(?:applied|viewed)|people also (?:viewed|applied)|"
+                     r"jobs you may (?:like|be interested in)|you may also like)\b", re.I | re.M)
 OPTIONAL = re.compile(r"\b(?:nice to have|a plus|is a plus|bonus|preferred|advantage|desirable|ideally)\b", re.I)
 DEGREE = re.compile(r"\b(PhD|Ph\.D\.?|doctorate|master['’]?s(?: degree)?|MSc|M\.Sc\.?|MBA|"
                     r"bachelor['’]?s(?: degree)?|BSc|B\.Sc\.?|degree in)\b", re.I)
@@ -256,8 +309,11 @@ def scan(text, prof, source="jd"):
                     f"requires relocating to {', '.join(sorted(where))} — a real commitment")
 
         # 3. Nationality and clearance.
-        if NATIONALITY.search(s):
+        if NATIONALITY.search(s) and not NEGATED.search(s):
             add("STOP", "nationality", s, "citizenship gate — residency does not satisfy it")
+        elif LOCALISATION.search(s):
+            add("FLAG", "nationality", s, "localisation programme mentioned — a gate only if it says "
+                                          "nationals only; check the form's own question")
         if CLEARANCE.search(s) and not prof["clearances"]:
             lvl = "FLAG" if OPTIONAL.search(s) else "STOP"
             add(lvl, "clearance", s, "security clearance usually requires citizenship or long residency")
@@ -266,6 +322,11 @@ def scan(text, prof, source="jd"):
         low = s.lower()
         for lang in LANGS:
             if re.search(rf"\b{lang}\b", low) and lang not in prof["languages"]:
+                # the negation must sit next to THIS language: "Fluent German required, Swedish
+                # is not required" still requires German
+                near = re.search(rf"\b{lang}\b(?:\W+\w+){{0,4}}", low)
+                if near and NEGATED.search(near.group(0)):
+                    continue
                 if OPTIONAL.search(s):
                     add("FLAG", "language", s, f"{lang.title()} is a plus")
                 elif REQUIRED.search(s) or source == "form":
@@ -274,7 +335,7 @@ def scan(text, prof, source="jd"):
 
         # 5. Degrees.
         d = DEGREE.search(s)
-        if d and REQUIRED.search(s) and not OPTIONAL.search(s):
+        if d and REQUIRED.search(s) and not OPTIONAL.search(s) and not NEGATED.search(s):
             deg = d.group(1).lower()
             have = prof["degrees"]
             need_phd = deg.startswith(("phd", "ph.d", "doctor"))
@@ -296,10 +357,13 @@ def scan(text, prof, source="jd"):
 
     # 8. Salary — published band against the floor, sentence by sentence so a funding
     #    round in the next sentence is never mistaken for pay.
-    if prof["floor_usd"]:
+    floor, target = prof["floor_usd"], prof.get("target_usd") or 0
+    if floor or target:
         for s in sentences(text):
             if re.search(r"funding|raised|series [a-e]\b|valuation|revenue|\barr\b|customers|users", s, re.I):
                 continue
+            if BENEFIT.search(s) and not PAYWORD.search(s):
+                continue    # "Commuter assistance up to GBP 5,000 per year" is not the salary
             for m in MONEY.finditer(s):
                 cur = m.group(1)
                 fx = FX.get(cur.upper(), FX.get(cur))
@@ -317,12 +381,15 @@ def scan(text, prof, source="jd"):
                     r"(?:starting|from|at least|minimum|min\.?)\s+(?:at\s+)?" + re.escape(m.group(0)[:3])
                     + r"|" + re.escape(m.group(0)) + r"\s*\+", s, re.I)
                 lo_usd, hi_usd = lo * fx, hi * fx
-                if hi_usd < prof["floor_usd"] and not open_top:
+                if floor and hi_usd < floor and not open_top:
                     add("STOP", "salary", s, f"published top of band ≈ ${hi_usd:,.0f}/yr, below the floor "
-                                             f"${prof['floor_usd']:,.0f}")
-                elif lo_usd < prof["floor_usd"]:
+                                             f"${floor:,.0f} — confirm this sentence is the base salary")
+                elif target and hi_usd < target and not open_top:
+                    add("FLAG", "salary", s, f"published top of band ≈ ${hi_usd:,.0f}/yr, below the target "
+                                             f"${target:,.0f} (above the floor) — ranks low, not a drop")
+                elif floor and lo_usd < floor:
                     add("FLAG", "salary", s, f"band starts ≈ ${lo_usd:,.0f}/yr, below the floor "
-                                             f"${prof['floor_usd']:,.0f}")
+                                             f"${floor:,.0f}")
     return findings
 
 
@@ -340,6 +407,12 @@ def _read(src):
     return pathlib.Path(src).read_text(encoding="utf-8", errors="replace")
 
 
+def own_listing(text):
+    """Cut an aggregator page at its 'similar jobs' block (see SIDEBAR)."""
+    m = SIDEBAR.search(text)
+    return text[:m.start()] if m and m.start() > 200 else text
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--jd", required=True, help="posting text file, or - for stdin")
@@ -352,10 +425,13 @@ def main():
     prof = load_profile(ans) if ans and ans.exists() else None
     if not prof:
         print("NO KNOCK-OUT PROFILE: add a '## Knock-outs' section to profile/application-answers.md "
-              "(run job-search:job-onboarding). Without it every job is unscreened.", file=sys.stderr)
+              "(run job-search:job-onboarding), or pass --answers <brain>/45-jobs/profile/application-answers.md. "
+              "Without it every job is unscreened.", file=sys.stderr)
+        if TRIED:
+            print("looked in: " + " · ".join(TRIED), file=sys.stderr)
         sys.exit(2)
 
-    findings = scan(_read(a.jd), prof, "jd")
+    findings = scan(own_listing(_read(a.jd)), prof, "jd")
     if a.form:
         findings += scan(_read(a.form), prof, "form")
     v = verdict(findings)

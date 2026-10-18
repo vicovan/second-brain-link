@@ -99,6 +99,14 @@ def _workday_posted(text, today=None):
     return (today - datetime.timedelta(days=int(m.group(1)))).isoformat() if m else ""
 
 
+def _ms_date(ms):
+    """Lever's createdAt is epoch milliseconds."""
+    try:
+        return datetime.datetime.utcfromtimestamp(int(ms) / 1000).date().isoformat()
+    except (TypeError, ValueError, OverflowError, OSError):
+        return ""
+
+
 def norm(provider, slug, raw):
     out = []
     if provider == "greenhouse":
@@ -106,7 +114,9 @@ def norm(provider, slug, raw):
             out.append({"title": j.get("title", ""),
                         "location": (j.get("location") or {}).get("name", ""),
                         "url": j.get("absolute_url", ""),
-                        "posted": (j.get("updated_at") or "")[:10],
+                        # first_published is when the req went live; updated_at moves on every
+                        # edit and makes a months-old role look fresh.
+                        "posted": (j.get("first_published") or j.get("updated_at") or "")[:10],
                         "id": str(j.get("id", ""))})
     elif provider == "lever":
         for j in raw if isinstance(raw, list) else []:
@@ -114,7 +124,7 @@ def norm(provider, slug, raw):
             out.append({"title": j.get("text", ""),
                         "location": cat.get("location", ""),
                         "url": j.get("hostedUrl", ""),
-                        "posted": "",
+                        "posted": _ms_date(j.get("createdAt")),
                         "id": str(j.get("id", ""))})
     elif provider == "ashby":
         for j in raw.get("jobs", []):

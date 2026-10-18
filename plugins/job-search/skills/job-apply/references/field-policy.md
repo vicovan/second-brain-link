@@ -53,7 +53,8 @@ expectation, dates, titles held, languages, education, references, every consent
 certification.
 
 Every one of these comes from **`<brain>/45-jobs/profile/profile.md`** or
-**`profile/application-answers.md`**. Nothing else. If a factual question cannot be answered
+**`profile/application-answers.md`** (including its §5b standing defaults), plus the user's
+chat-answers note and ticked evidence items where they exist (job-apply step 0). Nothing else. If a factual question cannot be answered
 truthfully from those two files, **ask the user** — and in an autonomous run, where there is
 nobody to ask, **skip that job with a one-line reason**. Do not infer, do not approximate, do
 not "reasonably assume". An invented fact here goes out under their name to a real employer
@@ -114,6 +115,20 @@ have supplied, and where the employer expresses a preference about AI-assisted a
 write it and **record in `ANSWERS.md` that it was composed**, so the record is honest about
 how the words were produced.
 
+**The exception is an attestation about who wrote it.** A box that certifies the applicant
+*personally* completed the application, or a required confirmation of an AI policy that forbids
+AI-written answers, is never ticked by the agent at any autonomy level — ticking it would be a
+false statement in the user's name. Fill the factual fields, leave that box and the composed
+answers to the user, and hand the form over with the policy quoted.
+
+### 3c. Consents
+Read each consent's exact wording, then: **decline the optional ones** (keep my data for future
+roles, talent pools, marketing, WhatsApp or SMS updates) unless `application-answers.md` §5c says
+otherwise; **accept the ones inherent to submitting** (processing this application, a required
+privacy acknowledgement, AI-assisted screening of the application when the form requires it —
+there is no application without them). A *required* retention consent is accepted only when §5c
+allows it; otherwise the form goes to the user. Every consent goes verbatim into `ANSWERS.md` (§2).
+
 ## 4. EEO / demographic / diversity questions
 
 These are voluntary in almost every jurisdiction. **Default: select "prefer not to say" / decline
@@ -123,8 +138,11 @@ status. If a form makes one mandatory, surface it to the user rather than choosi
 ## 5. Contact set
 
 One phone, one location, chosen by playbook §2 in `cv-tailor/references/tailoring-playbook.md`
-and stated in the review. Never both phone numbers. Never both cities except for a global
-programme, per that playbook.
+and stated in the review — by default from the **job's location** (`profile.md` §8). Never both
+phone numbers. Never both cities except for a global programme, per that playbook. The form's phone,
+city and country match the CV that is uploaded with it; check the PDF's text before submitting.
+For a phone field split into a country picker and a number, pick the set's country code and type
+the national number without it.
 
 ## 6. Account-wall detection
 
@@ -136,7 +154,8 @@ confirm password, create a candidate account*.
 On a wall: never register. With criteria `walled: drop`, log the job as `skipped_walled`, tell the
 user the company, the role and the URL in one line, and move on. With `walled: surface` (the
 default), prepare the CV and answers and hand off at the portal (job-apply step 7b,
-`handoff_portal`).
+`handoff_portal`). With `walled: assist`, prepare them, let the user do the account step in their
+browser, then fill (job-apply step 7b).
 
 ## 6b. HOW to fill a field so it actually registers — learned the hard way
 
@@ -164,7 +183,12 @@ that visibly contain the right text. This has wasted a submit more than once.
 | **Ashby** | React-controlled inputs. `form_input` DOM writes display but never register; submit fails "missing required field". | Click the field, type real keystrokes. Verify toggles by screenshot. |
 | **SmartRecruiters** | The CV upload `<input type=file>` lives inside a **`SPL-DROPZONE` shadow root**, so `read_page`/`find`/`file_upload` cannot see it. Clicking "Choose a file" opens a native OS dialog you cannot use. | Locate it with `javascript_tool`, walk shadow roots for `SPL-DROPZONE`, **move the actual input element into the light DOM** (`document.body.appendChild(inp)` — listeners travel with it), give it an `aria-label` + id, `file_upload` to its ref, then **put it back** in the shadow root and clear the styles. Also: City is a typeahead needing a dropdown pick, and the phone country code defaults to the company's country. |
 | **Own-site forms** (a company's own careers page, not an ATS) | Hidden **honeypot** field — often "Website" with no placeholder, before Name, beside a hidden input. Filling it bins the application. | Leave any unlabelled/oddly-placed extra field blank. The real portfolio field is clearly labelled. |
-| **join.com** | Public posting, but "Apply now" → `/apply/authentication`. | Account wall — skip. |
+| **join.com** | Public posting, but "Apply now" → `/apply/authentication`. | Account wall — classify as walled and follow criteria `walled:`. |
+| **Ashby (Yes/No)** | A Yes/No question is a pair of buttons over ONE hidden checkbox, so "unchecked" means both *No* and *unanswered*. A pair can look selected and still fail validation. | Verify these visually. If submit names one as missing, click the other answer, then the intended one again, and re-submit. |
+| **Ashby (upload)** | Values typed while the CV upload is still processing are silently discarded. The cover letter may be a **file upload**, not a text box. | Upload first, wait for the file chip, then fill. Build a one-page cover-letter PDF when the field is an upload. |
+| **Lever** | *Current location* is pre-filled from the IP address (often a city the user does not live in), and the uploaded CV is parsed into the form, overwriting fields. | Upload the CV first and wait for parsing; then clear and re-select the location from its autocomplete and re-check every parsed field. |
+| **Teamtailor** | Textareas in the apply dialog reached by a reference click may not take typed text. | Click by coordinate from a fresh screenshot, then read back every input in the dialog before submitting. |
+| **Any ATS (reCAPTCHA)** | An invisible `g-recaptcha-response` textarea in the DOM. | Background reCAPTCHA that fills itself — not a challenge, does not block submit. A *visible* challenge still stops the run (§1). |
 | **Greenhouse (embedded)** | The form is an iframe on the company domain; the extension may lack `greenhouse.io` permission. | Ask the user to allow the domain — never drop the job for this. |
 | **Ashby (submit)** | Deduplicates by email per company, and can silently reject automated sessions at submit — the page may look successful while nothing arrives. | After submit, read the confirmation text from the DOM and record it in `ANSWERS.md`; if an application to the same company went out in the last 30 days, do not send a second. |
 | **Lever** | Checkbox clicks can raise an hCaptcha. | A CAPTCHA stops the run (§1) — report it; never try to solve it. |
@@ -188,6 +212,13 @@ answer lives in a separate hidden input that only React's own change handler wri
 
 Batching click+type+Enter with no waits silently does nothing. This was reproduced: the identical
 batch failed without waits and worked with them.
+
+**Enter can land in a different dropdown.** Filling several react-selects in a row with Enter has
+set values in *sibling* dropdowns on the same form — two sponsorship answers flipped to "No"
+unprompted. So: fill every dropdown before any textarea, and after **each** one read back every
+`singleValue` on the form, not just the one you set. If values drift, stop using Enter: open the
+menu and click the visible option by coordinate from a fresh screenshot (a reference to an option
+goes stale when the list re-renders).
 
 **Verify the REGISTERED value, never the displayed one:**
 ```js
@@ -241,6 +272,8 @@ that host their own form (`jobs.elastic.co`, `databricks.com`, `fivetran.com`).
 
 ## 7. Rate and conduct
 
-One application at a time. Never submit the same application twice — check `outcomes.jsonl` for the
+One application at a time, unless `application-answers.md` §0 sets `fill-mode: parallel-tabs` —
+then each form has its own tab, and the read-back and the submit still go one tab at a time.
+Never submit the same application twice — check `outcomes.jsonl` for the
 job key first. Never message a recruiter, never send email, never accept terms beyond the
 application form itself. Never touch a LinkedIn form (the user's standing choice — prepare and hand off).

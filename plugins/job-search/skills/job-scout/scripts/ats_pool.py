@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """
 ats_pool.py - Tier 0 of the daily sweep: bulk-probe company boards on the OPEN ATS
-APIs (Ashby, Greenhouse, Lever) and keep only the roles matching the criteria passed in,
+APIs (Ashby, Greenhouse, Lever, plus SmartRecruiters, Recruitee and Personio, which carry
+much of DACH and Benelux) and keep only the roles matching the criteria passed in.
 Everything it returns is applyable by construction - no account walls.
 
-    python3 ats_pool.py --out /tmp/scout/ats_pool.json
+    python3 ats_pool.py --out <state root>/scratch/ats_pool.json
+    python3 ats_pool.py --diagnose          # which slugs resolve at all - NO title filter
+
+Diagnose before concluding a pool is dead: run with a restrictive --titles and most boards
+"return nothing" because nothing matched, not because the slug is wrong. And an empty open-ATS
+sweep never proves a market is empty - see references/search-method.md.
 
 Slugs come from the built-in list PLUS <state root>/companies.txt, so the pool compounds
 as the scout learns new boards. companies.txt lines look like "ashby northwindventures".
@@ -65,11 +71,17 @@ def pull(pair):
             rows=[(j.get("title",""),j.get("location") or "",(j.get("compensation") or {}).get("compensationTierSummary") or "",j.get("jobUrl",""),(j.get("publishedAt") or "")[:10]) for j in d.get("jobs",[])]
         elif ats=="greenhouse":
             d=get(f"https://boards-api.greenhouse.io/v1/boards/{s}/jobs")
-            rows=[(j.get("title",""),(j.get("location") or {}).get("name",""),"",j.get("absolute_url",""),(j.get("updated_at") or "")[:10]) for j in d.get("jobs",[])]
-        else:
+            rows=[(j.get("title",""),(j.get("location") or {}).get("name",""),"",j.get("absolute_url",""),(j.get("first_published") or j.get("updated_at") or "")[:10]) for j in d.get("jobs",[])]
+        elif ats=="lever":
             d=get(f"https://api.lever.co/v0/postings/{s}?mode=json")
-            rows=[(j.get("text",""),(j.get("categories") or {}).get("location","") or "","",j.get("hostedUrl",""),"") for j in d]
+            rows=[(j.get("text",""),(j.get("categories") or {}).get("location","") or "","",j.get("hostedUrl",""),_ms_date(j.get("createdAt"))) for j in d]
+        else:
+            # The other open providers share ats_fetch.py's fetchers - one implementation.
+            from ats_fetch import board
+            rows=[(r["title"],r["location"],"",r["url"],r["posted"]) for r in board(ats,s)]
     except Exception: return out
+    if DIAGNOSE:
+        return [{"ats":ats,"company":s,"title":"(board resolved)","location":"","comp":"","url":"","posted":"","jobs":len(rows)}]
     for t,loc,comp,u,dt in rows:
         blob=t+" "+loc
         if not SENIOR.search(t) or not DOMAIN.search(t): continue
@@ -79,6 +91,18 @@ def pull(pair):
            and not REGIONS.search(loc): continue
         out.append({"ats":ats,"company":s,"title":t,"location":loc,"comp":comp,"url":u,"posted":dt})
     return out
+DIAGNOSE = False
+PROVIDERS = ("ashby", "greenhouse", "lever", "smartrecruiters", "recruitee", "personio")
+
+
+def _ms_date(ms):
+    import datetime
+    try:
+        return datetime.datetime.utcfromtimestamp(int(ms) / 1000).date().isoformat()
+    except (TypeError, ValueError, OverflowError, OSError):
+        return ""
+
+
 def state_root():
     """Delegates to paths.py — the single resolver. Kept as a function so callers
     that already import `state_root` keep working."""
@@ -97,7 +121,7 @@ def extra_boards(path):
         if not line:
             continue
         parts = line.split()
-        if len(parts) >= 2 and parts[0] in ("ashby", "greenhouse", "lever"):
+        if len(parts) >= 2 and parts[0] in PROVIDERS:
             out.append((parts[1], parts[0]))
     return out
 
@@ -120,10 +144,14 @@ def main():
                          "sales board through. Write '\\bai\\b|machine learning' instead.")
     ap.add_argument("--exclude-titles", default=None,
                     help="regex of role titles to DROP — from profile/search-criteria.md §5 exclusions")
+    ap.add_argument("--diagnose", action="store_true",
+                    help="report which boards resolve and how many jobs each lists, ignoring every "
+                         "title/region filter - use it before declaring slugs dead")
     ap.add_argument("--quiet", action="store_true")
     a = ap.parse_args()
 
-    global REGIONS, EXCLUDE_REGIONS, SENIOR, DOMAIN, BAD
+    global REGIONS, DIAGNOSE, EXCLUDE_REGIONS, SENIOR, DOMAIN, BAD
+    DIAGNOSE = a.diagnose
     if a.regions:
         REGIONS = re.compile(a.regions, re.I)
     if a.exclude_regions:
@@ -152,6 +180,16 @@ def main():
                 hit += 1
             raw.extend(rows)
 
+    if DIAGNOSE:
+        print(f"{hit} of {len(boards)} boards resolved (no filters applied):")
+        for r in sorted(raw, key=lambda x: -x["jobs"]):
+            print(f"  {r['ats']:16} {r['company']:28} {r['jobs']:4} jobs")
+        dead = sorted(set(b for b, _ in boards) - {r["company"] for r in raw})
+        if dead:
+            print(f"\n{len(dead)} did not resolve - try slug variants (hyphenated, -bank, -io, -ltd, "
+                  f"-hq, the product name, the legal name) before dropping them:\n  " + " ".join(dead))
+        return
+
     # One row per (company, title). Celonis alone posts "Principal Enterprise Architect" in nine
     # cities; nine identical rows is noise, one row listing the cities is a decision.
     merged = {}
@@ -161,6 +199,9 @@ def main():
             locs = merged[k]["location"].split(" / ")
             if r["location"] and r["location"] not in locs:
                 merged[k]["location"] = " / ".join(locs + [r["location"]])
+                # Each city is often its own req with its own band, language and visa questions.
+                # The merged string is a summary - read the req for the city you score.
+                merged[k]["multi_city"] = True
         else:
             merged[k] = r
     res = list(merged.values())

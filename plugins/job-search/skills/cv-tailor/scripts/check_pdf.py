@@ -12,6 +12,10 @@ replacement characters (font problems), phone/email in the first 300 chars, and 
 PyMuPDF — orphaned bullet lines: a wrapped bullet whose second half fell back to the left
 margin, which reads to a human as a broken document. `--png DIR` renders each page so the
 layout can be looked at, not only parsed.
+
+Portability gates (any viewer, any parser, any upload widget): file size (FAIL over 1 MB,
+WARN over 400 KB), every font embedded and none of them Type3, and section headings that
+extract as whole words rather than spaced capitals ("W O R K").
 Exit code 1 if any hard check fails.
 """
 import os, sys
@@ -83,6 +87,51 @@ def orphans(pdf):
             prev = (y, x, t)
     return out
 
+BASE14 = ("Helvetica", "Times", "Courier", "Symbol", "ZapfDingbats")
+
+
+def fonts_report(pdf):
+    """[(name, kind, embedded)] for every font the PDF references, or None when no tool can
+    read them. PyMuPDF first, then pypdf, then poppler's pdffonts."""
+    try:
+        import fitz
+        seen = {}
+        for page in fitz.open(pdf):
+            for xref, ext, kind, name, *_ in page.get_fonts(full=False):
+                seen[name] = (name, kind, ext not in ("n/a", ""))
+        return list(seen.values())
+    except ImportError:
+        pass
+    try:
+        from pypdf import PdfReader
+        seen = {}
+        for page in PdfReader(pdf).pages:
+            res = page.get("/Resources") or {}
+            for f in (res.get("/Font") or {}).values():
+                f = f.get_object()
+                name = str(f.get("/BaseFont", "?")).lstrip("/")
+                kind = str(f.get("/Subtype", "?")).lstrip("/")
+                desc = f
+                if kind == "Type0":
+                    desc = f["/DescendantFonts"][0].get_object()
+                fd = desc.get("/FontDescriptor")
+                fd = fd.get_object() if fd else {}
+                emb = any(k in fd for k in ("/FontFile", "/FontFile2", "/FontFile3"))
+                seen[name] = (name, kind, emb)
+        return list(seen.values())
+    except ImportError:
+        pass
+    if shutil.which("pdffonts"):
+        out = subprocess.run(["pdffonts", pdf], capture_output=True, text=True).stdout
+        rows = []
+        for line in out.splitlines()[2:]:
+            parts = line.split()
+            if parts:
+                rows.append((parts[0], parts[1], not re.search(r"\bno\b", line.split(parts[1], 1)[-1][:12])))
+        return rows
+    return None
+
+
 def render_png(pdf, outdir, dpi=80):
     try:
         import fitz
@@ -104,6 +153,7 @@ def main():
     ap.add_argument("--nice", default="", help="';'-separated nice-to-have keywords")
     ap.add_argument("--title", default="", help="target job title that must appear")
     ap.add_argument("--name", help="the candidate name that must appear at the top")
+    ap.add_argument("--headline", help="the CV headline; checks the order name -> headline -> contact")
     ap.add_argument("--max-pages", type=int, default=2)
     ap.add_argument("--show", action="store_true", help="print extracted text")
     ap.add_argument("--text", action="store_true",
@@ -127,6 +177,11 @@ def main():
     if not re.search(r"\+\d[\d\s]{7,}", head): fails.append("phone not in first 300 chars")
     if a.name and a.name.lower() not in low[:120]:
         fails.append(f"name {a.name!r} not at top")
+    if a.name and a.headline:
+        i_n, i_h = low.find(a.name.lower()), low.find(a.headline.lower()[:40])
+        m = re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", txt)
+        if not (0 <= i_n < i_h and (m is None or i_h < m.start())):
+            fails.append("reading order is not name -> headline -> contact")
 
     if "\ufffd" in txt or "?" in re.sub(r"[^\w?]", "", txt[:200]):
         fails.append("replacement characters found — font/diacritics problem")
@@ -152,12 +207,30 @@ def main():
     if a.nice:
         cov(a.nice, "nice-to-have keywords", 1)
 
-    if shutil.which("pdffonts"):
-        f = subprocess.run(["pdffonts", a.pdf], capture_output=True, text=True).stdout
-        base14 = ("Helvetica", "Times", "Courier", "Symbol", "ZapfDingbats")
-        for line in f.splitlines()[2:]:
-            if re.search(r"\bno\b", line) and not line.startswith(base14):
-                warns.append(f"font not embedded: {line.split()[0]}")
+    # Portability: a CV must open and parse on any machine with nothing installed, and fit
+    # through an upload widget.
+    size = os.path.getsize(a.pdf)
+    print(f"size: {size // 1024} KB")
+    if size > 1024 * 1024:
+        fails.append(f"file is {size // 1024} KB — over 1 MB; upload widgets and mail filters reject it "
+                     f"(an unresampled photo is the usual cause)")
+    elif size > 400 * 1024:
+        warns.append(f"file is {size // 1024} KB — over 400 KB")
+    fr = fonts_report(a.pdf)
+    if fr is None:
+        warns.append("no tool to list fonts (pip install pymupdf or pypdf) — embedding not checked")
+    else:
+        for name, kind, emb in fr:
+            clean = re.sub(r"^[A-Z]{6}\+", "", name)
+            if "Type3" in kind:
+                fails.append(f"Type3 font {clean} — text may not extract")
+            elif not emb and clean.startswith(BASE14):
+                warns.append(f"standard font {clean} not embedded (every reader ships it)")
+            elif not emb:
+                fails.append(f"font not embedded: {clean} — the reader needs it installed")
+    spaced = re.findall(r"(?m)^\s*((?:[A-Z] ){3,}[A-Z])\b", txt)
+    if spaced:
+        fails.append(f"heading extracts as spaced letters ({spaced[0]!r}) — drop the letter-spacing")
 
     orph = orphans(a.pdf)
     if orph is None:

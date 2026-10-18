@@ -99,7 +99,9 @@ field that will not verify in the DOM.
 do not send the user to a terminal — Studio runs you with the Chrome integration enabled.
 
 1. **Resolve the row** to the employer's own ATS form (never a LinkedIn apply page).
-   `detect_portal.py` classifies it; a walled portal is reported, not fought.
+   `detect_portal.py` classifies it; a walled portal follows criteria `walled:` — reported as a
+   hand-off (`surface`), filled with the user doing only the account steps (`assist`), or left out
+   (`drop`). Never create the account or type a credential.
 2. **Create the application folder NOW**, before the CV exists — with `learn.py`, not
    `mkdir`:
    `learn.py log-outcome --company … --role … --url … --status filled`, then
@@ -110,20 +112,24 @@ do not send the user to a terminal — Studio runs you with the Chrome integrati
    however complete it is on disk — that is exactly the bug this line exists to prevent.
 3. **Tailor the CV** with the `cv-tailor` skill — never send a generic one. Write the
    Markdown and build the PDF into that folder, then `render_brain.py --quiet` again so
-   the CV shows up under it. Say the filename in one line when it lands.
+   the CV shows up under it. Say the filename in one line when it lands. The CV follows
+   the user's *CV design* settings (Settings → CV design: template, colours, photo policy and
+   shape, saved as `45-jobs/profile/style/cv-style.json`); override them only when the user asks
+   in this run. The photo (`45-jobs/profile/photo/`) appears only as that policy allows. If the user asks for a photo and none is uploaded, point them to that setting.
 4. **Draft every answer** into `answers.json` in the same folder (the permanent record —
    see `job-apply`).
 5. **Open the form in the browser and fill it.** Connect in THIS session first — a
    subagent cannot make the connection:
    - `list_connected_browsers`.
-   - **Gate on which browser — once per run, not once per job.** The extension's own
-     contract requires the user to choose and forbids you picking for them, even when only
-     one browser is connected. Emit
-     `{"id":"browser","question":"Which browser should I use?","options":[…]}` listing every
-     connected browser by its display name, and end the turn. That costs a turn, not the run
-     — the session is still yours when the answer arrives, and the connection is then reused
-     for every job in the run. This one question survives `autonomous`, because it is the
-     extension's requirement rather than an approval.
+   - **One browser connected (or one already chosen) → no question:** the browser tools just
+     work. Say which one in a line.
+   - **Several connected and none chosen → gate on which browser, once per run.** The
+     extension forbids you picking for them. Ask with `AskUserQuestion` (or emit
+     `{"id":"browser","question":"Which browser should I use?","options":[…]}` where that tool is
+     unavailable) listing every connected browser by its display name. The connection is then
+     reused for every job in the run. This one question survives `autonomous`, because it is
+     the extension's requirement rather than an approval.
+   - **Check this at the start of the run, before building anything** — not after ten CVs.
    - `select_browser <deviceId>` → `tabs_context_mcp` (createIfEmpty) for a tab id.
    - **Empty list, stale deviceId, or an extension that "isn't connected"?** Don't just report it
      — follow `browser-setup.md` (job-apply's references): give the user the numbered steps to
@@ -147,7 +153,9 @@ Steps 2 and 3 are what makes this visible: the folder, then the CV, then the bro
 
 **Applying to several at once.** "Apply to the top 3" is one run, not three conversations.
 Fan out steps 1–4 as parallel subagents (up to four at a time), then do step 5 and 6 one job
-at a time in the one browser. `job-pipeline` has the full protocol — including the rule that
+at a time in the one browser — or, with `fill-mode: parallel-tabs` in
+`application-answers.md` §0, one tab per job, with verification and submit still one tab at a
+time. Open-form jobs first; hand-offs and assisted portals after. `job-pipeline` has the full protocol — including the rule that
 **only you, never a subagent, writes the ledger**.
 
 If the browser genuinely is not available — `list_connected_browsers` errors, returns

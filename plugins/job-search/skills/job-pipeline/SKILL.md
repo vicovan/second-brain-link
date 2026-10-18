@@ -85,6 +85,16 @@ the run is happening — linked titles, a `CV` column, a `Status` emoji and a `S
 sentence, all updated the moment anything changes. They have had to ask for this twice; do not make it
 a third time.
 
+**Check the browser at the START, before building anything** (`browser-setup.md`). Ten built
+applications waiting on a disconnected extension is the most avoidable delay in the whole run.
+
+**Run every script from the brain root, and keep working files in the state root.** From another
+folder the ledger, the profile and memory resolve somewhere else, and the run quietly ignores the
+user's standing rules. Working files go in `paths.py --scratch` (one sub-folder per job for
+parallel agents: `paths.py --scratch <job_key>`), never `/tmp`, which parallel agents share and
+which can be wiped mid-run. If memory recall comes back empty in a brain that has an applications
+ledger, stop and check the surface (`find_brain.py --who`) before sweeping.
+
 **Surface Chrome domain permissions immediately.** Claude cannot grant them. Name the domain and the
 job waiting on it (`field-policy.md` §6e). If a run covers several ATS domains, ask for all of them
 in one go at the start rather than interrupting once per job — the fills themselves still happen
@@ -167,6 +177,8 @@ one exists, read it before searching — it carries the local conventions this f
 **The profile first** — it is what this run is for. Read order: this surface's
 `45-jobs/profile/` → the other surface's, used with a one-line notice and an offer to copy it
 here → **run `job-search:job-onboarding` (the **Skill** tool)**. Never guess a compensation floor, a location or a target title.
+Then `45-jobs/Answers You Gave in Chat.md` if it exists (job-apply step 0, *Answers given in
+chat*) — it holds what the user settled in earlier runs and wins over a read-only profile mirror.
 
 **Then the brain, if one is reachable** — best-effort enrichment, never a dependency:
 
@@ -229,7 +241,10 @@ offered, chosen or applied to.
 
 Present the scout's shortlist (sized by `learn.py target`, every one above the apply floor) in
 its format, headed by `Target: <valid today>/<daily-target>`. A short list after the scout's wider
-sweep is a correct result — never lower the floor or relax the criteria to fill slots.
+sweep is a correct result — never lower the floor or relax the criteria to fill slots. On a thin
+day the lever is the sweep (more boards, slug variants, more of the profile's markets, the 30-day
+repost pass), not the screens: never pad the list with walled-when-`drop`, below-floor or
+already-applied roles.
 
 - **`supervised` — Gate 1, they pick.** *"Apply to which today? (<remaining> to target)"* →
   *"Top <remaining + margin> — toward today's target"* (recommended; margin covers the gates that
@@ -241,8 +256,8 @@ sweep is a correct result — never lower the floor or relax the criteria to fil
   stop some). Say which ones you are taking in one line, and stop submitting the moment
   `learn.py target` shows the target met. Skip
   anything the scout marked excluded, disqualified or knock-out (a walled row is a hand-off —
-  job-apply step 7b — when criteria `walled: surface`), and never two roles at
-  the same company.
+  job-apply step 7b — when criteria `walled: surface`, and an assisted fill when `assist`), and
+  never two roles at the same company.
 
 Each chosen job then passes three more gates on its way to submit, whatever the level: the
 knock-out screen (job-apply 2b), the CV and answers lint, and the independent recruiter review
@@ -257,6 +272,12 @@ screen (2b — on `STOP` it returns the quoted sentence and builds nothing), cre
 `learn.py log-outcome --status filled`, write `posting.md`, `fit.md` and `company.md` (three
 searches, no more), invoke `job-search:cv-tailor` with that folder as the output directory,
 write `answers.json`, and run both `lint_cv.py` gates until they pass.
+
+**Before dispatching:** run cv-tailor's evidence check once for the whole run (one missing number
+sinks every CV the same way), and make sure every brief carries the brain root as its working
+folder, its own scratch path, the explicit `--answers` path for `knockout.py`, and
+`build_cv.py --no-render` (you render once as each agent returns, so a builder's automatic
+re-render never overwrites the report mid-run).
 
 **Then you, not the subagents, run job-apply step 4b** — one recruiter review per built
 application (on your own model — never pin a smaller one for it), sequentially, and record each verdict with `lint_cv.py review`. A subagent cannot
@@ -285,7 +306,7 @@ the end look like nothing happened for four minutes.
   keywords present, no replacement characters) and say the filename in one line. A CV that
   fails those checks is rebuilt, not sent.
 
-### 6. Phase B — fill and submit, one at a time
+### 6. Phase B — fill and submit
 
 Connect and select the browser **once** in this session (not connected → `references/browser-setup.md`,
 the user's steps to install, sign in and reconnect the extension), then for each job in score order:
@@ -293,10 +314,17 @@ open a tab, invoke **`job-search:job-apply`** from its step 5, verify every requ
 the DOM, submit (`autonomous`) or gate (`supervised`), close the tab, log
 `--status applied`, `render_brain.py --quiet`, next.
 
-**Sequential on purpose.** The extension drives one browser; interleaving DOM work across tabs
-risks typing one job's answers into another's form or clicking the wrong submit — the single
-mistake that cannot be undone, to save a few minutes. Parallelism belongs in Phase A, where
-the time actually goes.
+**Order:** open-form jobs first — get those submits through — then the hand-offs and assisted
+portals, which need the user and take the longest. A run that spends its budget building
+twenty applications before a single submit ends with nothing sent.
+
+**Sequential by default** (`fill-mode: sequential`). The extension drives one browser;
+interleaving DOM work across tabs risks typing one job's answers into another's form or clicking
+the wrong submit — the single mistake that cannot be undone. **`fill-mode: parallel-tabs`** opens
+one tab per ready application and dispatches one filler per tab (job-apply step 5), each told its
+own tab id and forbidden from touching others; the DOM verification and the submit still go one
+tab at a time, with the tab's URL and company checked before each click. `filler-model: cheap`
+moves only the typing to a smaller model — never the verification or the submit.
 
 Do not second-guess `job-apply`'s policy file.
 

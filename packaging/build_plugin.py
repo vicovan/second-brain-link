@@ -154,6 +154,12 @@ def build_openai(name: str) -> bool:
             return False
         ref_seen[f.name] = f
         shutil.copy2(f, out / "references" / f.name)
+    # 3b. bundled fonts keep their own folder (cv-tailor reads ../references/fonts when flat)
+    for f in sorted(src.glob("skills/*/assets/fonts/*")):
+        if not f.is_file() or f.name in SKIP_NAMES:
+            continue
+        (out / "references" / "fonts").mkdir(exist_ok=True)
+        shutil.copy2(f, out / "references" / "fonts" / f.name)
 
     # 4. the manifest + any provider extras (agents/openai.yaml)
     shutil.copy2(man, out / "SKILL.md")

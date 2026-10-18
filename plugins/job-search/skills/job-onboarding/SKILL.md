@@ -116,6 +116,10 @@ untouched, then list what was added:
    Read the public record from a LinkedIn data export (`Positions.csv`) or text the user pastes —
    never by fetching LinkedIn. Where the internal dates and the public record differ, say so role
    by role and record which the CV uses; check each company site responds before recording it.
+   For the §10 design rows ask ONE question — *"CV look: designed or plain, and a photo for
+   markets that expect one?"* — defaulting to designed, palette per employer, photo by market.
+   If they want a photo, point them to Studio → Jobs Agent → Settings → *Your CV photo*; never
+   ask them to paste one into chat.
 7. `search-criteria.md` §3a **Markets** and §3b **Sources** — ask as in Step 3. Without them the
    scout cannot build its query grid or check coverage, and searches only the open ATS boards.
 8. If a legacy state folder with applications exists, offer
@@ -187,7 +191,10 @@ Ask only what you could not find, and ask in one pass per file rather than one a
 - Which **roles/titles** are you targeting? Any second lane you would also take?
 - **Where** — countries or cities, and is remote acceptable, preferred, or required?
 - Do you have the **right to work** there already, or would you need sponsorship?
-- **Compensation floor**: the number below which you would decline. Base, or total?
+- **Compensation floor and target**: the number below which you would decline (the floor — a
+  published base below it drops the role), and the number you are actually aiming for (the
+  target — what roles are ranked on). Base, or total? Two numbers stop the agent treating the
+  target as a hard floor and quietly dropping every role in between.
 - **Hard exclusions** — sectors, company stages, or arrangements you will not consider.
 - **Company size/stage** you do best in.
 - **Sources (§3b)** — ask each in one line, with the honest caveat:
@@ -196,7 +203,9 @@ Ask only what you could not find, and ask in one pass per file rather than one a
   may I read LinkedIn in your signed-in Chrome? That one is your account."* · *"Some boards block
   automated reading — may I open their public lists in your Chrome, read-only?"* · *"Jobs on
   portals that need an account (Workday, SuccessFactors): show them with the CV and answers
-  ready for you to apply there, or leave them out?"* Defaults if they have no view:
+  ready for you to apply there, fill them with you in the run — you do only the account, password
+  and e-mail-code steps — or leave them out?"* (`surface` · `assist` · `drop`). Defaults if they
+  have no view:
   `linkedin-public: off`, `linkedin-signed-in: never`, `chrome-boards: off`, `walled: surface`.
 - **Markets (§3a)** — for each place they named, the cities and country names a job location
   would carry. These drive the query grid and the coverage gate.
@@ -210,11 +219,23 @@ Ask only what you could not find, and ask in one pass per file rather than one a
   they chose. If they hesitate at all, write `supervised`: it is the reversible choice, and
   they can change one word later. Also ask the cap — *"and at most how many in one run?"* —
   defaulting to 10.
+- **How the run works** (§0) — offer the defaults and change only what they ask for:
+  *"I fill one form at a time and stop to ask you when I'm stuck. I can fill several in parallel
+  tabs instead, use a cheaper model for the typing (I still check every field and decide the
+  submit), rework a CV up to three times when a review says no, and tell the reviewer to ignore
+  things you've decided aren't blockers, like visas."* → `fill-mode`, `filler-model`,
+  `review-rounds`, `when-stuck`, `reviewer-ignore`.
+- **Contact sets** (`profile.md` §1, §8) — if they use a different phone or address in different
+  regions, record each set and when it applies. Default rule: the job's location decides.
 - Notice period / earliest start date.
 - Willing to relocate? Travel percentage you accept?
 - Do you now or will you require sponsorship? (the exact wording forms use)
 - Languages and honest level for each.
-- Standing consent answers — AI-evaluation, data retention, background checks.
+- Standing consent answers — AI-evaluation, data retention, background checks (§5c), and the
+  standing defaults every form asks (§5b): relatives or previous employment at the employer, a
+  calendar start date, a numbers-only salary figure.
+- **Framing** (`profile.md` §9): *"May a CV name your clients or customers, or should they be
+  described generically?"* → `name-clients`.
 - Pronouns / EEO fields: what to answer, or "prefer not to say".
 - **The raw material for free text.** Not "anything you want said" — the actual substance:
   what draws them to a company (the two or three things they look for), their proudest piece
@@ -252,8 +273,10 @@ updated: <today>
 
 Use the shipped templates in `references/` for the shape of each file, and the structure of the
 existing profile if one is being updated. `references/` carries `profile-template.md`,
-`criteria-template.md`, `answers-template.md`, `archetypes-template.md` and
-`stories-template.md`; `scoring.md` and `sources.md` follow the shape described in
+`criteria-template.md`, `answers-template.md`, `archetypes-template.md`,
+`stories-template.md` and `evidence-template.md` (the *Career Evidence — confirm* note cv-tailor
+drafts when the profile lacks the numbers senior screens read first; it can also be drafted here
+when step 2 finds the last three roles without team sizes or scale); `scoring.md` and `sources.md` follow the shape described in
 `job-scout/references/scoring-rubric.md` (its default weights and apply floor) and `sources.md`.
 
 **Write every file that is missing, even the ones the user did not discuss.** A `sources.md` that

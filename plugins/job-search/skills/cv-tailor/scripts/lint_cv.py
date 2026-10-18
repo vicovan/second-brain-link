@@ -49,6 +49,8 @@ BANNED = [
     # "reads generated" from reviewers
     "first-class", "first class", "in one seat", "the normal case", "product substance",
     "single mandate", "as a matter of course", "-level ownership",
+    # the designed-CV playbook's list (references/designed-template.md §3)
+    "robust", "dynamic leader", "dynamic professional", "results-oriented",
     # filler a recruiter has read on every CV that day — it names no thing and no result
     "best practices", "cross-functional collaboration", "high-performing team", "key initiatives",
     "innovative solutions", "scalable solutions", "modern data stack", "fostered a culture",
@@ -326,6 +328,19 @@ def _sibling(fit, name):
     return p if p.exists() else None
 
 
+# Personal data that stays off a CV unless the market requires it.
+PERSONAL_DATA = [
+    ("date of birth", r"\b(date of birth|d\.?o\.?b\.?|born (on|in) \d)"),
+    ("marital status", r"\b(marital status|married|single|divorced)\b(?=\s*[,·|\n]|\s*$)"),
+    ("religion", r"\breligion\b"),
+    ("ID number", r"\b(passport (no|number)|national id|id number|emirates id)\b"),
+]
+DOB_MARKETS = {"DE", "AT", "CH"}            # where a DOB is still sometimes expected
+NO_PHOTO_MARKETS = {"US", "USA", "GB", "UK", "CA", "AU", "IE", "NZ"}
+# "20+ years / 4 products / 30+ engineers": three or more number+word cells in one line
+STAT_TILE = re.compile(r"(\d[\d,.]*\+?\s*[A-Za-z]+\s*[/|·]\s*){2,}\d[\d,.]*\+?\s*[A-Za-z]+")
+
+
 def lint_cv(md_path, profile=None, keywords=None, fit=None, posting=None):
     text = pathlib.Path(md_path).read_text(encoding="utf-8")
     c = cv_md.md_to_content(text)
@@ -351,6 +366,23 @@ def lint_cv(md_path, profile=None, keywords=None, fit=None, posting=None):
             fails.append(f"'{h_}' sits above the work history — move skills to one plain "
                          f"'## Skills' line at the end")
             break
+
+    # 1c. Personal data a CV does not carry by default (designed-template.md §2.3). The
+    # frontmatter `market:` names the target country; a few markets expect a date of birth.
+    design = c.get("design") or {}
+    market = str(design.get("market", "")).strip().upper()
+    raw_body = text.split("\n---", 2)[-1]
+    pd_hits = [w for w, rx in PERSONAL_DATA if re.search(rx, raw_body, re.I)]
+    if pd_hits and market not in DOB_MARKETS:
+        fails.append(f"personal data on the CV ({', '.join(pd_hits)}) — leave it off unless the "
+                     f"target market requires it (set `market:`)")
+    photo = str(design.get("photo", "")).strip().lower()
+    if market in NO_PHOTO_MARKETS and photo not in ("", "none", "no", "false", "off"):
+        warns.append(f"photo is on for market {market}, where a CV photo usually costs the screen — "
+                     f"`photo: none` unless the user asked for it")
+    tiles = [ln for ln in raw_body.splitlines() if STAT_TILE.search(ln)]
+    if tiles:
+        fails.append(f"stat-tile line ({tiles[0].strip()[:60]!r}) — put the numbers inside the work")
 
     # Collect prose by where it sits.
     summary, prose, bullets_by_role = "", [], []
@@ -497,10 +529,23 @@ def lint_cv(md_path, profile=None, keywords=None, fit=None, posting=None):
     core = _core_title(target)
     if core and head:
         hl = head.lower()
-        if core.lower() not in hl and target.lower() not in hl:
-            fails.append(f"headline does not carry the target title '{core}'")
-        elif hl.find(core.lower()) > 0 and hl.find(target.lower()) != 0:
+        lead = re.split(r"(?<=[.!?:])\s", summary.strip(), maxsplit=1)[0].lower() if summary.strip() else ""
+        in_head = core.lower() in hl or target.lower() in hl
+        if not in_head and core.lower() not in lead:
+            fails.append(f"target title '{core}' is in neither the headline nor the summary's first "
+                         f"sentence — the ATS and the six-second read both look for it there")
+        elif in_head and hl.find(core.lower()) > 0 and hl.find(target.lower()) != 0:
             fails.append(f"headline puts something in front of the target title '{core}'")
+        elif in_head:
+            # ATS matching wants the title; a human screener penalises a headline that states a
+            # title the candidate never held ("copied our job title"). Both placements pass the
+            # lint; this says which one a reviewer is likely to flag.
+            held = [r["title"].lower() for r in roles if r.get("title")]
+            if held and not any(core.lower() in h or h in core.lower() for h in held):
+                warns.append(f"headline presents '{core}', a title no role on this CV carries — human "
+                             f"screeners often read that as copied. If the review says so, move the "
+                             f"title into the summary's first sentence and let the headline say what "
+                             f"the person actually is")
         if len(head) > max(HEADLINE_MAX, len(target) + 30):
             fails.append(f"headline is {len(head)} characters (max {HEADLINE_MAX}) — title plus one "
                          f"short differentiator")

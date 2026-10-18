@@ -57,6 +57,14 @@ question in an autonomous run and never becomes a guess:
 - A knock-out `STOP` (step 2b / 5b) — the truthful answer disqualifies; sending it wastes the
   employer's first impression.
 - A red gate in `gates.json` (CV lint, answers lint, recruiter review). See step 6.
+- An attestation that the applicant **personally** completed the form, or an employer policy that
+  forbids AI help with the answers (`application-answers.md` §5c). The agent fills the
+  factual fields, leaves that box unticked, and hands the form to the user.
+
+**`when-stuck:` (§0) decides what "stops that job" means.** `ask` (the default at `supervised`):
+bring the stuck tab to the front and tell the user exactly what to click or type there, then carry
+on once they have — a missing fact, a field that will not register, a frame you cannot reach. `skip`
+(the default at `autonomous` when unset): one line in the report, next job. Either way never a guess.
 
 ## Asking the user something
 
@@ -105,9 +113,11 @@ never treat silence as consent, and never chain past a gate.
 2. **Never create an account and never type a credential.** See `field-policy.md` §1 —
    passwords, passport or national identity numbers, payment details, DOB. These halt the run.
 3. **Account-walled portals are a hand-off** (criteria `walled:`): Workday, Taleo, SuccessFactors,
-   iCIMS, BrassRing, Oracle HCM, Avature, Eightfold, Phenom, Cornerstone. With `surface` (the
-   default) build the CV and every answer, then hand the user the portal — they create the account
-   and apply. With `drop`, skip it.
+   iCIMS, BrassRing, Oracle HCM, Avature, Eightfold, Phenom, Cornerstone, join.com. With `surface`
+   (the default) build the CV and every answer, then hand the user the portal — they create the
+   account and apply. With `assist`, fill it in their browser and hand over only the account steps
+   (step 7b). With `drop`, skip it. The account, the password, e-mail codes and CAPTCHAs are always
+   the user's.
 4. **Never automate LinkedIn.** LinkedIn's User Agreement forbids it and enforcement lands on the
    user's own account, not ours. Prepare the CV and every answer, hand them the ready tab, stop.
 5. **Never invent an answer.** Not in the master profile or `profile/application-answers.md` → ask them.
@@ -130,6 +140,22 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/paths.py     # prints the
 and an offer to copy it here → **run `job-search:job-onboarding` (the **Skill** tool)**. Never guess a fact, a floor or a location:
 this skill's whole output goes out under the user's name.
 
+Also read `45-jobs/Answers You Gave in Chat.md` when it exists (see *Answers given in chat*
+below) and the ticked items of `45-jobs/Career Evidence — confirm.md`. **Run every script from
+the brain root**: from elsewhere the ledger and the profile resolve to the wrong place.
+
+**Answers given in chat.** Every answer the user gives during a run — a form fact, a consent, a
+one-off decision ("apply anyway", "use this phone for that market") — is saved **in the same turn**,
+before you act on it:
+1. `memory.py observe … --source user` (the memory protocol), and
+2. the profile file it belongs in: a standing form answer → `application-answers.md` §5b / §5c, a
+   career fact → `profile.md`. Say so in one line.
+3. If the profile is read-only on this surface (a mirror of a master kept elsewhere), append it
+   instead to `45-jobs/Answers You Gave in Chat.md` — a plain table of *question shape · answer ·
+   date* — and remind the user once to merge it into the master. That note is read at the start of
+   every run and, where it disagrees with the mirror, it wins.
+Never store a date of birth, an ID number or a password in any of them.
+
 ### 0b. Load what past runs learned
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/learn.py show
@@ -146,6 +172,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-apply/scripts/detect_portal.py "<url>" 
   ```
   `walled: surface` (the default): **continue through the CV, answers and recruiter review**, never
   touch the portal's account flow, and finish at step 7b (portal hand-off).
+  `walled: assist`: the same build, then step 7b's assisted fill.
 - `aggregator` → find the employer's own posting, re-run step 1.
 - `linkedin` → **do not hand off yet — run step 1b first.**
 - `fillable` / `unknown` → continue.
@@ -175,12 +202,33 @@ work-authorization wording, and **every question the form will ask**. Note anyth
 answer is a problem (a language they lack, a certification they lack) — that goes to them now, not
 after the CV is built.
 
+**Read the real form before drafting answers.** Greenhouse publishes it:
+`boards-api.greenhouse.io/v1/boards/<token>/jobs/<id>?questions=true` returns every question, its
+required flag and the exact option labels (the token is not always the brand name — take it from the
+apply URL; EU boards use the same API host, `boards-api.eu.greenhouse.io` does not exist). Some forms
+have only a handful of fields and no cover letter or salary at all; a long answer set drafted before
+looking is wasted. Even then **map the live DOM before filling** — the live form can require fields
+(country, city) the API never lists. Embedded Greenhouse forms open directly at
+`job-boards.greenhouse.io/embed/job_app?for=<token>&token=<id>`.
+
+**Check two more things on the form now:**
+- **Its attestation and AI wording.** Classify it: *permissive* (says AI help is fine), *silent*, or
+  *prohibiting* ("I certify that I personally completed this application", a candidate AI policy
+  that forbids AI-written answers). Prohibiting → fill the factual fields only, leave the box, hand
+  the form to the user (Autonomy, above).
+- **Per-employer application limits** ("at most N applications in 30 days"). Before preparing a
+  second role at one employer, read its stated limit; the ledger's one-per-30-days rule is the
+  floor, not the only limit.
+
 ### 2b. Knock-out screen — before a single token goes into the CV
 Save the posting text to the scratchpad and run:
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-apply/scripts/knockout.py --jd <scratch>/posting.txt
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-apply/scripts/knockout.py --jd <scratch>/posting.txt \
+        --answers <brain>/45-jobs/profile/application-answers.md     # explicit in a subagent
 ```
-- `STOP` → do not build anything. Log it and move on:
+- `STOP` → **first read the quoted sentence**: is it really this job's base salary or requirement
+  (not a benefit line, another listing on an aggregator page, or a negated "X is not required")? A
+  confirmed STOP → do not build anything. Log it and move on:
   ```bash
   python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/learn.py log-outcome --company C --role R \
       --url U --status skipped_knockout --note "<the quoted sentence>" --score N
@@ -269,6 +317,19 @@ the CV. Save as `cover-letter.md` (and a PDF if the form wants an upload).
 **Salary** — a mandatory figure comes from `## Knock-outs` → `salary_figures` for that
 currency. Never type instruction text into a salary field.
 
+**In the user's own voice.** Free text and cover letters are read by people who screen out
+anything that sounds generated. Sample the voice from the user's own writing in the brain (their
+posts, `40-career` reusable answers, `stories.md`): usually short, plain, first-person sentences
+with concrete names. Stay under the field's limit (100–180 words is usually right) and never use
+the rhetoric `cv-tailor`'s playbook bans (tricolons, "not X but Y" contrasts, aphorisms, closing
+zingers). Cap any one credential at **one** appearance across the CV, cover letter and answers.
+Respect `profile.md` §9 `name-clients:` — with `no`, describe clients generically.
+
+**Before the gates, re-read every free-text answer and the cover letter for claims that are not
+in the profile, the answers file, the chat-answers note or a ticked evidence item** — a
+"teams in six countries", an "every day", a commitment nobody made. Composers still invent these;
+cut them.
+
 Then gate the answers:
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/cv-tailor/scripts/lint_cv.py answers <app dir>/answers.json \
@@ -310,8 +371,9 @@ Agent(subagent_type: "general-purpose", prompt: <brief>)
 ```
 **No `model:` override — the reviewer runs on the same model as you.** Its verdict decides what
 is sent in the user's name; a smaller model is a worse hiring manager, not a cheaper one. This
-holds for every subagent that judges, writes or fills anything: never pin a smaller model for
-it. (A purely mechanical, independently verified chore is the only place a smaller model fits.)
+holds for every subagent that judges or writes anything: never pin a smaller model for it. (A
+purely mechanical, independently verified chore — typing already-decided answers with
+`filler-model: cheap` — is the only place a smaller model fits.)
 The brief contains, verbatim: `posting.md`, `answers.json`, **the CV as the employer receives
 it** — the text extracted from the built PDF, not the Markdown source, so a broken layout or a
 garbled line is seen exactly as a screener sees it:
@@ -335,6 +397,9 @@ analysis, and with it in hand the reviewer grades the argument instead of the pa
 > `reads_generated` true if you would suspect a tool wrote this CV — uniform bullet shapes,
 > label-colon lists, stylised one-liners, words no person uses about their own work.
 
+If §0 `reviewer-ignore:` lists topics (for example `visa`), append to the prompt: *"The candidate
+has decided these are not blockers: <topics>. Leave them out of your verdict and your reasons."*
+
 Record the verdict:
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/cv-tailor/scripts/lint_cv.py review <app dir> \
@@ -346,25 +411,37 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/cv-tailor/scripts/lint_cv.py review <app di
 - **`reads_generated: true`** blocks like a `maybe`, whatever the verdict: rewrite every quoted
   `generated_phrases` item and every `not_understood` bullet, cut the `irrelevant` ones, re-run
   the gates, review once more. Still true → fill but do not submit.
-- **maybe** → apply `top_fixes` once (re-run the CV and answers gates), review once more. Still
-  `maybe` → fill the form but do not submit; report it as `filled` with the reviewer's reasons.
-- **reject** → stop; log `--status skipped_review --note "<reason>"`. A reviewer's reject on a
-  job the scout ranked highly is also a scoring lesson: `learn.py add-lesson … --tag scoring`.
+- **`top_fixes` pass the fact gate first.** A reviewer will propose fixes that are themselves
+  inventions — a figure, a tool, a commitment the profile does not hold. Apply only the ones the
+  profile supports; a fix that needs a fact the profile lacks becomes a question for the user (or
+  a row in the evidence note), never a bullet.
+- **maybe** → apply `top_fixes`, re-run the CV and answers gates, review again — up to §0
+  `review-rounds` (default 1). Still `maybe` → fill the form but do not submit; report it as
+  `filled` with the reviewer's reasons.
+- **reject** → with `review-rounds` above 1, treat it as a CV problem first: rebuild against the
+  posting's must-haves with confirmed facts only, and review again. Rewording rarely moves a
+  verdict; a missing fact does — when every reviewer asks for the same numbers, collect them once
+  (`cv-tailor` evidence note) instead of another round. Still `reject` → stop; log
+  `--status skipped_review --note "<reason>"`. A reviewer's reject on a job the scout ranked highly
+  is also a scoring lesson: `learn.py add-lesson … --tag scoring`.
+- **The user may overrule a `maybe` or a `reject`.** Decide that **before** the form is filled, not
+  after the submit click: `learn.py log-outcome --status applied` refuses a non-green gate, and an
+  application that went out but is not in the ledger is the one failure with no way back. On an
+  overrule, log with `--force-gates "<the user's words>"` the moment it is sent.
 
 Save the reviewer's JSON as `<app dir>/review.json`. One review per job, never a fan-out.
 
-### 5. Fill the form — cheap subagent, DOM not screenshots
+### 5. Fill the form — DOM first, then verify
 
 **Connect the browser in THIS session first — the subagent cannot do it.** A subagent that
 starts unconnected reports "extension not connected" and burns a run for nothing. So, before
 dispatching:
 ```
 list_connected_browsers          -> the deviceId(s)
-ask which one                    -> EVERY time, even for a single browser: the extension's
-                                    contract requires the user to choose and forbids you
-                                    picking for them. AskUserQuestion (terminal and
-                                    Studio); a `gate` block only where that tool is
-                                    unavailable — it ends the turn but NOT the session.
+one browser (or one chosen)      -> nothing to ask; the tools just work
+several, none chosen             -> ask which one (browser-setup.md §2) — never pick for
+                                    the user. AskUserQuestion (terminal and Studio); a
+                                    `gate` block only where that tool is unavailable.
 select_browser <deviceId>        -> connect
 tabs_context_mcp createIfEmpty   -> a tabId to hand the subagent
 ```
@@ -390,10 +467,23 @@ scratchpad copy is only to satisfy the uploader. (If the session was started out
 working folder: `/add-dir "<working folder>"`.)
 
 Form-filling is the token-expensive step. It stays affordable by working through the DOM (no
-screenshot loops — see the brief), NOT by a smaller model: what it types is what the employer
-receives in the user's name, and a filler that skips a field or mis-picks a dropdown costs the
-application. So it runs on the same model as you — no `model:` override:
+screenshot loops — see the brief). Two settings in `application-answers.md` §0 decide the rest:
 
+- **`filler-model: same`** (the default) — no `model:` override; the filler runs on your model.
+  **`cheap`** — dispatch the filler on a smaller model: by now every value is already decided in
+  `answers.json`, so typing it in needs no judgement. The parts that do need it never move:
+  **you** re-read every field from the DOM, repair the ones the form silently dropped, and decide
+  the submit (step 6). Custom controls are exactly where small fillers fail, so expect repairs.
+- **`fill-mode: sequential`** (the default) — one form at a time. **`parallel-tabs`** — one tab and
+  one filler per ready application, each told its own `tabId` and forbidden from touching any
+  other tab. Step 6 still runs one tab at a time, and you check the tab's URL and company before
+  each submit.
+
+**Cost order on a big run:** build, review and submit the jobs with open forms first, and get
+those submits through, before starting the wave of hand-offs and assisted portals — that wave is
+the slow, conversation-heavy part.
+
+The dispatch (add `model: "haiku"` only with `filler-model: cheap`):
 ```
 Agent(
   subagent_type: "general-purpose",
@@ -405,8 +495,11 @@ The brief must contain, verbatim: the form URL · the absolute path of the CV PD
 contents of `answers.json` · the **NEVER-TYPE list** from `field-policy.md` §1 · and these
 instructions:
 
-> Use `read_page` and `find` to locate fields and `form_input` to fill them. Use `file_upload`
-> for the CV. **Do not take screenshots to explore** — a single `computer` screenshot at the end,
+> Use `read_page` and `find` to locate fields. Fill plain text inputs with real keystrokes
+> (click the field, then type); `form_input` is only for plain non-React inputs, and every custom
+> control follows `references/field-policy.md` §6b–6d (dropdowns, toggles, uploads). Use
+> `file_upload` for the CV, wait until the file chip has rendered (and any CV parsing has
+> finished) before typing anything else, then re-check the fields the parser may have overwritten. **Do not take screenshots to explore** — a single `computer` screenshot at the end,
 > for verification, is the only one allowed; screenshot loops are what make this expensive.
 > Fill only from the supplied answers. If a required field is not covered, or matches the
 > NEVER-TYPE list, or the page demands an account, **stop and report it — do not guess and do not
@@ -476,12 +569,19 @@ Do not offer "show me every field": they have said they do not want the form.
 
 Otherwise trust the standing answers — they confirmed them precisely so they would not be re-asked.
 
-**Never ask them anything already answered in `profile/application-answers.md` §2, §5b or §5c.** Today's run
-asks about work permits, languages, or exclusivity, store the answers. Re-asking a settled
+**Never ask them anything already answered in `profile/application-answers.md` §2, §5b or §5c**
+(or in the chat-answers note). When today's run asks about work permits, languages or exclusivity,
+store the answers (step 0, *Answers given in chat*). Re-asking a settled
 question is the friction they objected to.
 
 On **Submit**, click the control, confirm the success state, and screenshot it. On anything else,
 do what they say; never submit.
+
+**A code after the submit click.** Some boards (Greenhouse EU boards among them) answer the submit
+with *"a verification code was sent to <email>"* and accept the application only once it is typed.
+The agent cannot read the user's inbox: keep the tab open, tell the user at once which tab is
+waiting, and continue when they have entered it (or given you the code). The application is not
+sent until the confirmation appears; log it only then.
 
 ### 7. LinkedIn hand-off (and the fallback path)
 Build the CV and all answers, save them to the application folder, and give them: the job URL, the
@@ -493,6 +593,15 @@ Same as the LinkedIn hand-off: the CV and every answer are built and saved, the 
 and the user gets the portal URL, the CV path and the answers as copy-pasteable text. One line:
 *"<Portal> needs an account — CV and answers are ready; create the account and paste them in."*
 Never create the account, never type a credential. Log with `--status handoff_portal --portal <ats>`.
+
+**`walled: assist`** — the run fills the portal itself, with the user beside it:
+1. Open the portal in the user's browser and go as far as the account step.
+2. Stop and say exactly what is theirs: *"Your turn in the tab <portal — company>: create the
+   account / sign in (and enter the e-mail code). Tell me when you're in."* Wait for them.
+3. Re-read the page, then fill everything from `answers.json` as in steps 5–6 — the same DOM
+   verification, the same gates, the same autonomy rule for the submit.
+4. Any further password, code or CAPTCHA is handed back the same way. Log as `applied` once
+   confirmed (or `handoff_portal` if the user finishes it themselves).
 
 ### 8. Log the outcome
 

@@ -12,7 +12,11 @@ tell them exactly what to click — not to retry in a loop, and never to guess.
 
 ## When to run this
 
-- Before the first browser action of a run, as part of connecting.
+- **At the start of any run that will need the browser — before building anything.** A run that
+  prepares ten applications and only then finds the extension disconnected has wasted the user's
+  wait. If it is not connected, lead your reply with the one action that fixes it (usually *"Open
+  the Claude panel in Chrome and sign in with the same claude.ai account, then tell me"*), not a
+  list of possibilities.
 - Whenever a browser tool fails with "not connected", "no browser", an unknown `deviceId`, or a
   permission block.
 
@@ -25,11 +29,13 @@ exists, the session was started without Chrome. Tell the user:
 - *In Codex, claude.ai or mobile:* there is no browser control; go straight to the fallback.
 
 **2. `list_connected_browsers`.**
-- **One or more browsers** → ask which one (AskUserQuestion: one option per browser, the ones on
-  this computer first, display name as the label and the deviceId in brackets, plus the
-  extension's "open a confirmation screen in every connected Chrome extension" option), then
-  `select_browser` (or `switch_browser` for that last option). Ask once per run, even when only
-  one is connected — the extension requires the user to choose.
+- **Exactly one browser, or one already chosen this session** → nothing to ask: the browser tools
+  just work. Say which browser you are using in one line.
+- **Several browsers and none selected** (or the user asks to change) → ask which one
+  (AskUserQuestion: one option per browser, the ones on this computer first, display name as the
+  label and the deviceId in brackets, plus the extension's "open a confirmation screen in every
+  connected Chrome extension" option), then `select_browser` (or `switch_browser` for that last
+  option). Ask once per run. Never pick one yourself.
 - **An empty list** → the extension is not signed in or not running. Go to step 3.
 - **`select_browser` says "No connected browser has deviceId …"** → the ID you had is stale.
   A browser gets a NEW deviceId after it signs in again or Chrome restarts. Never reuse an ID
@@ -60,6 +66,9 @@ then take the fallback rather than burning the run.
 is not allowed, name the domain and tell the user: "In the Claude panel in Chrome, allow
 `<domain>` when it asks (or in the extension's site permissions), then say *try again*." Don't
 drop the task over a permission prompt; everything else can continue meanwhile.
+**Front-load them:** on a run that will visit several sites, open one tab per domain early so
+every permission prompt arrives at the start, with the user still watching, not one by one
+through the run.
 
 ## Never
 
@@ -85,4 +94,13 @@ answer or detail ready to copy — then say in one line what was skipped and why
 - **When the user takes over** (a login, a code, a CAPTCHA, or they just did something in the
   tab), **re-read the page before you continue** and say what changed: "You filled the email
   field — continuing from the cover-letter step." Never resume from a stale plan.
-- **One tab at a time.** Helpers may research in parallel; only one run fills a form.
+- **One tab at a time, unless the user chose parallel tabs.** Helpers may research in parallel.
+  When a skill's settings allow parallel filling, each filler gets its own tab id and must never
+  touch another tab, and the final read-back and the irreversible click stay one tab at a time,
+  with the tab's URL checked first — so one form's answers can never land in another.
+- **Stuck in a tab?** Bring that tab to the front and tell the user exactly what to click or type
+  there. A blocker reported late, or vaguely, costs more than the question.
+- **Clicking and typing.** A click on an element reference does not always give the field keyboard
+  focus — typed text can go nowhere. When typing does not land, click the field by coordinate from
+  a fresh screenshot, then type. Screenshot coordinates are in the screenshot's own scale, not the
+  page's CSS pixels: never click coordinates taken from `getBoundingClientRect`.

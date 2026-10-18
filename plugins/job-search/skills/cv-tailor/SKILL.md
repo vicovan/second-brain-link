@@ -32,14 +32,17 @@ target precisely, never invent, verify the PDF the way a machine will read it.
 |---|---|
 | `<profile>/profile.md` (in the user's data, resolved at step 0) | ALWAYS. The only allowed source of facts, titles, numbers, contacts. |
 | `references/tailoring-playbook.md` | ALWAYS. Intake, location decision, title mirroring, keyword strategy, human-gate rules, variants by company type. |
+| `references/designed-template.md` | ALWAYS. The designed template's layout, the photo / personal-data policy by market, the palette, and the three reviews (recruiter, ATS import, designer) every CV gets before delivery. |
 | `references/ats-checklist.md` | Before delivering. QA gates. |
 | `<app dir>/posting.md` | Written at step 1 (or by job-apply). The JD text the gates check vocabulary against. |
 | `<app dir>/fit.md` | ALWAYS when it exists (job-apply writes it). The two-pass requirement table, keywords, reviewer doubts, gaps. Build the CV from its `existing`/`supported` rows only. |
 | `<profile>/archetypes.md` | ALWAYS. The lane this job belongs to decides the headline, summary skeleton, lead proof points and bullet priority. |
 | `scripts/lint_cv.py` | Before building and after every edit. The deterministic gate — chronology, fact gate, de-tell, self-disqualifiers. Its result goes into `gates.json`. |
 | `assets/example-cv.md` | Once, to see the Markdown shape and the register to write in. It passes every gate; copy its shape, never its (fictional) facts. |
-| `scripts/build_cv.py` | To render JSON → PDF (`--docx` for Word too). Pure Python + reportlab. |
-| `scripts/check_pdf.py` | To verify keyword coverage, page count, extraction order, fonts. |
+| `scripts/build_cv.py` | To render the Markdown → PDF (`--docx` for Word too). Pure Python + reportlab. The `designed` template lives in `scripts/cv_designed.py`; `--template classic` is the plain single-column layout. |
+| `<profile>/style/cv-style.json` | ALWAYS when it exists. The user's CV design settings (template, palette, photo policy and shape) from Studio → Jobs Agent → Settings → *CV design*. The default for every CV. |
+| `<profile>/photo/` | When the CV carries a photo — the image the user uploaded in Studio → Jobs Agent → Settings → *Your CV photo*. `photo: auto` picks the newest one. |
+| `scripts/check_pdf.py` | To verify keyword coverage, page count, extraction order, fonts embedded, file size. |
 
 ## Workflow (do all steps, in order)
 
@@ -54,6 +57,19 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/paths.py     # prints the
 **Read order:** this surface's `45-jobs/profile/` → the other surface's, used with a one-line notice
 and an offer to copy it here → **run `job-search:job-onboarding` (the **Skill** tool)**. Never guess a fact, a floor or a location:
 this skill's whole output goes out under the user's name.
+
+Facts may also come from `45-jobs/Answers You Gave in Chat.md` (answers the user gave during
+runs) and the **ticked** items of `45-jobs/Career Evidence — confirm.md`. Nothing unticked, and
+nothing from anywhere else.
+
+**Evidence check — before the first CV of a run.** Senior screens read numbers first. If
+`profile.md` lacks, for the last three roles, the team or org size, the managers who reported in,
+and one scale or outcome figure, the CVs will read as generic and reviews will reject them for the
+same reason every time. Draft `45-jobs/Career Evidence — confirm.md` from
+`job-onboarding/references/evidence-template.md` — facts the brain already holds (posts,
+recommendations, career notes) to tick, and the missing numbers to fill — and ask the user to
+answer it once. One pass of facts beats many rounds of rewording. In an autonomous run with nobody
+to ask, build anyway and list the gaps in `fit.md` under `## Needs <user>`.
 
 ### 0b. Load what past applications taught
 ```bash
@@ -87,10 +103,23 @@ archetype is not tailored** — say so and stop; that is a targeting problem, no
   one profile fact that proves it, and names the three roles that get depth. The CV is written
   from the plan; a bullet that serves no row is not written.
 
-### 2. Decide the contact set
+### 2. Decide the contact set — and the page design
 Apply playbook §2. Output exactly one phone + one primary location (dual city
 allowed only for global programmes). Note the reason in one clause for the
 final message.
+
+Then the design. **The user's CV design settings are the default for every CV**: Studio → Jobs
+Agent → Settings → *CV design*, saved as `<profile>/style/cv-style.json` (schema in
+`designed-template.md` §3b). Read it; `build_cv.py` reads it too, so a key you leave out of the
+frontmatter follows the settings. Write in the frontmatter only:
+- `market:` the ISO code of the country the role sits in — always; the photo policy needs it.
+- `palette:` only when the settings say `employer` (pick per company: conservative → `navy-steel`
+  / `oxford-sky`; product and design → `pine-mint` / `plum-rose` / `graphite-coral`).
+- `template:` / `palette:` / `photo:` / `photo_shape:` only for a **one-off request in this run**
+  ("a plain CV for this one", "no photo here") — and say so in the delivery note.
+- `keywords:` the posting's exact title and its top must-have terms (PDF metadata).
+With no settings file, the profile's §10 rows decide, then the defaults (band, navy-steel, photo
+by market). Never override a setting on your own taste.
 
 ### 3. Read the master profile and select
 - If `45-jobs/profile/cv/` holds the user's own CV (uploaded via Studio -> Jobs Agent ->
@@ -209,6 +238,10 @@ A bullet that fails and cannot be made specific truthfully is cut. Then **the co
 
 Facts never move. This is how it is written, not what it says.
 
+### 4c. The red-flag pass — playbook §3h
+Overlapping current roles, gaps, empty role headers, short-tenure clusters, jargon, claims without
+scale, impossible durations, CV vs form mismatches, client names. Fix each before building.
+
 ### 5. Build
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/cv-tailor/scripts/build_cv.py <cv.md> --out <outdir>        # PDF
@@ -226,7 +259,8 @@ ship 3 pages.
 
 ### 5b. Title check before verifying
 Read the built CV's role headers back and confirm:
-1. The **headline** contains the target title verbatim, first.
+1. The **headline** contains the target title verbatim, first — or, when the headline reads as
+   copied (playbook §3 Rung 1), the summary's first sentence does.
 2. **Every** role title appears in `profile/profile.md` §4.0. Anything else is a defect — fix it.
 3. Any role whose title still reads distant from the target carries a scope-equivalence line.
 
@@ -243,15 +277,22 @@ Then render the pages and **look at them**:
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/cv-tailor/scripts/check_pdf.py <outdir>/<file>.pdf --png <outdir>/_pages
 ```
 Read each PNG: every bullet whole with a hanging indent, no role header alone at a page bottom,
-no role line wrapping onto a second line (shorten the descriptor), no overflow. Run through
-`references/ats-checklist.md`.
+no role line wrapping onto a second line (shorten the descriptor), no overflow. A role split across
+pages gets `<!-- break -->` before its first page-2 bullet so the builder prints "Company,
+continued". Run through `references/ats-checklist.md`.
+
+**Then the three reviews — `designed-template.md` §6**: recruiter, ATS import (pass
+`--name "<name>" --headline "<headline>"` so `check_pdf.py` checks the reading order), designer.
+Fix every finding, rebuild, look again. The size and font gates must be green: under 1 MB (a
+designed CV with a photo is about 90 KB), every font embedded, no Type3 — the PDF opens and parses
+on any machine with nothing installed.
 
 ### 7. Deliver
 - Name the PDF and its folder in one line so the surface can link it. Add DOCX only if
   asked or the portal needs Word.
-- Reply in ≤ 6 lines: contact set chosen + why; title label used; the top
-  keywords you led with; anything you need the user to confirm (a fact you lacked,
-  a framing choice). No essays.
+- Reply in ≤ 6 lines (`designed-template.md` §7): contact set chosen + why; template, palette and
+  photo (used or not, and why); title label used; the top keywords you led with; anything you need
+  the user to confirm (a fact you lacked, a framing choice). No essays.
 - If the user shared new career facts during the run, tell them in one line that
   `profile/profile.md` should be updated with them, and update it if
   you have write access to the skill folder (Claude Code / Desktop).
@@ -341,6 +382,14 @@ blank line is what separates them from a following paragraph — keep it.
 Section order: Professional Summary → Work Experience → (Open Source, or a programme-specific
 section) → Education → Skills.
 
+**Design keys** (frontmatter, all optional — they override the user's CV design settings for this
+CV only; `designed-template.md`): `template: band|minimal|executive|classic` (`designed` = whatever
+the settings say), `palette: <preset>|from-photo|custom|band=#..,accent=#..` (+ `accent: #rrggbb`
+for custom), `photo: auto|none|<path>` (`auto` = follow the settings' policy), `photo_shape:
+square|rounded|circle`, `photo_zoom: 1.0`, `photo_center_x: 0.5`, `market: <ISO country>`,
+`keywords: [title, term, term]`. A line
+`<!-- break -->` before a bullet forces a page break there with a "Company, continued" label.
+
 `scripts/cv_md.py` converts between this and the internal structure
 (`to-md`, `to-json`, and `check` for a round-trip gate over a folder of CVs).
 
@@ -360,19 +409,23 @@ section) → Education → Skills.
   country, write `Remote from <country> · <Employer country> company (<city>)`, never just the
   employer's city — otherwise the reader assumes they lived there, and the assumption surfaces
   later as a discrepancy.
-- **Typeface: one sans family, no serif.** A display serif on a CV reads as a template. The
-  builder picks a designed open-licensed sans when one is installed (IBM Plex Sans, Source Sans 3,
-  Inter, Lato), else a system sans; it never downloads a font.
-- **Design is drawn, never written.** The accent band, the section-rule accents and the bullet
-  colour are vector shapes with no text in them, so the page still extracts as one clean column.
-  The only running text is the page-2+ footer (`name · page`), drawn after the page content so a
-  parser reads it last. Never add icons, photos, columns, text boxes or contact details in a
-  header/footer — those are what break scrapers.
-- **Colour: one deep blue** (`#1F4E8C`) on the headline, section headings and links. Nothing else is
-  coloured. Bright web-blue everywhere is what makes a CV look generated; no colour at all reads as
-  a plain-text dump.
-- Target title verbatim in the headline.
-- ≤ 2 pages; PDF always; verified with `lint_cv.py` (gate green) and `check_pdf.py` before delivery.
+- **Typefaces are the bundled ones, never another.** `designed`: Fraunces (the serif) for the name,
+  headline and section headings only; IBM Plex Sans for everything else. `classic`: IBM Plex Sans
+  alone. All are SIL OFL, shipped in `assets/fonts/`, subset-embedded — nothing is downloaded and
+  nothing needs installing to open or parse the PDF.
+- **Design is drawn, never written.** The band, separator dots, timeline rule, ring markers and
+  hairlines are vector shapes with no text in them. Text is drawn in reading order (name →
+  headline → contact → status → body; dates before their entry; the footer last). Never add icons,
+  skill bars, stat tiles, text boxes, or contact details in a footer — those are what break
+  scrapers and read as a template.
+- **The photo only by market** (`designed-template.md` §1), only from Settings, never retouched,
+  always resampled small. No date of birth, marital status, religion or ID number unless the market
+  requires it (`lint_cv.py` fails them).
+- **Colour: one palette, used with restraint** — the band, markers, dates and dashes. `classic`
+  keeps its single deep blue (`#1F4E8C`).
+- Target title verbatim in the headline (or first in the summary's opening sentence).
+- ≤ 2 pages, ≤ 1 MB, fonts embedded; PDF always; verified with `lint_cv.py` (gate green),
+  `check_pdf.py` and the three reviews before delivery.
 - Strictly reverse-chronological, consistent date format; overlaps framed per the profile's
   framing policy.
 - No "Why …" section, no first person, no named gap — on any employment CV.

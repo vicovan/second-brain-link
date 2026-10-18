@@ -168,13 +168,61 @@ Run `python3 skills/job-scout/scripts/paths.py` to see every decision it made.
   then every hiring company's own careers board — and a coverage check refuses to call a market
   empty until several sources agree.
 - **It never creates an account.** Jobs on portals that need one (Workday, SuccessFactors) are kept
-  on your shortlist with the CV and answers ready for you to apply there — or left out, if you
-  prefer (`walled: drop`).
+  on your shortlist with the CV and answers ready for you to apply there, filled in the run with
+  you doing only the account, password and e-mail-code steps (`walled: assist`), or left out, if
+  you prefer (`walled: drop`).
 - **It identifies itself honestly** to every endpoint it calls, and only calls public ones.
+
+## What changed
+
+**1.6.0** — the CV's look is a setting:
+- Studio → Jobs Agent → Settings now has a **CV design** tab with four templates (Band, Minimal,
+  Executive, Classic) shown as live miniatures, six palettes plus "from my photo", "match each
+  employer" and a custom accent, and the photo: when to use it and its shape (square, rounded,
+  circle). It is saved as `45-jobs/profile/style/cv-style.json`, and every CV follows it unless you
+  ask otherwise in a run.
+- The builder adds the **Minimal** and **Executive** templates and the photo shapes, and reads the
+  settings file on every build (`from=settings` in its summary line).
+- The settings dialog itself is redesigned: tabs, template cards, swatches, a photo row with a
+  live preview, file cards, inline delete confirmation, a sticky Save.
+
+**1.5.0** — a designed CV, and a photo when the market expects one:
+- `build_cv.py` now renders the **designed** template by default (`cv_designed.py`). It has a dark
+  header band with an optional square photo, a serif name and headings, a dated timeline with ring
+  markers, a "Name, Headline · n / total" footer, six palettes or one taken from the photo, and a
+  "Company, continued" label at a forced page break. `--template classic` keeps the plain layout.
+- Fonts ship in the plugin: Fraunces and IBM Plex Sans, SIL OFL, subset-embedded. The PDF opens
+  and parses anywhere with nothing installed. A CV with a photo is about 90 KB, because the photo
+  is resampled and stripped of its metadata.
+- Studio → Jobs Agent → Settings has a new **Your CV photo** upload. Studio shrinks the photo to
+  800 px JPEG and drops its location data before it is saved in `45-jobs/profile/photo/`.
+- The photo and personal data follow the market (`market:` in the CV frontmatter). `lint_cv.py`
+  fails a date of birth, marital status, religion or ID number, fails stat-tile lines, and warns on
+  a photo for US/UK/CA/AU/IE. `check_pdf.py` fails a file over 1 MB, any font that isn't embedded,
+  a Type3 font, spaced-letter headings and a broken name → headline → contact order.
+- New `references/designed-template.md`: layout, palette, the photo policy, and the three reviews
+  (recruiter, ATS import, designer) that every CV gets before delivery.
+
+**1.4.0** — lessons from a month of real daily runs, generalised:
+- `knockout.py` no longer stops on negated requirements ("X is not required"), benefit lines read
+  as salary, localisation duties read as a nationality gate, or another listing's text on an
+  aggregator page; it separates a **salary floor** (drop) from a **salary target** (rank), and finds
+  the profile from any working folder.
+- ATS freshness uses each provider's real publish date (Greenhouse `first_published`, Lever
+  `createdAt`); the open pool adds SmartRecruiters, Recruitee and Personio, flags multi-city rows,
+  and has a `--diagnose` mode for slugs.
+- CV notes show plain links in Studio; `build_cv.py --no-render` for parallel builders; the CV lint
+  accepts the target title in the summary's first sentence when a headline would read as copied.
+- New settings, cautious by default: `fill-mode`, `filler-model`, `review-rounds`, `when-stuck`,
+  `reviewer-ignore`, `walled: assist`, `name-clients`, contact sets by job location, `salary_target`,
+  standing form defaults and consents (§5b/§5c).
+- New *Career Evidence — confirm* note; sourcing, LinkedIn-pace, attestation, consent and form-trap
+  rules throughout the skills; working files in the state root, never `/tmp`.
 
 ## Requirements
 
-Python 3.9+ · `reportlab` for PDFs (`pip install -r requirements.txt`) · Claude Code with the
+Python 3.9+ · `reportlab` for PDFs (`pip install -r requirements.txt`; Pillow comes with it and
+resamples the CV photo; the fonts are bundled) · Claude Code with the
 Chrome extension for the apply half. The scout and the CV builder work without Chrome; without
 `reportlab` the CV is produced as Markdown and the PDF step is skipped with a notice.
 

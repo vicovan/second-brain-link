@@ -160,7 +160,13 @@ the resolver** (walk `*.md`, key on `title:`, resolve every `[[…]]`); the targ
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py stats
 DAYS=$(python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py window)   # 1–14, since the last run
 REPORT=$(python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py report-path)
+SCRATCH=$(python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/paths.py --scratch)       # today's working files
 ```
+**Run every script from the brain root** (Studio starts there; a subagent may not). From another
+folder the state root resolves elsewhere: the ledger gate passes roles already applied to and the
+knock-out screen finds no profile. **Working files go in `$SCRATCH`, never `/tmp`** — `/tmp` is
+shared by parallel agents (one builder's file overwrites another's) and can be wiped mid-run. A
+parallel agent uses its own folder: `paths.py --scratch <job_key>`.
 
 **Create `$REPORT` NOW, before searching anything**, with the frontmatter, today's date and a
 `## Status` line saying what you are about to do. Then render it into the vault so it appears
@@ -198,16 +204,23 @@ SINCE=$(python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py si
 # LinkedIn's public, no-login search — only if criteria §3b turns it on
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/linkedin_jobs.py --since-seconds "$SINCE" \
         --keywords "<title>" --keywords "<synonym>" ... --location "<market>" ... \
-        --out /tmp/scout-linkedin.json          # add --remote for a remote-only market
+        --out $SCRATCH/scout-linkedin.json          # add --remote for a remote-only market
 ```
 Regional boards and recruiters follow their route in the pack: `fetch` with WebFetch; `chrome`
 in the user's browser **only when criteria §3b allows it**, read-only — never sign in, apply or
 register; `search` with `site:` queries otherwise. Write each source's rows to
-`/tmp/scout-<source>.json` with `company`, `title`, `location`, `posted`, `url`, `source`,
+`$SCRATCH/scout-<source>.json` with `company`, `title`, `location`, `posted`, `url`, `source`,
 `market`. On Codex (no browser) the `chrome` route falls back to `search`; say so in coverage.
 
 If LinkedIn throttles (`linkedin_jobs.py` says so and stops), do not retry today. Report it and
 lean on the other sources.
+
+**The browser captures LISTS, never descriptions.** Driving Chrome is slow. Use it only to read
+the result pages of sites that refuse automated fetching (the signed-in LinkedIn search when the
+user allows it, some regional boards), and only to capture title, company, location, date and
+link. Every description, salary line and apply-form check afterwards goes through WebFetch or the
+ATS APIs. A signed-in LinkedIn read follows the pace and stop rules in `sources.md` → *On
+LinkedIn* without exception: the account at risk is the user's.
 
 ### 2b. Sweep — the companies' own boards (Tier 1)
 Every company discovery named goes into the registry, and every company that is hiring is then
@@ -218,29 +231,36 @@ employer's own posting date, and the real apply link:
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py merge \
         --titles "<criteria §1 seniority>" --domain "<criteria §1 discipline>" \
         --exclude-titles "<criteria §5>" --markets "<as in step 4>" \
-        --out /tmp/discovered.json /tmp/scout-*.json
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/companies.py add < /tmp/discovered.json
+        --out $SCRATCH/discovered.json $SCRATCH/scout-*.json
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/companies.py add < $SCRATCH/discovered.json
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/companies.py unresolved
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/companies.py batch > /tmp/boards.txt
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/ats_fetch.py --batch /tmp/boards.txt \
-        --filter "<lane regex>" --out /tmp/scout-careers.json
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/companies.py batch > $SCRATCH/boards.txt
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/ats_fetch.py --batch $SCRATCH/boards.txt \
+        --filter "<lane regex>" --out $SCRATCH/scout-careers.json
 ```
 For each `unresolved` company (most hits first, at least the top 15): `WebSearch "<company> careers"`,
 classify the page (`job-apply/scripts/detect_portal.py`), record it with
 `companies.py set "<company>" --ats <type> --slug <slug>`, or `--careers <url>` for a board no
 adapter reads, which you then read with WebFetch (or Chrome, if §3b allows) into
-`/tmp/scout-careers-<company>.json`. Stamp what you swept: `companies.py swept "<company>" ...`.
+`$SCRATCH/scout-careers-<company>.json`. Stamp what you swept: `companies.py swept "<company>" ...`.
 
 ### 2c. Sweep — the open ATS pool and Y Combinator (Tier 1b, Tier 3)
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/ats_pool.py \
-        --out /tmp/scout-ats.json \
+        --out $SCRATCH/scout-ats.json \
         --titles "<seniority band, criteria §1>" --domain "<discipline, criteria §1>" \
         --regions "<geographies to keep, criteria §3>" --exclude-titles "<exclusions, criteria §5>"
 ```
 `ats_pool.py` ships **neutral** defaults — pass the profile's own criteria in, never hardcode a
-lane. It covers US and EU tech companies on Greenhouse, Lever and Ashby well and other markets
-hardly at all, which is why it is one source among several, not the first. Include
+lane. It covers US and EU tech companies on Greenhouse, Lever, Ashby, SmartRecruiters, Recruitee
+and Personio well and other markets hardly at all, which is why it is one source among several,
+not the first. **An empty open-ATS sweep never proves a market is empty.** Large corporates and
+whole regions (the Gulf above all) hire through job boards and account-walled enterprise portals
+that no slug probe reaches; a sweep of a hundred Gulf slugs can return nothing in a week when the
+job boards carry dozens of in-lane roles. Before calling slugs dead, run
+`ats_pool.py --diagnose` (no title filter — a restrictive `--titles` makes live boards look dead)
+and a **slug-variant pass**: hyphenated, `-bank`, `-io`, `-ltd`, `-hq`, the product name, the legal
+name. Grow `companies.txt` from boards that actually resolved. Include
 `ycombinator.com/jobs` (see `sources.md` Tier 3; its apply flow needs a workatastartup.com login,
 so those rows are `⛔ YC login — you apply`).
 
@@ -257,7 +277,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py merge \
         --titles "<criteria §1 seniority>" --domain "<criteria §1 discipline>" \
         --exclude-titles "<criteria §5>" \
         --markets "<Market A>=<city|country regex>;<Market B>=<regex>" \
-        --out /tmp/scout-merged.json /tmp/scout-*.json
+        --out $SCRATCH/scout-merged.json $SCRATCH/scout-*.json
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py coverage
 ```
 **`coverage` is a gate.** A market with no in-lane rows from fewer than three sources is a
@@ -269,6 +289,12 @@ as thin. Paste the coverage table into the report, and lead the report with one 
 
 Score the **new** rows. Rows already seen stay in the report's "still open" section with their
 earlier score; do not re-read them unless the posting changed.
+
+**Senior markets are thin week to week.** When the 1–7 day window leaves a market short, run a
+**30-day repost pass** over the same boards: a role re-posted after a month usually means the
+search is still open, and it is fair game. Judge freshness by the ATS's own date
+(`first_published`, `publishedAt`, `createdAt`) — a LinkedIn date is the *listing* date, and a
+re-listed job looks new.
 
 ### 4b. Screen out the exclusions BEFORE scoring
 Drop anything matching the user's own exclusions in `profile/search-criteria.md` §2
@@ -290,11 +316,28 @@ die on the title alone.
 
 **Knock-out screen every fetched posting** (save the text, then):
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-apply/scripts/knockout.py --jd /tmp/posting-<n>.txt
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-apply/scripts/knockout.py --jd $SCRATCH/posting-<n>.txt
 ```
 `STOP` → out of the ranking, into an "excluded — knock-out" line with the quoted sentence. `FLAG`
 → keep, and show the flag in the job's Flag line. This is where UK-only, citizenship-gated,
 language-gated and below-floor roles leave the list, *before* anyone tailors a CV for them.
+**Check every salary or language STOP against its quoted sentence before dropping** — a benefit
+line, another listing on an aggregator page, or a negated requirement can still slip through.
+
+What only the full text reveals — read for it on every fetched posting:
+- **Multi-city rows.** `ats_pool.py` merges one title across cities into one row (`multi_city`).
+  Each city is often its own req with its own band, language and visa questions; read the req for
+  the city you score, and when several fit, show the choice rather than taking whichever came first.
+- **Remote that is not remote.** "Remote (US)", "remote within the US", or salary bands quoted only
+  for US metros mean US residence is required. An EU-tagged posting that asks for US work
+  authorisation or quotes USD is a US req with an EU location tag. "Remote anywhere / any time
+  zone / work from anywhere" is the wording that means it.
+- **Stated minimum qualifications.** Quote any stated minimum the profile does not visibly meet
+  (managing managers, an org size, a regulated-industry record) as a FLAG on the row. A gap is first
+  an **evidence** question — does the brain or the user hold the fact the CV is missing? — and only a
+  true hard knock-out (citizenship, a required language, a licence) drops the role. When the same
+  minimum keeps sinking applications, ask the user for the fact once (cv-tailor's evidence note)
+  rather than dropping every such role.
 
 ### 5b. Applyability check — BEFORE anything reaches the shortlist
 **A job the user cannot actually apply to does not belong on the shortlist.** For every candidate that
@@ -310,6 +353,8 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-apply/scripts/detect_portal.py "<url>" 
   keep it and rank it like any other row, Apply column `⛔ <portal> — you apply`. Claude cannot
   create the account, so the application is a hand-off (job-apply prepares the CV and answers).
   In some markets most senior roles sit behind these portals, and hiding them empties the list.
+  **`assist`:** keep and rank it, Apply column `🔐 <portal> — assisted`; job-apply fills it in the
+  user's browser and hands over only the account, password, e-mail code and CAPTCHA steps.
   **`drop`:** leave it out and list it in an "excluded — account wall" line.
 - `fillable` → keep, and **record the real apply URL in the report** so the apply step does not
   have to rediscover it.
@@ -317,7 +362,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-apply/scripts/detect_portal.py "<url>" 
   register to apply · log in to apply · set a password*). Treat as walled if found.
 
 The report's shortlist table carries an **Apply** column: `✅ direct form (<ats>)` · `⛔ <portal> — you apply` ·
-`✉️ email only` · `? unverified`. **A row must not say `?` in a delivered report** — verify it or
+`🔐 <portal> — assisted` · `✉️ email only` · `? unverified`. **A row must not say `?` in a delivered report** — verify it or
 leave the job out.
 
 This costs a few fetches per run and saves the user discovering the wall themselves after reading a role
@@ -346,7 +391,7 @@ ATS pool, a carried-over role from an earlier shortlist) never passed through it
 how a role the user applied to — and was rejected from — came back as #1. So the rows about to
 go into the table go through the ledger one last time:
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py gate < /tmp/scout-final.json > /tmp/scout-shortlist.json
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py gate < $SCRATCH/scout-final.json > $SCRATCH/scout-shortlist.json
 ```
 It drops the same posting (matched by the board's job id, so an embed or mirror URL still
 matches), the same company + title, and any company applied to in the last 30 days, printing
@@ -354,6 +399,10 @@ each drop and its reason to stderr. **A dropped row does not appear in the short
 not as a ❌ or ⛔ row, not "for context". Refill from the next roles above the floor, gate
 those too, and put the drops in one "left out — already applied" line with the count and the
 earliest eligible date. Never hand-edit the ledger's verdict.
+
+**Rank scarce fit above title fit.** The roles that convert are usually the ones whose #1
+requirement is something rare the user has actually done, not the ones whose title sits one rung
+up their ladder. When two rows tie, the one that matches the user's rarest proof wins.
 
 Record each shortlisted job's archetype and likelihood in the report; job-apply logs them to the
 ledger so `learn.py calibrate` can check the score against what comes back.
@@ -380,6 +429,9 @@ Three more sections, every run:
   market that ended as a coverage failure says what was tried and what will be tried next run.
 - **`## Still open (seen before)`** — in-lane roles from earlier runs that are still live, one line
   each with their earlier score, so a good role is not lost because it was first seen yesterday.
+  **Not** the hand-offs: a role from an earlier day's board that was handed to the user (a portal,
+  an Easy Apply) stays on *that* day's board; never carry it into today's list. When the user says
+  they applied, log it (`learn.py log-outcome --status applied`, noting they submitted it).
 
 **The report shows the CURRENT list ONLY.** Never append "Run 2", "Run 3"
 sections — a second sweep the same day **replaces** the list, it does not stack onto it. Rewrite
@@ -389,7 +441,8 @@ the file, carrying forward only the statuses of jobs already actioned. Permanent
 **The shortlist table MUST have a `Status` column as its second column**, every row starting at
 `⬜ not started`, followed by this legend line:
 
-> **Legend:** ✅ applied · 🟡 filled, awaiting submit · 🟠 ready — you apply (portal or LinkedIn) ·
+> **Legend:** ✅ applied · 🟡 filled, awaiting submit · 🔐 waiting on you in the portal (account step) ·
+> 🟠 ready — you apply (portal or LinkedIn) ·
 > ⬜ not started · ⛔ skipped · ❌ disqualified · 🚫 excluded by criteria · 🔵 replied · 🎯 interview
 
 **The table needs a `Status detail` column.** The emoji alone does not tell them
@@ -427,7 +480,7 @@ strongest filter is money, so it belongs in the table rather than a footnote.
 
 the user tracks their pipeline from this table, so it is not decoration — a report without it is incomplete. Then:
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py add-seen < /tmp/scout-new.json
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py add-seen < $SCRATCH/scout-new.json
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py mark-run
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/render_brain.py --quiet     # mirror the dashboard into the brain
 ```
@@ -468,7 +521,7 @@ to run it. Handle it like this:
 - **Never apply, never message a recruiter, never submit anything.** Hand them the link.
 - **Never fabricate a listing, a salary or a company.** Every job in the report carries a
   real URL that was actually fetched. If a source returned nothing, say so.
-- Public endpoints only, keep the built-in rate delays, and no Chrome on a routine run
-  (see `sources.md` Tier 5).
+- Public endpoints only, keep the built-in rate delays, and no Chrome on a routine run unless
+  criteria §3b turns it on (see `sources.md` → *On LinkedIn* and `regional-sources.md`).
 - Deduped against `seen.json` — they should not be shown the same job twice. If a genuinely
   better-matching *re-post* appears, say it is a repost.

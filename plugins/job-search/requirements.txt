@@ -1,6 +1,8 @@
 # Required for PDF output (cv-tailor/scripts/build_cv.py).
 # Without it the CV is still produced as Markdown; only the PDF step is skipped.
 reportlab>=4.0
+# Pillow arrives with reportlab; the designed template uses it to resample the CV photo.
+# Fonts are bundled (skills/cv-tailor/assets/fonts, SIL OFL) — nothing to install.
 
 # Optional.
 # pypdf        - fallback PDF text extraction when poppler's pdftotext is not on PATH

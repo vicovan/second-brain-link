@@ -129,6 +129,13 @@ accuracy, because a headline states what they are applying *as*, not a role they
 | Head of ML | `Head of ML · recommendation models serving 40M users` |
 | Engineering Director | `Engineering Director · multi-team product organisations` |
 
+**When the headline reads as copied.** Human screeners sometimes penalise a headline that states
+a title the person never held (*"copies our exact job title"*), while the ATS rewards it. Both
+placements pass `lint_cv.py`: the title first in the headline, **or** first in the summary's
+opening sentence with the headline saying what the person actually is. Default to the headline;
+switch to the summary placement when a recruiter review flags the copied title, or when no role on
+the CV is anywhere near the target title. Never both bolded at once.
+
 **Rules the gate enforces:** the title comes first, nothing in front of it; ≤ 80 characters; no
 second title (`VP Engineering / CTO`), no "-level" phrasing, no keyword list after the dot.
 
@@ -396,6 +403,15 @@ Replace each with the specific thing it is standing in for. "Spearheaded the mig
 4. Is there a skills block above the work history? Move it to one plain line at the end.
 5. Any phrase from the banned list? Any round number? Any "not just X but Y"?
 6. Read the summary aloud. If every sentence lands the same way, cut one in half.
+7. **The user's own voice.** Compare against something they wrote themselves (their posts and
+   reusable answers in the brain). A CV that sounds like a ghostwriter next to their LinkedIn posts
+   reads as generated. Plain verbs, concrete names, uneven sentence lengths.
+8. **One appearance per credential, per application.** The strongest phrase ("eight-time founder",
+   "two exits") appears once across the CV, the cover letter and the form answers together —
+   repeated in all three it reads as a template.
+9. **No title echo as self-description.** The posting's title is the target, not an adjective:
+   no "as a seasoned <posting title>", no "<posting title>-level". State the team, the reach or the
+   result instead.
 
 **Rewrite, do not just unbold.** A lead-in ends in a colon and the text continues it; delete the
 bold and you get *"Designed the data layer for volume and for trust high-volume data pipelines…"*.
@@ -439,6 +455,32 @@ A recruiter who notices *organise* next to *authorize*, *CTO* next to *Chief Tec
 - **Capitalisation** — role-line descriptors in Title Case; section headings as the template has them.
 - **Numbers** — the same style for the same kind of thing (*30+ developers* and *20+ developers*,
   not *thirty* and *20+*).
+
+## 3h. The red-flag pass — before the review, every CV
+
+A screener rejects on what looks wrong before reading what is good. Read the built CV once as a
+sceptic and fix each of these:
+
+- **Overlapping current roles.** Several roles marked *present*: decide per posting which to show
+  and how much space each gets (profile §9 `show-current-roles`), and make the relationship visible
+  (part-time, advisory, own venture). Never relabel a role, and never drop one that the user's
+  LinkedIn shows if dropping it would leave a visible gap.
+- **Date gaps** of six months or more with nothing to explain them, and **short-tenure clusters**
+  (three or more roles under 18 months in a row) without their recorded reason (§6).
+- **Empty role headers** — a role line with no bullets under it reads as padding or as hiding.
+- **Unexplained acronyms and internal product names** a recruiter outside the field cannot read.
+- **Claims without scale** at the level the posting hires for ("led engineering" with no team
+  size on a Director role). If the profile has no number, this is an evidence gap: add it to the
+  evidence note, never estimate it.
+- **Impossible durations.** No "N years of <technology>" longer than the technology has existed;
+  write "N years in <the broader field>, including <technology>".
+- **CV vs form.** The *current employer*, *current title*, location and phone on the form match the
+  CV the form carries.
+- **Client names** — none when profile §9 says `name-clients: no`.
+
+The CV must read as **one coherent career story for this role**. When the same red flag keeps
+coming back from reviews, the fix is a fact from the user, not another rewording: facts move
+verdicts, wording rarely does.
 
 ## 4. Keyword strategy (the ATS gate)
 
@@ -572,10 +614,14 @@ someone who has thought about their business, not someone who skimmed the career
 
 ## 8. Regional CV conventions
 
-- Gulf states: 2 pages fine; nationality + visa status expected; photo optional
-  (default none); an existing right to work in the target country is a strong signal — say it.
-- EU (DE/AT/CH): photo sometimes expected, DOB sometimes expected — default
-  none; ask if the user wants a German-style CV. Lead with the highest formal
+Photo and personal data by market, and what the designed template does with them:
+`designed-template.md` §1. The frontmatter `market:` carries the decision to the builder and the
+linter.
+
+- Gulf states: 2 pages fine; nationality + visa status expected; photo common
+  (used by default when the user uploaded one — profile §10 *Photo on CV*); an existing right to work in the target country is a strong signal — say it.
+- EU (DE/AT/CH): photo sometimes expected (used by market when uploaded), DOB
+  sometimes expected — DOB default none; ask if the user wants a German-style CV. Lead with the highest formal
   qualification the profile lists; these markets weight it more than the UK or US do.
 - UK / US: no photo, no DOB, no nationality (US); 2 pages; US spelling for US
   targets, UK spelling for UK/EU targets (organise/organize, tokenisation/

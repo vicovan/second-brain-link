@@ -21,6 +21,20 @@ Sources that were tried and do not work are listed at the bottom.
 > - **Signed-in browser read** — only when the user asks for a deep look, only if criteria §3b
 >   allows it, and only read-only result pages in their own Chrome: never apply, message, connect
 >   or "Easy Apply". Any enforcement here would land on the user's own account; say so when asked.
+>   **Pace and stop rules — no exceptions:** read at a human pace (a few seconds per page), page
+>   through the result list with the page's own controls (about 10 pages per search is plenty), and
+>   keep to a handful of searches a day. No scripted fetches against the signed-in session, no hidden
+>   iframes, no parallel tabs paging the same search, no profile edits. **A warning banner, a CAPTCHA
+>   or an HTTP 429 ends LinkedIn for the day.** Anything beyond reading — an Easy Apply submit,
+>   revealing a hidden apply link, a message — is handed to the user as exact steps ("in the tab
+>   *LinkedIn — <title>*, click *Apply*, then …"); the agent never does it.
+> - **Easy Apply vs external apply.** A row whose apply button leads off LinkedIn is resolved to
+>   the employer's form and applied to there. An *Easy Apply*-only row (often an agency repost with
+>   the client unnamed) gets the tailored CV and answers prepared, and the user submits it on
+>   LinkedIn. Job alerts the user forwards are resolved to the employer first, too: alerts often
+>   carry agency and aggregator reposts rather than the employer itself.
+> - **Full postings throttle sooner than lists.** The public per-job page returns HTTP 429 after
+>   roughly 15–20 reads per IP. Budget about 15 a run and read the rest at the employer's board.
 > - Either way, a LinkedIn posting is **resolved to the employer's own careers site**
 >   (`job-apply` step 1b) before it is scored for applyability.
 
@@ -36,22 +50,22 @@ posted since the last run:
 SINCE=$(python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/scout_state.py since-seconds)
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/linkedin_jobs.py --since-seconds "$SINCE" \
         --keywords "<lane title>" --keywords "<synonym>" ... \
-        --location "<market>" ... --out /tmp/scout-linkedin.json
+        --location "<market>" ... --out $SCRATCH/scout-linkedin.json
 ```
 Regional boards that block automated reading (`chrome` / `search` routes) are read in the user's
 browser when criteria §3b allows it, otherwise through `site:` searches; write what they give into
-`/tmp/scout-<board>.json` in the same row shape (`company`, `title`, `location`, `posted`, `url`,
+`$SCRATCH/scout-<board>.json` in the same row shape (`company`, `title`, `location`, `posted`, `url`,
 `source`, `market`).
 
 ## Tier 1 — the company registry: every employer's own board
 
 Every company discovery names goes into the registry, which remembers its careers board:
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/companies.py add < /tmp/scout-merged.json
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/companies.py add < $SCRATCH/scout-merged.json
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/companies.py unresolved   # find + `set` their boards
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/companies.py batch > /tmp/boards.txt
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/ats_fetch.py --batch /tmp/boards.txt \
-        --filter "<lane regex>" --out /tmp/scout-careers.json
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/companies.py batch > $SCRATCH/boards.txt
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/ats_fetch.py --batch $SCRATCH/boards.txt \
+        --filter "<lane regex>" --out $SCRATCH/scout-careers.json
 ```
 For an unresolved company: `WebSearch "<company> careers"`, classify the page with
 `job-apply/scripts/detect_portal.py`, then `companies.py set "<company>" --ats <type> --slug <slug>`
@@ -172,7 +186,9 @@ it is the expensive step.
 | `remoterocketship.com` | HTTP 403 to WebFetch |
 | Indeed / Glassdoor direct fetch | bot-walled; reach them through WebSearch results instead |
 | Bayt, GulfTalent direct fetch | HTTP 403 — read them in the user's Chrome (criteria §3b) or via `site:` search |
-| Workable public API | no public listing API — `WebFetch` `apply.workable.com/<slug>` or search |
+| Workable public API | no public listing API — `WebFetch` `apply.workable.com/<slug>` or search. The `apply.workable.com/api/v1/widget/accounts/<slug>` endpoint returns HTTP 200 with a not-found body for **any** string, so it cannot be used to probe whether a slug exists |
+| Workday / SuccessFactors / iCIMS by slug-guessing | large corporates keep these behind their own careers domain; slug probing finds startups only. Find the employer first, then its portal |
+| Search-index and aggregator hits as proof a role is open | they go stale fast; a role that ranks in WebSearch is often gone from the board. Confirm on the employer's live board or API before it reaches a shortlist |
 
 ## Rate and etiquette rules
 
@@ -180,6 +196,22 @@ Public endpoints only, and never an authenticated session scraped at volume. Kee
 delays between requests, and identify honestly — the scripts send a plugin User-Agent rather
 than impersonating a browser. If a provider starts returning empty pages mid-sweep, stop that
 query, report it, and lean on the other tiers for the day. Do not hammer it.
+
+**Enterprise portals that can be read without an account.** Reading a list needs no login even
+where applying does:
+- **Phenom** career sites (`careers.<company>.com`, JS-rendered) answer `POST /widgets` with a JSON
+  body: `ddoKey: "refineSearch"` for the list, `ddoKey: "jobDetail"` plus `jobId` for a description.
+  This beats WebFetch, which sees only the JS shell. Multi-unit groups often expose one site per
+  unit at `<host>/<unit>/widgets`.
+- **SuccessFactors** career sites usually publish `/sitemap.xml` listing every job URL when the
+  search page is JS-rendered.
+- **Workday**: `ats_fetch.py workday <host>/<site>` (the public CXS JSON).
+
+**Recruiter and aggregator pages carry other listings.** A recruiter's job page often shows
+"similar jobs" or "other people applied" with *their* salaries and titles beside this one. Never
+take a salary from a regex over the page; read this job's own text, and treat comp as not posted
+unless it appears there. `knockout.py` cuts the page at the usual sidebar headings, but check
+which listing a matched sentence belongs to.
 
 **A posting's listed date is the LISTING date, not the opening date.** A re-listed job looks
 brand new. Where a role resolves to a company ATS board, prefer that board's `publishedAt`;

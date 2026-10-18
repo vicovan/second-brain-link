@@ -146,6 +146,23 @@ def memory_dir(brain: str | None = None) -> pathlib.Path:
     return pathlib.Path(home).expanduser() if home else pathlib.Path.home() / ".second-brain" / "memory"
 
 
+def _warn_wrong_surface(brain=None):
+    """Empty memory outside any brain while a job ledger exists is almost always the wrong
+    working folder (a subagent's scratch dir, /tmp, another brain) - and a run that goes on
+    from there contradicts every standing rule the user ever gave. Say so loudly."""
+    if find_brain(brain):
+        return
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import find_brain as fb
+        b = fb.from_env() or fb.remembered()
+    except Exception:  # noqa: BLE001 - a warning must never break recall
+        b = None
+    if b and (pathlib.Path(b) / "_memory").is_dir():
+        print(f"WARNING: no brain at the working folder, but {b} has a memory store. You are probably "
+              f"on the wrong surface - cd there or pass --brain {b} before going on.", file=sys.stderr)
+
+
 class Store:
     """The event logs under <memory>/.store. All writes hold one lock."""
 
@@ -648,6 +665,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(json.dumps(items, ensure_ascii=False, indent=1))
             elif not items:
                 print("(memory is empty for this scope — nothing to apply yet)")
+                _warn_wrong_surface(args.brain)
             else:
                 print(f"=== MEMORY ({args.scope}) — apply these; say which ones changed what you did ===")
                 for it in items:

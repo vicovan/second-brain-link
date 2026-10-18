@@ -274,6 +274,30 @@ def merge_rows(ledger, on_disk):
 
 
 
+_LINKS_BLOCK = re.compile(r"^links:[ \t]*\n((?:[ \t]+.*\n?)+)", re.M)
+
+
+def flatten_links(md_text):
+    """The rendered copy's `links:` becomes a flat list of URLs.
+
+    cv-tailor stores `links` as a list of `{text, url}` objects because the PDF builder needs
+    the text. Studio's property panel cannot show nested objects and prints "[object Object]",
+    so the VIEW gets plain URLs. The source CV in the ledger is never touched.
+    """
+    if not md_text.startswith("---"):
+        return md_text
+    end = md_text.find("\n---", 3)
+    if end == -1:
+        return md_text
+    head, rest = md_text[:end + 1], md_text[end + 1:]
+    m = _LINKS_BLOCK.search(head)
+    if not m or "url:" not in m.group(1):
+        return md_text
+    urls = re.findall(r"url:\s*[\"']?([^\"'\n]+)", m.group(1))
+    flat = "links:\n" + "".join(f"  - {u.strip()}\n" for u in urls)
+    return head[:m.start()] + flat + head[m.end():] + rest
+
+
 def retitle(md_text, label):
     """Give the rendered CV the note title we link it by.
 
@@ -283,6 +307,7 @@ def retitle(md_text, label):
     `title: CV Northwind`. The CV in the ledger keeps its own title; only this view is retitled, and
     `cv_md.md_to_content` ignores `title`, so the PDF still builds from it unchanged.
     """
+    md_text = flatten_links(md_text)
     if md_text.startswith("---"):
         end = md_text.find("\n---", 3)
         if end != -1:
@@ -638,7 +663,7 @@ def render(dest, quiet=False):
                     continue
                 if not CV_NAME_RE.search(md.stem):
                     kind = re.sub(r"[-_]+", " ", md.stem).strip().capitalize() or md.stem
-                    w.text(f"{base}/{note} · {kind}.md", md.read_text(encoding="utf-8"))
+                    w.text(f"{base}/{note} · {kind}.md", flatten_links(md.read_text(encoding="utf-8")))
                     continue
                 # One label per CV, allocated HERE. It used to be allocated once before the
                 # loop and again at the end of every iteration, so each application burned a

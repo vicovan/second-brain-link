@@ -25,15 +25,16 @@ unrelated lanes in the same week is itself a signal recruiters read.
 | # | Component | Default max | What it measures |
 |---|---|---|---|
 | 1 | **Shortlist likelihood** | **30** | Would *this* candidate make the screening call? See below. |
-| 2 | **Compensation** | 15 | Does the pay clear the user's floor, and by how much. Convert to the floor's currency and period before comparing — never eyeball a foreign headline number. A *published* figure below the floor is a drop (the knock-out screen catches it); **no published figure is not a drop** unless the profile says so. |
+| 2 | **Compensation** | 15 | Does the pay clear the user's floor, and by how much. Convert to the floor's currency and period before comparing — never eyeball a foreign headline number. A *published* figure below the floor is a drop (the knock-out screen catches it); a published band between the floor and the user's `salary_target` scores low but stays. **No published figure is not a drop** unless the profile says so — and in markets where bands are rarely posted, estimate from employer size and level, label it an estimate, and score the estimate. |
 | 3 | **Role fit** | 15 | Title and scope against the archetype's target titles. An exact title at the right company size scores at the top; adjacent titles mid; a senior-IC job wearing an executive title near zero. |
 | 4 | **Domain fit** | 15 | Overlap with the domains in the profile. Score the *intersection* highest — two domains the user combines are rarer, and more defensible, than one they merely know. |
-| 5 | **Geography and work mode** | 10 | Where the job is and how it is worked, against the profile's mode table. A knock-out (right to work, must-be-based-in, required language) never reaches scoring — `knockout.py` removed it. |
+| 5 | **Geography and work mode** | 10 | Where the job is and how it is worked, against the profile's mode table. A knock-out (right to work, must-be-based-in, required language) never reaches scoring — `knockout.py` removed it. Read "remote" carefully: US-only remote, or bands quoted only for US metros, means residence is required. If the user has said they will relocate, a role that needs a move is scored on its merits, not discounted for the move. |
 | 6 | **Company quality and stage** | 10 | Funding, product reality, investor credibility. An agency repost for an unnamed client scores at the bottom regardless of the title. |
 
 Freshness is a **gate**, not points: a stale repost does not reach the shortlist. An account wall
 is decided by criteria `walled:` — with `surface` (the default) it reaches the shortlist as a
-hand-off row and scores like any other; with `drop` it does not (workflow step 5b).
+hand-off row and scores like any other; with `assist` it is filled in the run with the user doing
+the account steps; with `drop` it does not (workflow step 5b).
 
 ### Shortlist likelihood — the 30 points that decide interviews
 

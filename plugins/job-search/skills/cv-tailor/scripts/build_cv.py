@@ -3,7 +3,11 @@
 build_cv.py — render a CV content JSON into an ATS-safe PDF (and optionally DOCX).
 
 Usage:
-    python3 build_cv.py cv.md [--out DIR] [--max-pages 2] [--docx]
+    python3 build_cv.py cv.md [--out DIR] [--max-pages 2] [--docx] [--template band|minimal|executive|classic]
+
+Four templates. `band` (the default), `minimal` and `executive` are cv_designed.py; `classic` is
+the plain single-column layout below. --template wins, then the CV's frontmatter, then the user's
+CV design settings (45-jobs/profile/style/cv-style.json, written by Studio), then the defaults.
 
 Takes the CV Markdown the model wrote (a .json content file is still accepted). Requires
 reportlab (pip install reportlab); DOCX export additionally needs python-docx — optional.
@@ -72,6 +76,10 @@ FONT_CANDIDATES = [
     ("DejaVuSans.ttf", "DejaVuSans-Bold.ttf"),
 ]
 FONT_DIRS = [
+    # The bundled open-licensed faces first (Claude plugin layout, then the flattened Codex
+    # skill), so every machine renders - and embeds - the same fonts and nothing needs installing.
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "fonts"),
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "references", "fonts"),
     "/usr/share/fonts", "/usr/local/share/fonts", os.path.expanduser("~/.fonts"),
     os.path.expanduser("~/Library/Fonts"), "/Library/Fonts",
     "/System/Library/Fonts", "/System/Library/Fonts/Supplemental",
@@ -538,6 +546,12 @@ def main():
     ap.add_argument("--out", default=".")
     ap.add_argument("--max-pages", type=int, default=2)
     ap.add_argument("--docx", action="store_true")
+    ap.add_argument("--template", choices=["band", "minimal", "executive", "classic", "designed"],
+                    help="page design; default: the CV's `template:` key, then the user's CV design "
+                         "settings, else band (`designed` = whatever the settings say)")
+    ap.add_argument("--no-render", action="store_true",
+                    help="skip the automatic brain re-render — for parallel builders; the "
+                         "orchestrator renders once when they have all finished")
     a = ap.parse_args()
 
     content = load_content(a.content)
@@ -559,8 +573,35 @@ def main():
         print(f"  interpreter: {sys.executable}", file=sys.stderr)
         print(f"  the CV IS complete as Markdown: {a.content}", file=sys.stderr)
         print(f"  fix: {sys.executable} -m pip install reportlab", file=sys.stderr)
-        mirror_into_brain(a.out)
+        if not a.no_render:
+            mirror_into_brain(a.out)
         return 3
+
+    # The design: --template, then the CV's frontmatter, then the user's settings
+    # (Studio -> Jobs Agent -> Settings -> CV design = 45-jobs/profile/style/cv-style.json).
+    import cv_designed
+    style = cv_designed.load_style(a.content, a.out)
+    eff = cv_designed.effective_design(content.get("design"), style, a.template)
+    if style:
+        print(f"settings: {style['_file']}")
+    if eff["template"] != "classic":
+        if cv_designed.register_fonts():
+            pages, dens, pal, photo, eff = cv_designed.build_designed(
+                content, out_pdf, a.max_pages, md_path=a.content, out_dir=a.out, eff=eff)
+            print(f"PDF: {out_pdf}  pages={pages}  template={eff['template']}  density={dens[0]}pt  "
+                  f"palette={eff['palette']} {pal['band']}/{pal['accent']}/{pal['ink']}  "
+                  f"photo={(os.path.basename(photo) + ' ' + eff['photo_shape']) if photo else 'none'}  "
+                  f"from={eff['source']}  size={os.path.getsize(out_pdf) // 1024}KB")
+            if pages > a.max_pages:
+                print(f"WARNING: still {pages} pages at the tightest density — cut content.")
+            if a.docx:
+                out_docx = os.path.join(a.out, base + ".docx")
+                if build_docx(content, out_docx):
+                    print(f"DOCX: {out_docx}")
+            if not a.no_render:
+                mirror_into_brain(a.out)
+            return 0
+        print("note: falling back to the classic template", file=sys.stderr)
 
     reg, bold, fname = register_fonts()
     unicode_ok = reg == "CV"
@@ -579,7 +620,8 @@ def main():
         out_docx = os.path.join(a.out, base + ".docx")
         if build_docx(content, out_docx):
             print(f"DOCX: {out_docx}")
-    mirror_into_brain(a.out)
+    if not a.no_render:
+        mirror_into_brain(a.out)
     return 0
 
 if __name__ == "__main__":

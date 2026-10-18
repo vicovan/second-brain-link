@@ -25,6 +25,7 @@ home directory - never from where this file happens to sit.
     render_dir()    <surface_root>/45-jobs
 
 Run it directly to see every decision:  python3 paths.py
+The run's scratch folder (created):     python3 paths.py --scratch [job_key]
 """
 import os, pathlib, sys
 
@@ -214,7 +215,23 @@ def other_profile_dir():
     return None
 
 
+def scratch_dir(tag=None):
+    """<state root>/scratch/<YYYY-MM-DD>[-tag] - the run's working files.
+
+    Never /tmp: it is shared by every parallel agent (two builders writing the same
+    /tmp/q.json swap one company's answers into another's form) and can be wiped mid-run.
+    A parallel agent passes its job_key as the tag so its files are its own."""
+    import datetime
+    name = datetime.date.today().isoformat() + (f"-{tag}" if tag else "")
+    d = state_root() / "scratch" / name
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "--scratch":
+        print(scratch_dir(sys.argv[2] if len(sys.argv) > 2 else None))
+        return
     print(f"plugin root  : {plugin_root()}   (read-only)")
     print(f"work root    : {work_root()}")
     print(f"state root   : {state_root(verbose=True)}")

@@ -976,6 +976,158 @@ def _job_search_sourcing(js):
           and af._workday_posted("Posted Yesterday", _dt.date(2026, 10, 10)) == "2026-10-09")
 
 
+def _job_search_designed_cv(js):
+    """The CV templates (band · minimal · executive · classic), the photo shapes and the user's CV
+    design settings file. Each PDF is held to the portability gates — reading order, every font
+    embedded, small. The photo is a generated gradient, never a real face. Needs reportlab;
+    skipped (and said so) where it is not installed."""
+    import subprocess as _sp, tempfile as _tf, pathlib, sys, shutil, json as _js
+    try:
+        import reportlab  # noqa: F401
+        import fitz
+        from PIL import Image, ImageDraw
+    except ImportError:
+        print("  (skip) designed CV: needs reportlab, pymupdf and pillow")
+        return
+    sc = js / "skills/cv-tailor/scripts"
+    src = (js / "skills/cv-tailor/assets/example-cv.md").read_text(encoding="utf-8")
+    tmp = pathlib.Path(_tf.mkdtemp(prefix="sbl-cv-"))
+    im = Image.new("RGB", (1200, 1600))
+    d = ImageDraw.Draw(im)
+    for y in range(1600):
+        d.line([(0, y), (1200, y)], fill=(110 + y // 20, 160 + y // 40, 190))
+    d.rectangle([250, 820, 950, 1600], fill=(25, 35, 55))
+    im.save(tmp / "photo.png")                       # a PNG of a few hundred KB on purpose
+
+    def build(tag, keys, cwd=None, out=None):
+        """Build the example with extra frontmatter `keys` into tmp/<tag>; return (proc, pdf)."""
+        out = out or (tmp / tag)
+        out.mkdir(parents=True, exist_ok=True)
+        text = src.replace("market: PT\n", "market: PT\n" + "".join(f"{k}: {v}\n" for k, v in keys.items()))
+        md = out / "Jane_Doe_CV_Northwind_Data.md"
+        md.write_text(text, encoding="utf-8")
+        shutil.copy(tmp / "photo.png", out / "photo.png")
+        r = _sp.run([sys.executable, str(sc / "build_cv.py"), str(md), "--out", str(out), "--no-render"],
+                    capture_output=True, text=True, cwd=str(cwd or tmp))
+        return r, out / "Jane_Doe_CV_Northwind_Data.pdf"
+
+    for tmpl in ("band", "minimal", "executive", "classic"):
+        for ph in (("photo", "photo.png"), ("nophoto", "none")):
+            if tmpl == "classic" and ph[0] == "photo":
+                continue
+            tag = f"{tmpl}-{ph[0]}"
+            r, pdf = build(tag, {"template": tmpl, "photo": ph[1], "photo_shape": "circle"})
+            check(f"CV [{tag}]: builds", r.returncode == 0 and pdf.is_file(), r.stdout + r.stderr)
+            if not pdf.is_file():
+                continue
+            doc = fitz.open(str(pdf))
+            txt = doc[0].get_text().lower()
+            check(f"CV [{tag}]: at most 2 pages", len(doc) <= 2, str(len(doc)))
+            check(f"CV [{tag}]: reads name -> headline -> email -> summary",
+                  0 <= txt.find("jane doe") < txt.find("vp engineering") < txt.find("jane.doe@example.com")
+                  < txt.find("professional summary"), txt[:200])
+            fonts = [f for p in doc for f in p.get_fonts()]
+            check(f"CV [{tag}]: every font embedded, none Type3",
+                  all(f[1] != "n/a" for f in fonts if not f[3].startswith("Helvetica"))
+                  and not any("Type3" in f[2] for f in fonts), str(fonts))
+            check(f"CV [{tag}]: under 400 KB", pdf.stat().st_size < 400 * 1024, str(pdf.stat().st_size))
+            check(f"CV [{tag}]: PDF title and author set",
+                  doc.metadata.get("author") == "Jane Doe" and "Jane Doe" in doc.metadata.get("title", ""))
+            check(f"CV [{tag}]: the template asked for is the one built", f"template={tmpl}" in r.stdout
+                  or (tmpl == "classic" and "scale=" in r.stdout), r.stdout[-300:])
+            if tmpl != "classic":
+                check(f"CV [{tag}]: no Helvetica referenced at all",
+                      not any(f[3].startswith("Helvetica") for f in fonts), str(fonts))
+                check(f"CV [{tag}]: photo embedded only when asked",
+                      (len(doc[0].get_images()) == 1) == (ph[0] == "photo"), str(doc[0].get_images()))
+                r2 = _sp.run([sys.executable, str(sc / "check_pdf.py"), str(pdf), "--name", "Jane Doe",
+                              "--headline", "VP Engineering"], capture_output=True, text=True)
+                check(f"CV [{tag}]: check_pdf passes", r2.returncode == 0, r2.stdout[-400:])
+    for shape in ("square", "rounded"):
+        r, pdf = build(f"shape-{shape}", {"photo": "photo.png", "photo_shape": shape})
+        check(f"CV: photo shape {shape} builds", r.returncode == 0 and pdf.is_file(), r.stderr[-300:])
+
+    # --- the user's CV design settings: a brain with 45-jobs/profile/style/cv-style.json
+    brain = tmp / "brain"
+    (brain / "00-me").mkdir(parents=True)
+    (brain / "45-jobs/profile/style").mkdir(parents=True)
+    (brain / "45-jobs/profile/photo").mkdir(parents=True)
+    shutil.copy(tmp / "photo.png", brain / "45-jobs/profile/photo/me.png")
+    (brain / "45-jobs/profile/style/cv-style.json").write_text(_js.dumps(
+        {"schema": "sbl-cv-style/1", "template": "minimal", "palette": "custom", "accent": "#c2410c",
+         "photo": "by-market", "photo_shape": "circle"}), encoding="utf-8")
+    app = brain / ".plugins/job-search/applications/2026-01-01/northwind"
+    r, pdf = build("settings", {}, cwd=brain, out=app)
+    check("CV settings: the settings file is read", "from=settings" in r.stdout, r.stdout[-400:])
+    check("CV settings: template, custom palette and shape follow it",
+          "template=minimal" in r.stdout and "palette=custom" in r.stdout and "circle" in r.stdout, r.stdout[-400:])
+    check("CV settings: photo by market — PT gets the profile photo",
+          pdf.is_file() and len(fitz.open(str(pdf))[0].get_images()) == 1, r.stdout[-300:])
+    us_src = src
+    src = us_src.replace("market: PT", "market: US")
+    r, pdf = build("settings-us", {}, cwd=brain, out=app.parent / "acme-us")
+    check("CV settings: photo by market — US gets none",
+          pdf.is_file() and len(fitz.open(str(pdf))[0].get_images()) == 0, r.stdout[-300:])
+    src = us_src
+    r, pdf = build("settings-override", {"template": "executive"}, cwd=brain, out=app.parent / "override")
+    check("CV settings: a one-off frontmatter template beats the settings", "template=executive" in r.stdout,
+          r.stdout[-300:])
+    r, pdf = build("settings-designed", {"template": "designed"}, cwd=brain, out=app.parent / "generic")
+    check("CV settings: the generic `template: designed` defers to the settings", "template=minimal" in r.stdout,
+          r.stdout[-300:])
+
+    sys.path.insert(0, str(sc))
+    import importlib
+    cd = importlib.import_module("cv_designed")
+    check("CV: every preset resolves to an ink of 4.5:1 on white",
+          all(cd.contrast(cd.resolve_palette(n)["ink"]) >= 4.5 for n in cd.PRESETS))
+    check("CV: a too-light ink is darkened to 4.5:1",
+          cd.contrast(cd.resolve_palette("band=#111111, accent=#eeeeee, ink=#cccccc")["ink"]) >= 4.5)
+    check("CV: a custom accent yields an ink of 4.5:1, even a pale one",
+          all(cd.contrast(cd.resolve_palette("custom", accent=a)["ink"]) >= 4.5
+              for a in ("#c2410c", "#fde047", "#a7f3d0", "#2457a6")))
+    st = cd.load_style(path=str(brain / "45-jobs/profile/style/cv-style.json"))
+    check("CV: load_style validates the file", st.get("template") == "minimal" and st.get("accent") == "#c2410c")
+    bad = tmp / "bad-style.json"
+    bad.write_text('{"template": "fancy", "palette": "neon", "photo": "sometimes"}', encoding="utf-8")
+    check("CV: unknown settings values are dropped, not trusted",
+          not {"template", "palette", "photo"} & set(cd.load_style(path=str(bad))))
+
+    # --- the Studio form that writes the file
+    sj = _js.loads((js / "studio.json").read_text(encoding="utf-8"))
+    form = sj["settings"].get("form") or {}
+    store = next((f for f in sj["settings"]["files"] if f["id"] == (form.get("store") or {}).get("setting")), None)
+    check("studio.json: the CV design form saves into a hidden .json setting",
+          bool(store) and store.get("hidden") is True and store.get("accept") == [".json"]
+          and form["store"]["file"] == "cv-style.json" and store["dest"].endswith("profile/style"))
+    check("studio.json: every form group is a type Studio renders",
+          all(g.get("type") in ("cards", "swatches", "segmented", "photo") for g in form.get("groups", [])))
+    opts = {g.get("key"): {o["value"] for o in g.get("options", [])} for g in form.get("groups", []) if g.get("key")}
+    for g in form.get("groups", []):
+        for f in g.get("fields", []):
+            opts[f["key"]] = {o["value"] for o in f.get("options", [])}
+    check("studio.json: the form offers exactly the values the builder accepts",
+          opts.get("template") == set(cd.TEMPLATES) and opts.get("palette") == set(cd.STYLE_CHOICES["palette"])
+          and opts.get("photo") == set(cd.STYLE_CHOICES["photo"])
+          and opts.get("photo_shape") == set(cd.STYLE_CHOICES["photo_shape"]), str(opts))
+
+    cm = importlib.import_module("cv_md")
+    c = cm.md_to_content(src.replace("market: PT", "market: PT\ntemplate: executive\nphoto_shape: circle")
+                         .replace("- Wrote the incident", "<!-- break -->\n- Wrote the incident"))
+    check("cv_md: design keys and the break marker round-trip",
+          cm.md_to_content(cm.content_to_md(c)) == c and c["design"]["template"] == "executive"
+          and c["design"]["photo_shape"] == "circle"
+          and any(b.get("type") == "break" for s_ in c["sections"] for b in s_["blocks"]), str(c.get("design")))
+    bad_cv = tmp / "bad.md"
+    bad_cv.write_text(src.replace("market: PT", "market: US\nphoto: photo.png").replace(
+        "Hires\nmanagers", "Date of birth 01/01/1980. Hires\nmanagers"), encoding="utf-8")
+    r = _sp.run([sys.executable, str(sc / "lint_cv.py"), "cv", str(bad_cv)], capture_output=True, text=True, cwd=str(tmp))
+    check("lint: date of birth fails and a US photo warns",
+          "personal data" in r.stdout and "photo is on for market US" in r.stdout, r.stdout[-600:])
+    for m in ("cv_designed", "cv_md", "lint_cv", "paths"):
+        sys.modules.pop(m, None)
+
+
 def _job_search_gates(js):
     """The gates that stop an application being sent: knock-out screen, CV lint, answers lint,
     and learn.py refusing `applied` without them. All synthetic — a fictional candidate."""
@@ -1018,6 +1170,50 @@ def _job_search_gates(js):
     r = run(ko, "--jd", eu, "--answers", tmp / "missing.md")
     check("knockout: no profile block exits 2", r.returncode == 2)
 
+    # 1.4.0 — false STOPs seen on real postings, and the floor/target split
+    ans2 = tmp / "answers-target.md"
+    ans2.write_text(ans.read_text(encoding="utf-8").replace(
+        "- salary_floor: EUR 100000\n", "- salary_floor: EUR 100000\n- salary_target: EUR 140000\n"),
+        encoding="utf-8")
+    for name, text in (
+            ("negated language requirement", "Head of Engineering, Stockholm. Swedish is not required."),
+            ("benefit line is not salary", "Director, London. Commuter assistance: up to GBP 5,000 per year."),
+            ("localisation duty is not a gate", "VP Data, Riyadh. You will support Saudisation objectives."),
+            ("aggregator sidebar ignored", "Head of Platform, Doha. Salary EUR 160,000.\n" + "x" * 240 +
+             "\nSimilar jobs\nEngineer — Qatari Nationals Only. QAR 5,000 per month.")):
+        r = run(ko, "--jd", jd("fp.txt", text), "--answers", ans2)
+        check(f"knockout 1.4: {name} — no STOP", r.returncode == 0 and "STOP " not in r.stdout, r.stdout)
+    r = run(ko, "--jd", jd("mid.txt", "VP Engineering, Berlin. Base salary €110,000 - €130,000."), "--answers", ans2)
+    check("knockout 1.4: band between floor and target FLAGs, not STOPs",
+          r.returncode == 0 and "below the target" in r.stdout, r.stdout)
+    r = run(ko, "--jd", jd("mo.txt", "Engineering Director, Stockholm. Salary SEK 60-70k per month."), "--answers", ans2)
+    check("knockout 1.4: monthly band annualised and STOPs below floor", r.returncode == 1, r.stdout)
+    r = run(ko, "--jd", jd("mixed.txt", "Head of Engineering, Berlin. Fluent German required, Swedish is not required."),
+            "--answers", ans2)
+    check("knockout 1.4: a negation next to one language does not excuse another", r.returncode == 1, r.stdout)
+    r = run(ko, "--jd", jd("budget.txt", "VP Engineering, Berlin. Annual learning budget of EUR 3,000."), "--answers", ans2)
+    check("knockout 1.4: an annual benefit budget is not salary", r.returncode == 0, r.stdout)
+    r = run(ko, "--jd", jd("only.txt", "CTO, Doha. This role is open to Qatari nationals only."), "--answers", ans2)
+    check("knockout 1.4: explicit nationals-only still STOPs", r.returncode == 1, r.stdout)
+
+    # render: nested CV links flattened in the rendered copy only
+    sys.path.insert(0, str(js / "skills/job-scout/scripts"))
+    import importlib
+    rb = importlib.import_module("render_brain")
+    out = rb.retitle("---\ntitle: x\nlinks:\n  - text: Profile\n    url: https://example.com/p\n---\nbody\n", "CV A")
+    check("render: CV links flattened to URLs", "  - https://example.com/p\n" in out and "text:" not in out
+          and "title: CV A" in out, out)
+    af = importlib.import_module("ats_fetch")
+    rows = af.norm("greenhouse", "x", {"jobs": [{"title": "T", "location": {"name": "L"}, "absolute_url": "u",
+                                                 "first_published": "2030-01-02T00:00:00", "updated_at": "2030-03-04T00:00:00", "id": 1}]})
+    check("ats: Greenhouse freshness uses first_published", rows[0]["posted"] == "2030-01-02", rows)
+    rows = af.norm("lever", "x", [{"text": "T", "categories": {}, "hostedUrl": "u", "createdAt": 1893456000000, "id": "a"}])
+    check("ats: Lever freshness from createdAt", rows[0]["posted"] == "2030-01-01", rows)
+    # leave no job-search modules behind: other plugins ship their own `paths`
+    sys.path.remove(str(js / "skills/job-scout/scripts"))
+    for m in ("render_brain", "ats_fetch", "paths", "find_brain"):
+        sys.modules.pop(m, None)
+
     # --- CV lint ------------------------------------------------------------------------
     prof = tmp / "profile.md"
     prof.write_text("# Profile\n### Tidewater Labs — VP Engineering\n- grew the team to 42 engineers\n"
@@ -1058,6 +1254,12 @@ Porto, Portugal
     r = run(lint, "cv", cv, "--profile", prof)
     check("lint_cv: clean CV passes", r.returncode == 0, r.stdout)
     check("lint_cv: writes gates.json", (cv.parent / "gates.json").is_file())
+    cv.write_text(good.replace('headline: "VP Engineering · platform teams"',
+                               'headline: "Engineering leader · platform teams"'), encoding="utf-8")
+    r = run(lint, "cv", cv, "--profile", prof)
+    check("lint_cv: target title opening the summary passes (headline may say what they are)",
+          r.returncode == 0, r.stdout)
+    cv.write_text(good, encoding="utf-8")
     bad_cases = {
         "roles out of date order": good.replace("*01/2016 – 12/2020*", "*01/2023 – 12/2024*"),
         "Why section": good + "\n## Why Acme\n<!-- blocks: mixed -->\n\n- Because.\n",
@@ -1070,8 +1272,9 @@ Porto, Portugal
         "summary sentence too long": good.replace("Short proof here.", "Ran the platform organisation through a "
                                                   "complete rebuild of the release process while the team kept shipping weekly "
                                                   "and grew across two sites and three product lines at the same time."),
-        "headline without the target title": good.replace('headline: "VP Engineering · platform teams"',
-                                                           'headline: "Engineering leader · platform teams"'),
+        "title in neither headline nor summary": good.replace('headline: "VP Engineering · platform teams"',
+                                                           'headline: "Engineering leader · platform teams"')
+                                                  .replace("**VP Engineering** who grew", "Engineering leader who grew"),
         "level echo": good.replace("Rebuilt the release process.", "Director-level scope over the release process."),
         "mixed date formats": good.replace("*01/2016 – 12/2020*", "*2016 – 2020*"),
         "mixed British and American spelling": good.replace("Rebuilt the release process.",
@@ -1484,6 +1687,7 @@ def test_plugins():
 
         _job_search_gates(js)
         _job_search_sourcing(js)
+        _job_search_designed_cv(js)
 
     # --- fundraising specifics ------------------------------------------------
     fr = plugins / "fundraising"
@@ -1658,6 +1862,10 @@ def test_plugins():
                           for x in n if x.endswith((".md", ".sh"))))
             check(f"{name}: openai packaging carries no claude manifest",
                   not any(".claude-plugin" in x for x in n))
+            fonts = root / "skills" / "cv-tailor" / "assets" / "fonts"
+            if fonts.is_dir():
+                check(f"{name}: openai packaging carries the CV fonts in references/fonts/",
+                      all(f"{name}/references/fonts/{f.name}" in n for f in fonts.iterdir() if f.is_file()))
         if cz.is_file():
             n = _zf2.ZipFile(cz).namelist()
             check(f"{name}: claude packaging carries no openai manifest",

@@ -13,6 +13,8 @@ email: jane.doe@example.com
 phone: "+00 000 000 000"
 location: Lisbon, Portugal
 status: Portuguese / EU citizen
+market: PT
+keywords: [VP Engineering, data platform, streaming, multi-tenant SaaS]
 links:
   - text: linkedin.com/in/janedoe
     url: https://www.linkedin.com/in/janedoe/
@@ -25,7 +27,9 @@ links:
      how; at most one bullet per role uses a "Label:" opener; one date format throughout; the
      current employed role is on top and the open-source work sits in its own small section; the
      summary says who she is in plain sentences, with no bolded title label; skills are one plain
-     line at the end, never a grid at the top. -->
+     line at the end, never a grid at the top. The design is not in the frontmatter: the
+     user's CV design settings decide it (template, palette, photo). Only `market:` is written —
+     the photo policy reads it — and `keywords:` for the PDF metadata. -->
 
 ## Professional Summary
 <!-- blocks: prose -->

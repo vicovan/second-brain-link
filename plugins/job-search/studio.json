@@ -69,7 +69,7 @@
   ],
   "settings": {
     "title": "Jobs Agent settings",
-    "blurb": "Files the agent reads when it builds and tailors your CV. They live in your brain, in the job-search profile — nothing is uploaded anywhere.",
+    "blurb": "The agent reads these when it tailors a CV. They live in this brain, in 45-jobs/profile; nothing is uploaded anywhere.",
     "files": [
       {
         "id": "cv",
@@ -87,8 +87,210 @@
           ".odt"
         ],
         "multiple": true
+      },
+      {
+        "id": "photo",
+        "label": "Your CV photo",
+        "hint": "A recent head-and-shoulders photo on a plain background. JPG, PNG or WebP (not HEIC); Studio resizes it and drops its location data before saving. The newest photo is the one used.",
+        "dest": "45-jobs/profile/photo",
+        "accept": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".webp"
+        ],
+        "multiple": false,
+        "image": {
+          "maxPx": 800,
+          "format": "jpeg",
+          "quality": 0.85
+        }
+      },
+      {
+        "id": "style",
+        "label": "CV design",
+        "dest": "45-jobs/profile/style",
+        "accept": [
+          ".json"
+        ],
+        "multiple": false,
+        "hidden": true
       }
-    ]
+    ],
+    "subtitle": "How every CV looks, your photo and your current CV, kept in this brain",
+    "icon": "briefcase",
+    "form": {
+      "label": "CV design",
+      "store": {
+        "setting": "style",
+        "file": "cv-style.json",
+        "schema": "sbl-cv-style/1"
+      },
+      "groups": [
+        {
+          "label": "Template",
+          "note": "Every CV uses this unless you ask otherwise",
+          "type": "cards",
+          "key": "template",
+          "default": "band",
+          "options": [
+            {
+              "value": "band",
+              "label": "Band",
+              "sub": "Dark header, photo, timeline",
+              "look": "band"
+            },
+            {
+              "value": "minimal",
+              "label": "Minimal",
+              "sub": "White header, accent rule, timeline",
+              "look": "minimal"
+            },
+            {
+              "value": "executive",
+              "label": "Executive",
+              "sub": "Centred header, dates on the line",
+              "look": "executive"
+            },
+            {
+              "value": "classic",
+              "label": "Classic",
+              "sub": "Plain single column, one blue",
+              "look": "classic"
+            }
+          ]
+        },
+        {
+          "label": "Colours",
+          "note": "Used on the header, markers, dates and dashes",
+          "type": "swatches",
+          "key": "palette",
+          "default": "navy-steel",
+          "options": [
+            {
+              "value": "navy-steel",
+              "label": "Navy steel",
+              "colors": [
+                "#17202a",
+                "#a7c4c0",
+                "#3e6b6a"
+              ]
+            },
+            {
+              "value": "oxford-sky",
+              "label": "Oxford sky",
+              "colors": [
+                "#14274e",
+                "#8fc1ff",
+                "#2457a6"
+              ]
+            },
+            {
+              "value": "pine-mint",
+              "label": "Pine mint",
+              "colors": [
+                "#0c3b3c",
+                "#4fd8a8",
+                "#0e7a63"
+              ]
+            },
+            {
+              "value": "ink-amber",
+              "label": "Ink amber",
+              "colors": [
+                "#121a24",
+                "#e2a03f",
+                "#a16111"
+              ]
+            },
+            {
+              "value": "plum-rose",
+              "label": "Plum rose",
+              "colors": [
+                "#2a1b2e",
+                "#e8a6b8",
+                "#8a3d5a"
+              ]
+            },
+            {
+              "value": "graphite-coral",
+              "label": "Graphite coral",
+              "colors": [
+                "#1d1f22",
+                "#ff8a65",
+                "#b84a2a"
+              ]
+            },
+            {
+              "value": "from-photo",
+              "label": "From my photo",
+              "sub": "Taken from your photo's tones"
+            },
+            {
+              "value": "employer",
+              "label": "Match each employer",
+              "sub": "The agent picks per company"
+            },
+            {
+              "value": "custom",
+              "label": "Custom",
+              "colorKey": "accent",
+              "defaultColor": "#2457a6"
+            }
+          ]
+        },
+        {
+          "label": "Photo",
+          "note": "Studio shrinks it before saving",
+          "type": "photo",
+          "setting": "photo",
+          "fields": [
+            {
+              "key": "photo",
+              "label": "When to use it",
+              "type": "segmented",
+              "default": "by-market",
+              "help": "By market: on for the Gulf, continental Europe and Asia; off for the US, UK, Canada, Australia and Ireland.",
+              "options": [
+                {
+                  "value": "by-market",
+                  "label": "By market"
+                },
+                {
+                  "value": "always",
+                  "label": "Always"
+                },
+                {
+                  "value": "never",
+                  "label": "Never"
+                }
+              ]
+            },
+            {
+              "key": "photo_shape",
+              "label": "Shape",
+              "type": "segmented",
+              "default": "rounded",
+              "options": [
+                {
+                  "value": "square",
+                  "label": "Square"
+                },
+                {
+                  "value": "rounded",
+                  "label": "Rounded"
+                },
+                {
+                  "value": "circle",
+                  "label": "Circle"
+                }
+              ]
+            }
+          ],
+          "hint": "Drop a head-and-shoulders photo here or upload one. JPG, PNG or WebP; Studio shrinks it and removes location data."
+        }
+      ]
+    }
   },
   "templates": "harness",
   "outcomes": {

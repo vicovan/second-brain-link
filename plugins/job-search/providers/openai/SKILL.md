@@ -49,7 +49,8 @@ Supporting references: `references/sources.md` (where to look, and what not to r
 `references/tailoring-playbook.md` (the CV rewriting moves), `references/ats-checklist.md`,
 `references/field-policy.md` (what may never be typed into a form),
 `references/profile-template.md` / `criteria-template.md` / `answers-template.md` /
-`archetypes-template.md` / `stories-template.md`.
+`archetypes-template.md` / `stories-template.md` / `evidence-template.md` (the *Career Evidence —
+confirm* note: the numbers senior screens look for, ticked by the user before they reach a CV).
 
 **The recruiter review (job-apply step 4b) has no subagent here.** Do it as a separate pass:
 read only `posting.md`, the CV Markdown and `answers.json` — not `fit.md` or your own notes —
@@ -64,20 +65,22 @@ All paths are relative to this skill folder. Run them with `python3`.
 
 ```bash
 python3 scripts/paths.py                    # where everything resolves — run this first when unsure
+python3 scripts/paths.py --scratch [job_key] # today's working folder (never /tmp)
 python3 scripts/scout_state.py stats        # daily gate, dedupe, report path
 python3 scripts/learn.py kpi                # the north star — interviews, and the interview rate
 python3 scripts/learn.py target             # daily pace: valid today vs daily-target, shortlist size
 python3 scripts/learn.py calibrate          # does the score predict replies?
 python3 scripts/learn.py set-result --job-key K --result rejected   # feed outcomes back
-python3 scripts/knockout.py --jd posting.txt       # auto-reject questions, before any CV
+python3 scripts/knockout.py --jd posting.txt --answers <brain>/45-jobs/profile/application-answers.md
 python3 scripts/lint_cv.py cv <cv.md> --profile <profile.md> --fit <fit.md>   # the CV gate
 python3 scripts/lint_cv.py answers <answers.json>  # the answers gate
 python3 scripts/lint_cv.py review <app dir> --verdict shortlist|maybe|reject
 python3 scripts/learn.py show               # lessons earned from real outcomes
 python3 scripts/ats_pool.py --titles "…" --domain "…" --regions "…"   # Tier 0 bulk board probe
+python3 scripts/ats_pool.py --diagnose      # which slugs resolve at all, with no title filter
 python3 scripts/ats_fetch.py auto <slug>    # one company's board
 python3 scripts/detect_portal.py <url> --fetch   # fillable / walled / aggregator
-python3 scripts/build_cv.py <cv.md> --out <dir>  # Markdown + PDF (needs reportlab)
+python3 scripts/build_cv.py <cv.md> --out <dir>  # Markdown + PDF (needs reportlab); --no-render for parallel builds
 python3 scripts/check_pdf.py <cv.pdf> --keywords "a;b"
 python3 scripts/find_brain.py --verbose     # locate the user's vault
 python3 scripts/render_brain.py --quiet     # render the 45-jobs layer into the vault
@@ -88,6 +91,9 @@ job-type noise, deliberately — so that it never applies one person's lanes to 
 else. Build `--titles` / `--domain` / `--regions` / `--exclude-titles` from
 `profile/search-criteria.md`, and use word boundaries (`\bai\b`, not `ai`, which also
 matches "Retail").
+
+**Run every script from the brain root.** From another folder the ledger and profile resolve
+elsewhere, and the dedupe gate passes roles already applied to.
 
 ## Where your data lives
 

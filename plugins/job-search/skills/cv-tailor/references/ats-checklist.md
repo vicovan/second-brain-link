@@ -33,8 +33,15 @@ the check's trigger word and leaving a broken sentence.
 - [ ] Every link shows its URL as text (`example.com`-style), never a linked title.
 
 ## Design (must stay invisible to a parser)
-- [ ] Decoration is drawn shapes only (band, rules, bullet colour); no text in graphics, no icons.
-- [ ] The only header/footer text is `name · page` on page 2+, and it extracts LAST on its page.
+- [ ] Decoration is drawn shapes only (band, dots, timeline rule, rings, hairlines); no text in
+      graphics, no icons, no skill bars, no stat tiles.
+- [ ] Extraction starts name → headline → contact → status; the photo (if any) carries no text.
+- [ ] The only footer text is `Name, Headline · n / total` (designed) or `name · page` on page 2+
+      (classic), and it extracts LAST on its page.
+- [ ] Photo only for a market that expects one (`designed-template.md` §1); no DOB, marital
+      status, religion or ID number.
+- [ ] File ≤ 1 MB (a designed CV with photo is ~90 KB); every font embedded, no Type3
+      (`check_pdf.py` checks both).
 
 ## Text & fonts
 - [ ] Real embedded TrueType text (pdffonts shows emb=yes); no text-as-image.
@@ -48,7 +55,7 @@ the check's trigger word and leaving a broken sentence.
 ## Keywords
 - [ ] Every must-have keyword from the JD appears in a bullet where it is true, and in the Skills
       line; acronym and long form on first use.
-- [ ] Target job title appears verbatim in the headline.
+- [ ] Target job title appears verbatim in the headline (or first in the summary's opening sentence — playbook §3 Rung 1).
 - [ ] Years of experience stated, using the profile's own figure.
 - [ ] check_pdf.py reports 0 missing must-have keywords.
 

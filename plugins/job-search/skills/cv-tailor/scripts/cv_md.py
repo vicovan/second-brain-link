@@ -70,7 +70,14 @@ import argparse, glob, json, os, re, sys
 
 FM_KEYS_ORDER = ["type", "title", "tags", "name", "headline", "output_basename",
                  "company", "role", "target_type", "contact_set",
-                 "email", "phone", "location", "status"]
+                 "email", "phone", "location", "status",
+                 "template", "palette", "accent", "photo", "photo_shape", "photo_zoom",
+                 "photo_center_x", "market", "keywords"]
+
+# How the page is laid out, not what it says. Kept under content["design"] only when the
+# frontmatter carries one of them, so a CV written before these keys round-trips unchanged.
+DESIGN_KEYS = ["template", "palette", "accent", "photo", "photo_shape", "photo_zoom",
+               "photo_center_x", "market", "keywords"]
 
 SECTION_KIND = {           # fallback when no <!-- blocks: --> marker is present
     "core competencies": "kv",     # older CVs; new ones put skills in one line at the end
@@ -154,8 +161,8 @@ def emit_frontmatter(fm):
         if k not in fm:
             continue
         v = fm[k]
-        if k == "tags" and isinstance(v, list):
-            out.append("tags: [" + ", ".join(v) + "]")
+        if k in ("tags", "keywords") and isinstance(v, list):
+            out.append(f"{k}: [" + ", ".join(v) + "]")
         else:
             out.append(f"{k}: {_q(v)}")
     for k, v in fm.items():
@@ -227,6 +234,9 @@ def content_to_md(content):
         "status": c.get("status", ""),
         "links": c.get("links", []),
     }
+    for k, v in (content.get("design") or {}).items():
+        if k in DESIGN_KEYS:
+            fm[k] = v
     out = [emit_frontmatter(fm), ""]
 
     for sec in content.get("sections", []):
@@ -269,6 +279,8 @@ def content_to_md(content):
                 out.append("")
             elif bt == "spacer":
                 out += [f"<!-- spacer: {b.get('height', 4)} -->", ""]
+            elif bt == "break":
+                out.append("<!-- break -->")
         if out and out[-1] != "":
             out.append("")
     while out and out[-1] == "":
@@ -290,6 +302,9 @@ def md_to_content(text):
                     "links": fm.get("links", []) or []},
         "sections": [],
     }
+    design = {k: fm[k] for k in DESIGN_KEYS if k in fm and fm[k] != ""}
+    if design:
+        content["design"] = design
     lines = body.split("\n")
     sec = None
     kind = "mixed"
@@ -374,6 +389,12 @@ def md_to_content(text):
             i += 1
             continue
 
+        # a forced page break inside a role: the designed template prints "<Company>, continued"
+        # above the next block on the new page
+        if re.match(r"^\s*<!--\s*break\s*-->\s*$", line):
+            sec["blocks"].append({"type": "break"})
+            i += 1
+            continue
         m = re.match(r"^\s*<!--\s*spacer:\s*([\d.]+)\s*-->\s*$", line)
         if m:
             sec["blocks"].append({"type": "spacer", "height": float(m.group(1))})
