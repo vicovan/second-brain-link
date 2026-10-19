@@ -41,6 +41,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import itinerary as itin  # noqa: E402
 import suggest as sug  # noqa: E402
 import quotes as qts  # noqa: E402
+import pipeline_doc as pdoc  # noqa: E402
 from paths import (render_dir, state_root, machinery_dir, surface_root, is_brain,  # noqa: E402
                    profile_dir, places_dir)
 
@@ -528,6 +529,138 @@ def render_dashboard(w, trips, current_id, surface, sets=(), current_set=None, q
            + "\n".join(L))
 
 
+# ---------------------------------------------------------------- pipeline.json (Studio's Pipeline canvas)
+TR_STAGES = (("idea", "Ideas", "open", ["draft"], "none", "Plan a trip to {title}."),
+             ("draft", "Draft", "open", ["shopped", "past"], "none", "Move {title} to {stage_label}."),
+             ("shopped", "Shopped", "open", ["booked", "draft"], "none", "Move {title} to {stage_label}."),
+             ("booked", "Booked", "positive", ["past"], "confirm", "Record that I booked {title} — ask me what I booked first."),
+             ("past", "Past", "parked", [], "confirm", "{title} is over — mark it past."))
+
+
+def _slug(x):
+    return re.sub(r"[^a-z0-9]+", "-", str(x).lower()).strip("-")[:80] or "x"
+
+
+def write_pipeline(w, out, trips, quote_sets):
+    """Every trip idea and every trip as one sbl-pipeline/2 file. Prices only with when they were seen."""
+    S, A = pdoc.stage, pdoc.action
+    out = pathlib.Path(out)
+    pre = out.name + "/" if is_brain(out.parent) else ""
+    doc = pdoc.new("travel-planner", "Travel", "#0f9d8a")
+    doc["stages"] = [S(sid, lab, role, next=nx, gate=g, move_prompt=mp) for sid, lab, role, nx, g, mp in TR_STAGES]
+    try:
+        ideas = json.loads((state_root() / "ideas.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        ideas = {}
+    items, seen = [], set()
+    planned = {_slug(s.get("place")) for it in trips for s in it["stops"]}
+    for x in ideas.get("ideas") or []:
+        iid = "idea-" + _slug(x.get("city"))
+        if iid in seen or _slug(x.get("city")) in planned:
+            continue
+        seen.add(iid)
+        n_saved, n_loved = len(x.get("saved_not_visited") or []), len(x.get("loved") or [])
+        tags = list(x.get("categories") or [])
+        items.append(pdoc.item(iid, x.get("city"), "idea", sub=x.get("country") or None,
+                               score=min(100, 10 * n_saved + 15 * n_loved + 10 * len(x.get("people") or [])) or None,
+                               why=x.get("why") or None, note=pre + IDEAS,
+                               attrs={"country": x.get("country") or "", "saved": n_saved, "loved": n_loved},
+                               detail={"facts": {"Saved, never visited": n_saved, "Rated highly": n_loved,
+                                                 "People you know there": len(x.get("people") or [])},
+                                       "tags": tags}))
+    by_trip = {}
+    for q in quote_sets:
+        if q.get("trip"):
+            by_trip.setdefault(q["trip"], []).append(q)
+    for it in sorted(trips, key=lambda t: t["trip_id"]):
+        tid = it["trip_id"]
+        st = it["status"] if it["status"] in ("draft", "shopped", "booked", "past") else "draft"
+        start = min((s["arrive"] for s in it["stops"] if s.get("arrive")), default="")
+        end = max((s["depart"] for s in it["stops"] if s.get("depart")), default="")
+        nights = int(it["window"].get("nights") or 0)
+        countries = sorted({s.get("country") for s in it["stops"] if s.get("country")})
+        flags, needs = [], ""
+        if st == "shopped" and start and start >= TODAY and not any((s.get("stay") or {}).get("status") == "booked" for s in it["stops"]):
+            flags, needs = ["needs-you"], "Prices found — book it yourself, then say so"
+        if any(l.get("self_transfer") for l in it["legs"]):
+            flags.append("self-transfer")
+        days_out = (datetime.date.fromisoformat(start) - datetime.date.fromisoformat(TODAY)).days if start else None
+        cur = it.get("currency", "")
+        T = trip_titles(it)
+        row = pdoc.item(tid, it["title"], st,
+                        sub=" · ".join(x for x in (f"{start} → {end}" if start else "", f"{nights} nights" if nights else "",
+                                                   ", ".join(countries)) if x) or None,
+                        flags=flags or None, needs=needs or None, note=pre + f"trips/{tid}/{T['trip']}.md",
+                        updated=it.get("updated") or None, stage_since=str(it.get("updated") or "")[:10] or None,
+                        attrs={k: v for k, v in {"country": countries[0] if countries else "", "nights": nights,
+                                                 "stops": len(it["stops"]), "days_out": days_out}.items() if v not in (None, "")})
+        if st != "past":
+            stops = [{"label": f"{s['place']}" + (" (stopover)" if s["role"] == "stopover" else ""),
+                      "status": "done" if (s.get("stay") or {}).get("status") == "booked" else "upcoming",
+                      "date": s.get("arrive") or "",
+                      "why": f"{s.get('nights', 0)} night(s)" + (f" · {(s.get('stay') or {}).get('name')} ({(s.get('stay') or {}).get('status')})" if s.get("stay") else "")}
+                     for s in it["stops"]]
+            quotes = []
+            for s in it["stops"]:
+                stay = s.get("stay") or {}
+                if stay.get("price") not in (None, "") and stay.get("quoted_at"):
+                    quotes.append({"label": f"{s['place']} · {stay.get('name', '')}", "price": stay["price"],
+                                   "currency": stay.get("currency") or cur, "quoted_at": stay["quoted_at"],
+                                   "url": stay.get("url") or "", "status": stay.get("status") or ""})
+            for q in sorted(by_trip.get(tid, []), key=lambda x: x.get("id", "")):
+                for o in (q.get("options") or [])[:5]:
+                    price = o.get("price") if q["kind"] == "flights" else o.get("price_total")
+                    if price in (None, "") or not o.get("quoted_at"):
+                        continue
+                    lab = (f"{o.get('from')} → {o.get('to')} · {o.get('provider')}" if q["kind"] == "flights"
+                           else f"{o.get('name') or o.get('provider')}")
+                    quotes.append({"label": lab, "price": price, "currency": o.get("currency") or "",
+                                   "quoted_at": o["quoted_at"], "url": o.get("url") or "", "status": q["kind"]})
+            budget = it.get("budget") or {}
+            facts = {"Window": f"{start} → {end}" if start else "", "Nights": nights,
+                     "Places": f"{len(it['pois'])} ({sum(1 for p in it['pois'] if p.get('from_brain'))} from your brain)",
+                     "Budget": " · ".join(f"{k} {v}" for k, v in sorted(budget.items()) if v not in (None, "")) if isinstance(budget, dict) else ""}
+            links = [{"label": "Itinerary", "note": pre + f"trips/{tid}/{T['itin']}.md"},
+                     {"label": "Flights", "note": pre + f"trips/{tid}/{T['flights']}.md"},
+                     {"label": "Stays", "note": pre + f"trips/{tid}/{T['stays']}.md"}]
+            row["detail"] = {"facts": {k: v for k, v in facts.items() if v not in (None, "", 0)},
+                             "stops": stops, "quotes": quotes, "links": links}
+        items.append(row)
+    doc["items"] = items
+    n = lambda *xs: sum(1 for t in trips if t["status"] in xs)  # noqa: E731
+    doc["headline"] = {"label": "booked", "value": n("booked", "past"), "n": len(trips), "period": "all trips"}
+    doc["stats"] = [{"label": "trips booked / planned", "num": n("booked", "past"), "den": n("shopped", "booked", "past"), "min_n": 5}]
+    doc["lenses"] = [pdoc.lens("score", "Idea strength", "score", domain=[0, 100]),
+                     pdoc.lens("soon", "Days to departure", "attrs.days_out", domain=[0, 90]),
+                     pdoc.lens("nights", "Nights", "attrs.nights", domain=[0, 21]),
+                     pdoc.lens("needs", "Needs you", "flags", scale="flag", value="needs-you")]
+    doc["facets"] = [pdoc.facet("country", "Country", "attrs.country")]
+    doc["panel"] = {
+        "top": ["{stage_label}", "{attrs.country}", "{attrs.nights} nights"],
+        "sections": [{"type": "text", "label": "Why go", "from": "why"},
+                     {"type": "kv", "label": "Trip", "from": "detail.facts"},
+                     {"type": "steps", "label": "Stops", "from": "detail.stops"},
+                     {"type": "quotes", "label": "Prices seen (snapshots, never promises)", "from": "detail.quotes"},
+                     {"type": "tags", "label": "What you keep there", "from": "detail.tags"},
+                     {"type": "links", "label": "Notes", "from": "detail.links"}],
+        "actions": [
+            A("Plan this trip", "Plan a trip to {title} from my own saved places first, and put it on the map.", "primary", stages=["idea"]),
+            A("Find flights", "Find real flight prices for {title} from my home airport. Book nothing.", "primary", stages=["draft", "shopped"]),
+            A("Find stays", "Find stays for each stop of {title} with real prices. Book nothing.", stages=["draft", "shopped"]),
+            A("Record that I booked", "I booked {title} — ask me what I booked and record it.", "primary", stages=["shopped"]),
+            A("Show on map", "Show {title} on the map.", "map", stages=["draft", "shopped", "booked", "past"]),
+            A("Plan these {n}", "Sketch a trip for each of these {n} ideas and tell me which fits my usual months best: {titles}.", "primary", stages=["idea"], bulk=True),
+        ],
+    }
+    doc["actions"] = [A("Where should I go?", "Where should I go next? Use only my brain and give me three ideas, each with its notes.", "primary")]
+    doc["generated"] = max([str(t.get("updated") or "") for t in trips] + [str((ideas.get("meta") or {}).get("generated") or "")])
+    probs = pdoc.check(doc)
+    if probs:
+        print("  ! pipeline.json not written: " + "; ".join(probs[:3]), file=sys.stderr)
+        return
+    w.text("pipeline.json", pdoc.dumps(doc))
+
+
 # ---------------------------------------------------------------- main
 def render(dest=None, quiet=False):
     out = render_dir(dest)
@@ -561,6 +694,7 @@ def render(dest=None, quiet=False):
     render_ideas(w, links)
     render_love(w, links, surface)
     render_dashboard(w, trips, current_id, surface, sets, current_set, quote_sets)
+    write_pipeline(w, out, trips, quote_sets)
     # the stable path Studio's Map opens: the active trip's map, or an empty collection
     geo_text = json.dumps({"type": "FeatureCollection", "properties": {"schema": itin.MAP_SCHEMA,
                                                                        "trip_id": ""}, "features": []}) + "\n"

@@ -76,14 +76,17 @@ SKIP_DIRS = {"45-jobs", "_state", "JobData", "reports", "applications",
              # fundraising: the rendered layer and its working folders
              "46-fundraising", ".plugins", "outreach", "targets", "plans",
              # travel-planner: the rendered layer and the ledger's working folders
-             "47-travel", "trips", "quotes", "bookings"}
+             "47-travel", "trips", "quotes", "bookings",
+             # sales: the rendered layer and its working folders
+             "48-sales", "accounts", "leads", "reviews", "batches"}
 # providers/ holds OTHER packagings' manifests — each build takes only its own.
 CLAUDE_SKIP_DIRS = SKIP_DIRS | {"providers"}
 SKIP_FILES = {"seen.json", "brain-path.txt", "companies.txt", "ats_pool.json",
               "last-run.txt", "snooze.txt", "nudged.txt", "lessons.md",
               "_FUNDRAISE_GENERATED.json", "gates.json", ".ledger.lock",
               "_TRAVEL_GENERATED.json", "_TRAVEL_BUILD_REPORT.md", "current.json", "ideas.json",
-              "outcomes.jsonl.lock", "lessons.md.lock"}
+              "outcomes.jsonl.lock", "lessons.md.lock",
+              "_SALES_GENERATED.json", "scout_state.json", "last_shortlist.json", "sending.json"}
 SKIP_DATA_SUFFIX = {".jsonl", ".pdf", ".docx"}
 
 
@@ -303,21 +306,31 @@ SHARED_FILES = {
         "job-search": "skills/job-scout/scripts/memory.py",
         "fundraising": "skills/raise-research/scripts/memory.py",
         "travel-planner": "skills/trip-planner/scripts/memory.py",
+        "sales": "skills/sales-scout/scripts/memory.py",
     },
     "memory-protocol.md": {
         "job-search": "skills/job-apply/references/memory-protocol.md",
         "fundraising": "skills/raise-apply/references/memory-protocol.md",
         "travel-planner": "skills/flight-search/references/memory-protocol.md",
+        "sales": "skills/sales-send/references/memory-protocol.md",
     },
     "harness.py": {
         "job-search": "skills/job-scout/scripts/harness.py",
         "fundraising": "skills/raise-research/scripts/harness.py",
         "travel-planner": "skills/trip-planner/scripts/harness.py",
+        "sales": "skills/sales-scout/scripts/harness.py",
+    },
+    "pipeline_doc.py": {
+        "job-search": "skills/job-scout/scripts/pipeline_doc.py",
+        "fundraising": "skills/raise-research/scripts/pipeline_doc.py",
+        "travel-planner": "skills/trip-planner/scripts/pipeline_doc.py",
+        "sales": "skills/sales-scout/scripts/pipeline_doc.py",
     },
     "browser-setup.md": {
         "job-search": "skills/job-apply/references/browser-setup.md",
         "fundraising": "skills/raise-apply/references/browser-setup.md",
         "travel-planner": "skills/flight-search/references/browser-setup.md",
+        "sales": "skills/sales-send/references/browser-setup.md",
     },
 }
 

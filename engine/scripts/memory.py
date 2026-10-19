@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """memory.py - the Second Brain memory layer (sbl-memory/1). Stdlib only, no network.
 
-SHIPPED BYTE-IDENTICAL in every plugin (job-search, fundraising, travel-planner); the plugin build
+SHIPPED BYTE-IDENTICAL in every plugin (job-search, fundraising, travel-planner, sales); the plugin build
 fails if the copies differ. Design: second-brain-link-docs/docs-memory/SBL-MEMORY-ARCHITECTURE.md.
 
 Memory lives in the user's brain, in plain files they own:
@@ -62,6 +62,7 @@ SCOPE_LABEL = {
     "job-search": "Jobs Agent",
     "fundraising": "Fundraising Agent",
     "travel-planner": "Travel Agent",
+    "sales": "Sales Agent",
 }
 SCOPE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
 

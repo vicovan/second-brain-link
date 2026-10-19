@@ -91,6 +91,28 @@ Studio validates every value (unknown `stage`/`when`/`subjects` are dropped, tex
 bounded) in both readers — `second-brain-link-web/src/lib/agents/discover.ts` and
 `second-brain-studio/src/main/agents.ts`, which must stay mirrors.
 
+
+### `studio.json` `"pipeline"` — the agent's terrace on Studio's Pipeline canvas
+
+An agent whose work moves through stages declares one file under its own layer:
+
+```json
+"pipeline": "48-sales/pipeline.json"
+```
+
+Studio validates that the path sits inside the plugin's `layer` and draws it beside every other
+agent's — an isometric terrace of stage plates, one tile per item — with no plugin-specific Studio
+code. The file is schema **`sbl-pipeline/2`**: stages (`role` open | positive | negative | parked,
+`gate` none | confirm | reason | owner, `next`, `move_prompt`), items (`id`, `title`, `stage`, `score`,
+`flags`, `attrs`, and a `detail` object only for live items), `lenses`, `facets`, a `panel` of typed
+Inspector sections (kv · text · people · steps · evidence · quotes · links · tags · bars) and
+`actions`. Build it with the shared **`pipeline_doc.py`** (byte-identical in every plugin that has a
+pipeline; `build_plugin.py` checks the copies): `pipeline_doc.check(doc)` must return `[]` before you
+write, and `pipeline_doc.dumps()` keeps a re-render byte-identical. The rules the check enforces:
+no price without `quoted_at`, stats as `num`/`den` (never a computed rate), no `detail` on parked or
+negative items. The canvas never writes the file — a click or a drag arrives in the agent's chat
+as an ordinary message, and the agent changes its own ledger and re-renders.
+
 ## Two packagings, one source
 
 The same split the engine skill uses, for the same reason: one implementation, thin
@@ -161,6 +183,7 @@ A plugin agent must get better with use. The memory layer
 | [`job-search`](job-search/) | Runs a whole job hunt: sweeps open ATS boards against your criteria, tailors a CV per role, fills the application, and writes it all into `45-jobs/` |
 | [`fundraising`](fundraising/) | Runs a raise: screens funds and programs against your own filter chain, verifies them on their own sites, writes a dated Funding Plan, drafts applications and investor emails (never sends them), and tracks it all in `46-fundraising/` |
 | [`travel-planner`](travel-planner/) | Plans a trip from the places already in your brain — trip ideas from cities you saved and never visited, a day-by-day itinerary on Studio's Map, then flights (with self-transfer stopover nights), stays, ground and food read from public sites in your own browser — into `47-travel/`. Developer preview; books nothing |
+| [`sales`](sales/) | Runs outbound: generates leads (the brain's warm ties and lost deals first, then companies with a reason to buy now, per market, with a coverage gate), researches the buying team, runs sequences, sends from your own mailbox and browser through a deterministic send guard, works the replies and books meetings — into `48-sales/`, drawn on Studio's Pipeline board. Developer preview; no bought data |
 
 ## Install one
 
@@ -171,7 +194,7 @@ python3 packaging/build_plugin.py <name> --provider claude --install   # → ~/.
 python3 packaging/build_plugin.py <name> --provider openai --install   # → ~/.agents/skills/<name>
 ```
 
-`<name>` is `job-search`, `fundraising` or `travel-planner`. The Claude install is what the
+`<name>` is `job-search`, `fundraising`, `travel-planner` or `sales`. The Claude install is what the
 CLI **and both Studios** (desktop and browser) read — one install, and the agent appears in
 Studio's Agents tab. `claude --plugin-dir plugins/<name>` loads a plugin for one CLI session
 only; Studio never sees it.

@@ -29,6 +29,8 @@ from paths import state_root, render_dir, brain_layer  # noqa: E402
 import ledger as L  # noqa: E402
 import founder_profile as prof  # noqa: E402
 from lint_claims import gates_ok  # noqa: E402
+import pipeline_doc as pdoc  # noqa: E402
+from paths import is_brain  # noqa: E402
 
 
 def _threads():
@@ -427,6 +429,7 @@ def render(dest=None, quiet=False):
                target_note(r, [e for e in evs if e["key"] == r["key"]], exists))
     w.text(DASHBOARD, dashboard(recs, known, packages))
     w.text(KPI, kpi_note())
+    write_pipeline(w, dest, recs, evs, exists)
 
     mdir = state_root()
     mdir.mkdir(parents=True, exist_ok=True)
@@ -448,6 +451,143 @@ def render(dest=None, quiet=False):
                   + ", ".join(gone[:5]), file=sys.stderr)
     return w
 
+
+
+# ---------------------------------------------------------------- the Pipeline canvas
+# Studio's Pipeline canvas draws every agent's pipeline.json (schema sbl-pipeline/2, built and
+# checked by pipeline_doc.py). Fundraising's: every target - fund, program, angel - as one item,
+# in the ledger's own statuses, with its stamped claims, people, applications and drafts.
+FR_LABEL = {"screened": "Screened", "verified": "Verified", "queued": "Queued", "drafted": "Drafted",
+            "draft_ready": "Draft ready", "filed": "Filed", "contacted": "Contacted", "no_reply": "No reply",
+            "replied": "Replied", "meeting": "Meeting", "term_sheet": "Term sheet", "accepted": "Accepted",
+            "passed": "Passed", "rejected": "Rejected", "out": "Screened out", "withdrawn": "Withdrawn"}
+FR_ROLE = {"term_sheet": "positive", "accepted": "positive", "passed": "negative", "rejected": "negative",
+           "out": "parked", "withdrawn": "parked"}
+FR_PROMPT = {
+    "verified": "Verify {title} on its own site and stamp every claim.",
+    "queued": "Queue {title} for this week.",
+    "drafted": "Draft the application or email for {title}.",
+    "draft_ready": "Finish the {title} draft so it is ready for me to send.",
+    "filed": "File my application to {title}.",
+    "no_reply": "Mark {title} as no reply yet.",
+    "replied": "Record that {title} replied.",
+    "meeting": "Record that {title} gave me a meeting.",
+    "term_sheet": "Record a term sheet from {title}.",
+    "accepted": "Record that {title} accepted me.",
+    "passed": "Record that {title} passed.",
+    "rejected": "Record that {title} rejected the application.",
+    "withdrawn": "Withdraw {title}.",
+    "screened": "Re-screen {title} against my filter chain.",
+    "out": "Screen {title} out.",
+}
+
+
+def write_pipeline(w, dest, recs, evs, exists):
+    S, A = pdoc.stage, pdoc.action
+    dest = pathlib.Path(dest)
+    pre = dest.name + "/" if is_brain(dest.parent) else ""
+    doc = pdoc.new("fundraising", "Fundraising", "#0f9d74")
+    stages = []
+    for sid in L.STATUSES:
+        nxt = sorted(x for x in L.TRANSITIONS.get(sid, set()) if x != sid)
+        gate = "owner" if sid in L.FOUNDER_ONLY else ("reason" if sid in ("passed", "rejected") else ("confirm" if sid in ("withdrawn", "filed") else "none"))
+        stages.append(S(sid, FR_LABEL.get(sid, sid), FR_ROLE.get(sid, "open"), next=nxt, gate=gate,
+                        move_prompt=FR_PROMPT.get(sid, "Move {title} to {stage_label}.")))
+    doc["stages"] = stages
+    last_ev = {}
+    for e in evs:
+        last_ev[e["key"]] = e.get("at")
+    items = []
+    today = datetime.date.today()
+    for r in sorted(recs, key=lambda x: x["name"].lower()):
+        st = r["status"] if r["status"] in FR_LABEL else "screened"
+        dl, yc = L.deadline_of(r)
+        dl_days = (dl - today).days if dl else None
+        stale = L.stale_claims(r)
+        flags, needs = [], ""
+        if st == "draft_ready":
+            flags, needs = ["needs-you"], "A draft is ready — send it yourself, then say “I sent it”"
+        elif dl_days is not None and 0 <= dl_days <= 7 and st in ("queued", "drafted", "verified"):
+            flags, needs = ["needs-you"], f"Deadline in {dl_days} day{'s' if dl_days != 1 else ''}" + ("" if yc else " (year not confirmed)")
+        elif r.get("next") and str(r["next"].get("due") or "")[:10] <= today.isoformat() and st not in ("out", "withdrawn", "passed", "rejected"):
+            flags, needs = ["needs-you"], f"Due: {r['next'].get('action')}"
+        if stale and st not in ("out", "withdrawn"):
+            flags.append("stale")
+        title = title_of(r)
+        attrs = {"kind": r.get("kind") or "", "tier": f"Tier {r['tier']}" if r.get("tier") else "untiered",
+                 "deadline_days": dl_days if dl_days is not None else None, "stale": len(stale)}
+        sub = " · ".join(x for x in (r.get("kind") or "", f"tier {r['tier']}" if r.get("tier") else "",
+                                     f"deadline {dl.isoformat()}" if dl else "") if x)
+        it = pdoc.item(r["key"], r["name"], st, sub=sub or None, score=r.get("fit"), flags=flags or None, needs=needs or None,
+                       why=r.get("out_reason") or r.get("why") or None, url=r.get("url") or None,
+                       note=(pre + f"targets/{title}.md") if st != "out" else None,
+                       attrs={k: v for k, v in attrs.items() if v is not None},
+                       next={"label": r["next"].get("action"), "due": r["next"].get("due")} if r.get("next") else None,
+                       stage_since=str(last_ev.get(r["key"]) or r.get("updated") or "")[:10] or None,
+                       updated=r.get("updated"))
+        if FR_ROLE.get(st) not in ("parked", "negative"):
+            claims = []
+            for f, c in sorted((r.get("claims") or {}).items()):
+                v = c.get("v")
+                if isinstance(v, dict):
+                    v = ", ".join(f"{k} {x}" for k, x in v.items())
+                claims.append({"label": f"{f}: {v}", "stamp": (c.get("stamp") or "⚠") + (" ⏳" if f in stale else ""),
+                               "url": c.get("src") if str(c.get("src") or "").startswith("http") else "", "seen": (c.get("at") or "")[:10]})
+            people = [{"name": p.get("name"), "role": p.get("role") or "", "evidence": p.get("why") or ""} for p in (r.get("people") or []) if p.get("name")]
+            work = []
+            for a in r.get("apps") or []:
+                day = a.split("/")[1] if a.count("/") >= 2 else ""
+                t = f"{safe(r['name'])} application {day}"
+                if t in exists:
+                    work.append({"label": "Application " + day, "note": pre + f"{a}/{t}.md"})
+            for d in r.get("drafts") or []:
+                stem = pathlib.Path(d.get("path", "")).stem
+                if stem in exists and d.get("path"):
+                    work.append({"label": f"{d.get('channel', 'email')} draft {str(d.get('at') or '')[:10]}", "note": pre + d["path"]})
+            hist = [{"label": f"{e.get('from') or '∅'} → {e['to']}", "status": "done", "date": str(e.get("at") or "")[:10]}
+                    for e in evs if e["key"] == r["key"]][-8:]
+            it["detail"] = {"claims": claims, "people": people, "work": work, "history": hist}
+        items.append(it)
+    doc["items"] = items
+    count = lambda *xs: sum(1 for r in recs if r["status"] in xs)  # noqa: E731
+    reached = count("filed", "contacted", "no_reply", "replied", "meeting", "term_sheet", "accepted", "passed", "rejected")
+    meetings = count("meeting", "term_sheet", "accepted")
+    doc["headline"] = {"label": "meetings", "value": meetings, "n": reached, "period": "all time"}
+    doc["stats"] = [{"label": "replies or better / reached", "num": count("replied", "meeting", "term_sheet", "accepted"), "den": reached, "min_n": 20},
+                    {"label": "meetings / reached", "num": meetings, "den": reached, "min_n": 20}]
+    doc["lenses"] = [pdoc.lens("fit", "Fit", "score", domain=[40, 100]),
+                     pdoc.lens("deadline", "Days to deadline", "attrs.deadline_days", domain=[0, 60]),
+                     pdoc.lens("age", "Age in stage", "stage_since", scale="days", buckets=[3, 7, 14, 30]),
+                     pdoc.lens("needs", "Needs you", "flags", scale="flag", value="needs-you")]
+    doc["facets"] = [pdoc.facet("kind", "Kind", "attrs.kind"), pdoc.facet("tier", "Tier", "attrs.tier")]
+    doc["panel"] = {
+        "top": ["{attrs.kind}", "{stage_label}", "{attrs.tier}", "fit {score}"],
+        "sections": [{"type": "text", "label": "Why this one", "from": "why"},
+                     {"type": "evidence", "label": "Claims (✅ own site · 3P · 📋 desk · ⚠ unverified)", "from": "detail.claims"},
+                     {"type": "people", "label": "People", "from": "detail.people"},
+                     {"type": "links", "label": "Applications and drafts", "from": "detail.work"},
+                     {"type": "steps", "label": "History", "from": "detail.history"}],
+        "actions": [
+            A("Verify on its own site", "Verify {title} on its own site and stamp every claim.", "primary", stages=["screened"]),
+            A("Apply", "Apply to {title}: find the real form, draft every answer from my profile, lint it, fill it and finish the way my autonomy setting says.", "primary", stages=["queued", "verified"]),
+            A("Draft the email", "Draft the email to {title} as a package — brief, fit, draft, lint, review. Drafts only; I send.", stages=["queued", "verified"]),
+            A("I sent it", "I sent the {title} email.", "primary", stages=["draft_ready"]),
+            A("Draft the follow-up", "Draft the follow-up to {title}.", "primary", stages=["contacted", "no_reply", "filed"]),
+            A("Record a reply", "I heard back from {title} — I will paste it or tell you what happened.", stages=["contacted", "no_reply", "filed", "replied"]),
+            A("Prep me", "Prep me for my meeting with {title} from the target note and my stories.", "primary", stages=["meeting"]),
+            A("Re-verify stale claims", "Re-verify the stale claims on {title}.", stages=["verified", "queued", "drafted"], flag="stale"),
+            A("Re-queue", "Re-queue {title} — ask me what changed first.", stages=["passed", "rejected", "withdrawn"]),
+            A("Screen these {n}", "Verify these {n} targets on their own sites and tier them: {titles}.", "primary", stages=["screened"], bulk=True),
+        ],
+    }
+    doc["actions"] = [A("Build my funding plan", "Build my funding plan: screen every target, verify the survivors, write the dated plan.", "primary"),
+                      A("What's due?", "What's due? Follow-ups, deadlines in the next two weeks, claims to re-verify.")]
+    doc["generated"] = max([str(r.get("updated") or "") for r in recs] + [""])
+    probs = pdoc.check(doc)
+    if probs:
+        print("  ! pipeline.json not written: " + "; ".join(probs[:3]), file=sys.stderr)
+        return
+    w.text("pipeline.json", pdoc.dumps(doc))
 
 def main():
     ap = argparse.ArgumentParser()

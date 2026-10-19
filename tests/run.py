@@ -36,6 +36,14 @@ sys.path.insert(0, str(SCRIPTS))
 PASS, FAIL = [], []
 
 
+def keep_pipeline(agent, path):
+    """SBL_KEEP_PIPELINES=<dir>: keep each agent's (synthetic) pipeline.json for canvas fixtures."""
+    d = __import__("os").environ.get("SBL_KEEP_PIPELINES")
+    if d and Path(path).is_file():
+        Path(d).mkdir(parents=True, exist_ok=True)
+        __import__("shutil").copyfile(path, Path(d) / f"{agent}.json")
+
+
 def check(name, cond, detail=""):
     (PASS if cond else FAIL).append(name)
     print(f"  [{'PASS' if cond else 'FAIL'}] {name}" + (f"  {detail}" if detail and not cond else ""))
@@ -1214,6 +1222,45 @@ def _job_search_gates(js):
     for m in ("render_brain", "ats_fetch", "paths", "find_brain"):
         sys.modules.pop(m, None)
 
+    # render: pipeline.json (sbl-pipeline/2) for Studio's Pipeline canvas, from a scratch ledger
+    import datetime as _dt
+    jst = tmp / "jp-state"; jst.mkdir()
+    jl = jst / "outcomes.jsonl"
+    jl.write_text("\n".join(json.dumps(x) for x in [
+        {"job_key": "acme-cto", "company": "Acme", "role": "CTO", "status": "applied", "result": "interview",
+         "date": "2030-01-02", "url": "https://jobs.example.com/acme/1"},
+        {"job_key": "globex-vp", "company": "Globex", "role": "VP Engineering", "status": "applied",
+         "result": "rejected", "date": "2030-01-03", "url": "https://jobs.example.com/globex/2"}]) + "\n", encoding="utf-8")
+    today = _dt.date.today().isoformat()
+    (jst / "seen.json").write_text(json.dumps({
+        "initech|head-of-data": {"title": "Head of Data", "company": "Initech", "score": 88, "first_seen": today,
+                                 "url": "https://jobs.example.com/initech/3"},
+        "hooli|eng-lead": {"title": "Engineering Lead", "company": "Hooli", "score": 40, "first_seen": today,
+                           "url": "https://jobs.example.com/hooli/4"}}), encoding="utf-8")
+    jdest = tmp / "jp-out" / "45-jobs"
+    jenv = dict(__import__("os").environ, JOB_SEARCH_HOME=str(jst))
+    jpp = jdest / "pipeline.json"
+    jr, jbytes = [], []
+    for _ in range(2):
+        jr.append(subprocess.run([sys.executable, str(js / "skills/job-scout/scripts/render_brain.py"), "--dest",
+                                  str(jdest), "--quiet"], capture_output=True, text=True, env=jenv))
+        jbytes.append(jpp.read_bytes() if jpp.is_file() else b"")
+    keep_pipeline("job-search", jpp)
+    jpj = json.loads(jpp.read_text(encoding="utf-8")) if jpp.is_file() else {}
+    jv = subprocess.run([sys.executable, str(js / "skills/job-scout/scripts/pipeline_doc.py"), "check", str(jpp)],
+                        capture_output=True, text=True)
+    check("jobs: render writes a valid sbl-pipeline/2 pipeline.json", jv.returncode == 0,
+          (jr[0].stderr + jv.stdout)[-400:])
+    jst_by = {}
+    for x in jpj.get("items") or []:
+        jst_by.setdefault(x["stage"], []).append(x["title"])
+    check("jobs: ledger rows and seen postings land in their stages",
+          jst_by.get("interview") == ["Acme — CTO"] and jst_by.get("rejected") == ["Globex — VP Engineering"]
+          and jst_by.get("shortlist") == ["Initech — Head of Data"]
+          and jst_by.get("seen") == ["Hooli — Engineering Lead"], str(jst_by))
+    check("jobs: a second render leaves pipeline.json byte-identical",
+          all(x.returncode == 0 for x in jr) and jbytes[0] and jbytes[0] == jbytes[1], jr[1].stderr[-200:])
+
     # --- CV lint ------------------------------------------------------------------------
     prof = tmp / "profile.md"
     prof.write_text("# Profile\n### Tidewater Labs — VP Engineering\n- grew the team to 42 engineers\n"
@@ -1424,6 +1471,18 @@ def _fundraising_checks(fr):
               and not (tmp / "46-fundraising" / "_FUNDRAISE_GENERATED.json").exists())
         check("fundraising: target note titled '(target)' so it never shadows an org note",
               (tmp / "46-fundraising" / "targets" / "Beta Ventures (target).md").is_file())
+        fpp = tmp / "46-fundraising" / "pipeline.json"
+        fb1 = fpp.read_bytes() if fpp.is_file() else b""
+        rv = run(S / "pipeline_doc.py", "check", str(fpp))
+        check("fundraising: render writes a valid sbl-pipeline/2 pipeline.json", rv.returncode == 0, rv.stdout[-300:])
+        fpj = _js.loads(fb1 or b"{}")
+        fst = {x["id"]: x for x in fpj.get("stages") or []}
+        check("fundraising: 'contacted' is founder-only on the canvas (never a drop target)",
+              fst.get("contacted", {}).get("gate") == "owner" and any(i["id"] == "beta-ventures" for i in fpj.get("items") or []),
+              str(fst.get("contacted"))[:200])
+        run(S / "render_brain.py", "--quiet")
+        check("fundraising: a second render leaves pipeline.json byte-identical", fb1 and fpp.read_bytes() == fb1)
+        keep_pipeline("fundraising", fpp)
 
         draft = tmp / "answers.json"
         draft.write_text(_js.dumps({"fields": [
@@ -1639,6 +1698,288 @@ def _fundraising_checks(fr):
           bool(__import__("re").search(r"min_net_cash:\s*\d+", rt)))
 
 
+def _sales_checks(sp):
+    """The sales plugin's own invariants, on a scratch brain: brain leads, the merge and the
+    coverage gate, knock-outs and reachability, the floor, the send guard's rule matrix, the
+    SMTP path against a local sink (never a real server), stop-on-reply, the renderer's
+    idempotency and the shipped defaults. Nothing here touches the network."""
+    import subprocess as _sp, tempfile as _tf, json as _js, os as _os, datetime as _dt
+    import socket as _so, threading as _th
+    S = sp / "skills/sales-scout/scripts"
+    ON = sp / "skills/sales-onboarding/references"
+    today = _dt.date.today()
+    d = lambda n: (today - _dt.timedelta(days=n)).isoformat()  # noqa: E731
+
+    tmpl = (ON / "sending-template.md").read_text(encoding="utf-8")
+    check("sales: sending template ships supervised", "\nlevel: supervised\n" in tmpl and "level: autonomous" not in tmpl)
+    check("sales: sending template ships social automation off", "\nsocial_auto: off\n" in tmpl)
+    sj = _js.loads((sp / "studio.json").read_text(encoding="utf-8"))
+    check("sales: studio.json declares its pipeline file on its own layer",
+          str(sj.get("pipeline", "")).startswith(sj["layer"] + "/") and str(sj.get("pipeline")).endswith(".json"))
+    lv = [g for g in sj["settings"]["form"]["groups"] if g.get("key") == "level"]
+    check("sales: Studio's Sending tab defaults to supervised", bool(lv) and lv[0]["default"] == "supervised")
+    check("sales: no module shadows the standard library",
+          not any((S / f"{m}.py").exists() for m in ("profile", "email", "json", "socket", "smtplib", "imaplib")))
+
+    with _tf.TemporaryDirectory() as tmp:
+        B = Path(tmp) / "brain"
+        for sub in ("00-me", "10-people", "15-organizations", "40-career", "48-sales/profile"):
+            (B / sub).mkdir(parents=True)
+        (B / "00-me/identity.md").write_text('---\ntype: identity\ntitle: Jane Doe\ncompany: "[[Northwind Data]]"\n---\n', encoding="utf-8")
+
+        def person(name, co, role, status, strength, last, email=""):
+            (B / "10-people" / f"{name}.md").write_text(
+                f'---\ntype: person\ntitle: {name}\ncompany: "[[{co}]]"\nrole: {role}\nstatus: {status}\n'
+                f'strength: {strength}\nlast_contact: {last}\nurl: "https://linkedin.com/in/{name.lower().replace(" ", "-")}"\n'
+                f'email: {email}\n---\n', encoding="utf-8")
+        person("Dana Reyes", "Globex", "VP Operations", "warm", 4, d(20), "dana@globex.example")
+        person("Lee Park", "Globex", "Engineer", "warm", 2, d(40))
+        person("Priya Nair", "Initech", "Head of RevOps", "dormant", 4, d(300))
+        person("Sam Ortiz", "Umbrella", "COO", "cold", 1, "")
+        (B / "40-career" / "Deal Pilot (Initech) — Closed Lost.md").write_text(
+            f'---\ntype: deal\ntitle: "Deal: Pilot (Initech) — Closed Lost"\nkind: deal\ndate: {d(200)}\naccount: "[[Initech]]"\n---\n', encoding="utf-8")
+        (B / "40-career" / "Deal Rollout (Acme) — Closed Won.md").write_text(
+            f'---\ntype: deal\ntitle: "Deal: Rollout (Acme) — Closed Won"\nkind: deal\ndate: {d(100)}\naccount: "[[Acme]]"\n---\n', encoding="utf-8")
+        sending = tmpl.replace("days: MON,TUE,WED,THU,FRI", "days: MON,TUE,WED,THU,FRI,SAT,SUN") \
+                      .replace("quiet_start: 08:00", "quiet_start: 00:00").replace("quiet_end: 18:00", "quiet_end: 23:59") \
+                      .replace("timezone: Europe/Lisbon", "timezone: UTC").replace("eu_gate: on", "eu_gate: off")
+        P = B / "48-sales/profile"
+        (P / "sending.md").write_text(sending, encoding="utf-8")
+        (P / "icp.md").write_text((ON / "icp-template.md").read_text(encoding="utf-8")
+                                  .replace("competitors:", "competitors: Contoso"), encoding="utf-8")
+        (P / "offer.md").write_text(
+            "# Offer\n```settings\ncompany: Northwind Data\n```\n## Proof points\n"
+            "- A working knowledge base in 7 days.\n- Used by 40 teams.\n## Do not claim\n- SOC 2 certified\n",
+            encoding="utf-8")
+        env = dict(_os.environ, CLAUDE_PROJECT_DIR=str(B))
+        env.pop("SALES_HOME", None)
+        env.pop("SBL_MAIL_PASSWORD", None)
+
+        def run(script, *args, stdin=None):
+            return _sp.run([sys.executable, str(S / script), *args], cwd=B, env=env,
+                           capture_output=True, text=True, input=stdin, timeout=60)
+
+        r = run("sales_profile.py", "check")
+        check("sales: profile check passes on a complete profile", r.returncode == 0, r.stdout + r.stderr)
+        r = run("warm_rank.py", "--out", str(Path(tmp) / "scout-brain.json"))
+        brain = _js.loads((Path(tmp) / "scout-brain.json").read_text(encoding="utf-8"))["rows"]
+        by = {a["name"]: a for a in brain}
+        check("sales: warm_rank finds the warm decision-maker", "Globex" in by and by["Globex"]["origin"] == "warm", str(list(by)))
+        check("sales: warm_rank turns a lost deal into a revival", by.get("Initech", {}).get("origin") == "revival", str(by.get("Initech")))
+        check("sales: warm_rank skips a cold non-tie and the brain's own company",
+              "Umbrella" not in by and "Northwind Data" not in by, str(list(by)))
+        check("sales: warm_rank lists decision-makers before others",
+              by["Globex"]["contacts"][0]["name"] == "Dana Reyes")
+        (Path(tmp) / "scout-news.json").write_text(_js.dumps({"source": "news", "markets": ["Iberia", "DACH", "UK"], "rows": [
+            {"company": "Hooli", "market": "Iberia", "kind": "funding", "what": "Series B", "url": "https://news.example/a", "seen": d(5)},
+            {"company": "Hooli", "market": "Iberia", "kind": "hiring", "what": "Knowledge manager", "url": "https://jobs.example/1", "seen": d(3),
+             "contacts": [{"name": "Mo Haddad", "role": "COO", "email": "mo@hooli.example", "email_source": "public-page"}]},
+            {"company": "Wayne Co", "market": "UK", "kind": "event", "what": "Exhibitor", "url": "https://ev.example", "seen": d(9),
+             "contacts": [{"name": "Bruce Ng", "role": "CTO", "email": "bruce@wayne.example", "email_source": "pattern-unverified"}]},
+            {"company": "Contoso", "market": "UK", "kind": "funding", "what": "Seed", "url": "https://news.example/c", "seen": d(2),
+             "contacts": [{"name": "Kim Lo", "role": "COO", "email": "kim@contoso.example", "email_source": "public-page"}]},
+            {"company": "Acme", "market": "DACH", "kind": "funding", "what": "Series C", "url": "https://news.example/d", "seen": d(2)}]}),
+            encoding="utf-8")
+        (Path(tmp) / "scout-linkedin.json").write_text(_js.dumps([
+            {"title": "RevOps Lead", "company": "Cyberdyne", "location": "Berlin, Germany", "posted": d(2), "url": "https://www.linkedin.com/jobs/view/123456789"},
+            {"title": "Barista", "company": "Coffee Co", "location": "London", "posted": d(2), "url": "https://www.linkedin.com/jobs/view/223456789"}]),
+            encoding="utf-8")
+        r = run("scout.py", "merge", *[str(Path(tmp) / f) for f in ("scout-brain.json", "scout-news.json", "scout-linkedin.json")])
+        check("sales: scout merge runs", r.returncode == 0, r.stderr[-400:])
+        acc = {}
+        for line in (B / ".plugins/sales/accounts.jsonl").read_text(encoding="utf-8").splitlines():
+            o = _js.loads(line)
+            acc[o["name"]] = o
+        check("sales: the state root is hidden inside the brain", (B / ".plugins/sales/events.jsonl").is_file())
+        check("sales: merge collapses one company's signals into one account",
+              len([n for n in acc if n == "Hooli"]) == 1 and len(acc["Hooli"]["signals"]) == 2, str(acc.get("Hooli")))
+        check("sales: a job posting outside the buyer and need roles is not a lead", "Coffee Co" not in acc, str(list(acc)))
+        check("sales: a hiring signal in a profile market is a lead", "Cyberdyne" in acc and acc["Cyberdyne"]["markets"] == ["DACH"])
+        r = run("scout.py", "coverage")
+        check("sales: coverage with fewer than 3 sources is not called ok", r.returncode == 0 and "partial" in r.stdout, r.stdout)
+        (Path(tmp) / "scout-empty.json").write_text(_js.dumps({"source": "registry", "markets": ["Nordics"], "rows": []}), encoding="utf-8")
+        st = B / "48-sales/profile/icp.md"
+        st.write_text(st.read_text(encoding="utf-8").replace("market.UK:", "market.Nordics: sweden|norway\nmarket.UK:"), encoding="utf-8")
+        run("scout.py", "merge", *[str(Path(tmp) / f) for f in ("scout-brain.json", "scout-news.json", "scout-linkedin.json", "scout-empty.json")])
+        r = run("scout.py", "coverage")
+        check("sales: an unsearched market is a coverage FAILURE (exit 1)", r.returncode == 1 and "FAILURE" in r.stdout + r.stderr, r.stdout + r.stderr)
+        r = run("lead_score.py", "shortlist", "--json")
+        sl = _js.loads(r.stdout)
+        names = [x["name"] for x in sl["shortlist"]]
+        ko = {x["name"]: x["knocked_out"] for x in sl["knocked_out"]}
+        check("sales: a competitor is knocked out with its rule", "Contoso" in ko and "excluded" in ko["Contoso"], str(ko))
+        check("sales: an existing customer is knocked out", ko.get("Acme") == "already a customer", str(ko))
+        check("sales: nothing below the floor is shortlisted", all(x["score"] >= sl["floor"] for x in sl["shortlist"]), str(sl["shortlist"]))
+        check("sales: a warm lead and a funded cold lead both clear the floor", "Globex" in names and "Hooli" in names, str(names))
+        r = run("lead_score.py", "why", "wayneco")
+        check("sales: a guessed address scores as red reach", '"reach": "pattern"' in r.stdout, r.stdout)
+        run("scout.py", "mark-run")
+        run("scout.py", "merge", str(Path(tmp) / "scout-news.json"))
+        sl2 = _js.loads(run("lead_score.py", "shortlist", "--json").stdout)
+        again = {x["name"] for x in sl2["shortlist"]}
+        still = {x["name"] for x in sl2["still_open"]}
+        check("sales: yesterday's shortlist comes back as still open, not as new leads",
+              set(names) <= still and not (set(names) & again), f"short={again} still={still}")
+
+        # sequences and the guard
+        run("ledger.py", "stage", "globex", "target")
+        run("ledger.py", "stage", "hooli", "target")
+        r = run("sequence.py", "seed")
+        check("sales: sequence templates seed into the layer", r.returncode == 0 and len(list((B / "48-sales/sequences").glob("*.md"))) == 5, r.stdout + r.stderr)
+        run("sequence.py", "start", "globex", "--sequence", "Warm — new offer", "--contacts", "Dana Reyes")
+        run("sequence.py", "start", "hooli", "--sequence", "Cold — signal-led")
+        r = run("sequence.py", "due", "--count")
+        check("sales: both first steps are due today", r.stdout.strip() == "2", r.stdout + r.stderr)
+        good = Path(tmp) / "good.md"
+        good.write_text("Dana — we now set up a working knowledge base in 7 days. Would that help your ops team?\n\n"
+                        "Reply 'no thanks' and I won't write again.\n", encoding="utf-8")
+        bad = Path(tmp) / "bad.md"
+        bad.write_text("Dana — we are SOC 2 certified and 300 teams use us. Call?\n", encoding="utf-8")
+        g = lambda *a: run("send_guard.py", "check", *a)  # noqa: E731
+        r = g("--channel", "email", "--account", "globex", "--contact", "Dana Reyes", "--to", "dana@globex.example", "--body-file", str(bad))
+        check("sales: guard blocks an unsourced claim, a do-not-claim term and a missing opt-out",
+              r.returncode == 1 and "SOC 2" in r.stdout and "300" in r.stdout and "opt-out" in r.stdout, r.stdout)
+        r = g("--channel", "email", "--account", "wayneco", "--contact", "Bruce Ng", "--to", "bruce@wayne.example", "--body-file", str(good))
+        check("sales: guard never sends to a guessed address", r.returncode == 1 and "guess" in r.stdout, r.stdout)
+        r = g("--channel", "email", "--account", "globex", "--contact", "Dana Reyes", "--to", "someone@globex.example", "--body-file", str(good))
+        check("sales: guard refuses an address that is not on the record", r.returncode == 1, r.stdout)
+        r = g("--channel", "linkedin_dm", "--account", "globex", "--contact", "Dana Reyes", "--body-file", str(good), "--kind", "dm")
+        check("sales: social steps are ASSIST while social automation is off", r.returncode == 4 and r.stdout.startswith("ASSIST"), r.stdout)
+        r = run("send_guard.py", "sent", "--channel", "linkedin_dm", "--account", "globex", "--contact", "Dana Reyes")
+        check("sales: a social step cannot be logged as sent without an ALLOW", r.returncode == 1 and "REFUSED" in r.stdout, r.stdout)
+
+        # a local SMTP sink - the only server any test ever talks to
+        got = []
+        srv = _so.socket()
+        srv.setsockopt(_so.SOL_SOCKET, _so.SO_REUSEADDR, 1)
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(4)
+        port = srv.getsockname()[1]
+
+        def serve():
+            while True:
+                try:
+                    c, _ = srv.accept()
+                except OSError:
+                    return
+                f = c.makefile("rwb")
+                say = lambda s: (f.write((s + "\r\n").encode()), f.flush())  # noqa: E731
+                say("220 sink")
+                data, buf = False, []
+                for line in f:
+                    t = line.decode("utf-8", "replace").rstrip("\r\n")
+                    if data:
+                        if t == ".":
+                            got.append("\n".join(buf))
+                            buf, data = [], False
+                            say("250 ok")
+                        else:
+                            buf.append(t)
+                        continue
+                    u = t.upper()
+                    if u.startswith(("EHLO", "HELO")):
+                        say("250 sink")
+                    elif u.startswith("DATA"):
+                        data = True
+                        say("354 go")
+                    elif u.startswith("QUIT"):
+                        say("221 bye")
+                        break
+                    else:
+                        say("250 ok")
+                c.close()
+        _th.Thread(target=serve, daemon=True).start()
+        send = lambda *a: run("mail.py", "send", "--account", "globex", "--contact", "Dana Reyes", "--to", "dana@globex.example",  # noqa: E731
+                              "--subject", "Your ops team", "--body-file", str(good), "--step", "1", "--sink", f"127.0.0.1:{port}", *a)
+        r = send("--batch", "b1")
+        check("sales: the first real send is gated even before the level is read (exit 3)", r.returncode == 3 and r.stdout.startswith("GATE"), r.stdout)
+        check("sales: a gated send never reaches the server", not got)
+        run("ledger.py", "approve", "--batch", "b1")
+        r = send("--batch", "b1")
+        check("sales: an approved batch sends through the mailbox", r.returncode == 0 and r.stdout.startswith("SENT") and len(got) == 1, r.stdout + r.stderr)
+        check("sales: every email carries List-Unsubscribe and the opt-out line",
+              bool(got) and "List-Unsubscribe:" in got[0] and "no thanks" in got[0])
+        ev = (B / ".plugins/sales/events.jsonl").read_text(encoding="utf-8")
+        check("sales: the send is in the ledger with its message id", '"kind": "sent"' in ev and '"message_id": "<' in ev)
+        run("ledger.py", "log", "replied", "--account", "globex", "--contact", "Dana Reyes", "--data", '{"reply_class": "meeting-ask"}')
+        r = g("--channel", "email", "--account", "globex", "--contact", "Dana Reyes", "--to", "dana@globex.example",
+              "--body-file", str(good), "--kind", "follow-up")
+        check("sales: stop-on-reply blocks the next sequence step", r.returncode == 1 and "stop-on-reply" in r.stdout, r.stdout)
+        r = run("sequence.py", "due", "--count")
+        check("sales: the replied contact drops out of today's due steps", r.stdout.strip() == "1", r.stdout)
+        run("ledger.py", "suppress", "mo@hooli.example", "--reason", "asked")
+        r = g("--channel", "email", "--account", "hooli", "--contact", "Mo Haddad", "--to", "mo@hooli.example", "--body-file", str(good))
+        check("sales: the do-not-contact list blocks at every level", r.returncode == 1 and "do-not-contact" in r.stdout, r.stdout)
+        (P / "sending.json").write_text(_js.dumps({"schema": "sbl-sales-sending/1", "level": "draft"}), encoding="utf-8")
+        r = send("--batch", "b1")
+        check("sales: Studio's Sending tab overrides sending.md, and draft never sends",
+              r.returncode == 1 and "draft" in r.stdout and len(got) == 1, r.stdout)
+        srv.close()
+        # the approval card: the batch note in full + the fence Studio draws
+        run("batch.py", "add", "--batch", "b9", "--account", "hooli", "--contact", "Mo Haddad", "--channel", "email",
+            "--to", "mo@hooli.example", "--subject", "Your knowledge manager role", "--body-file", str(good),
+            "--hook-source", "https://jobs.example/1", "--verdict", "GATE", "--step", "1")
+        run("batch.py", "add", "--batch", "b9", "--account", "wayneco", "--contact", "Bruce Ng", "--channel", "email",
+            "--verdict", "BLOCK", "--rule", "only a guessed address")
+        r = run("batch.py", "card", "--batch", "b9")
+        fence = r.stdout.split("```approval", 1)[-1].split("```", 1)[0].strip() if "```approval" in r.stdout else ""
+        try:
+            card = _js.loads(fence)
+        except ValueError:
+            card = {}
+        check("sales: batch.py prints an approval card Studio can draw",
+              card.get("irreversible") is True and str(card.get("artifact", "")).endswith("batches/Batch b9.md")
+              and card.get("fields") and card["fields"][0]["source"] == "https://jobs.example/1"
+              and any("Bruce Ng" in n for n in card.get("never", [])) and "of 25 today" in card.get("consequence", ""), r.stdout[-400:])
+        bn = B / "48-sales/batches/Batch b9.md"
+        check("sales: the batch note carries every message in full", bn.is_file() and "would that help your ops team" in bn.read_text(encoding="utf-8").lower())
+        r = run("ledger.py", "stage", "globex", "won")
+        check("sales: won / lost are the owner's call only", r.returncode != 0)
+        r1 = run("render_sales.py")
+        r2 = run("render_sales.py")
+        check("sales: render writes the layer", r1.returncode == 0 and (B / "48-sales/Pipeline.md").is_file()
+              and (B / "48-sales/pipeline.json").is_file(), r1.stderr[-300:])
+        check("sales: a re-render with no new events writes nothing", "rendered 0 files" in r2.stdout, r2.stdout)
+        pj = _js.loads((B / "48-sales/pipeline.json").read_text(encoding="utf-8"))
+        keep_pipeline("sales", B / "48-sales/pipeline.json")
+        items = {i["title"]: i for i in pj.get("items", [])}
+        check("sales: pipeline.json is sbl-pipeline/2 with stages, items and coverage",
+              pj.get("schema") == "sbl-pipeline/2" and "Globex" in items and items["Globex"]["stage"] == "sequenced"
+              and any(s["role"] == "positive" for s in pj["stages"]) and pj.get("coverage") is not None)
+        rv = run("pipeline_doc.py", "check", str(B / "48-sales/pipeline.json"))
+        check("sales: the pipeline file passes the shared schema check", rv.returncode == 0, rv.stdout)
+        check("sales: knocked-out leads sit in a parked stage without detail",
+              all(i["stage"] == "out" and "detail" not in i for i in pj["items"] if i["title"] in ("Contoso", "Acme")))
+        check("sales: an unanswered reply shows as needing the seller",
+              "needs-you" in (items.get("Globex") or {}).get("flags", []))
+        an = (B / "48-sales/accounts/Globex.md").read_text(encoding="utf-8")
+        check("sales: an account note links the brain's own person note", "[[10-people/Dana Reyes|Dana Reyes]]" in an, an[:400])
+        (B / "48-sales/accounts/Globex.md").write_text(an + "\nmy own note\n", encoding="utf-8")
+        run("ledger.py", "log", "answered", "--account", "globex", "--contact", "Dana Reyes")
+        r3 = run("render_sales.py")
+        # the starter: a fresh brain opens on a dashboard (no profile, no network)
+        F = Path(tmp) / "fresh"
+        for sub in ("00-me", "10-people", "40-career"):
+            (F / sub).mkdir(parents=True)
+        for f in (B / "00-me").glob("*.md"):
+            (F / "00-me" / f.name).write_text(f.read_text(encoding="utf-8"), encoding="utf-8")
+        for f in (B / "10-people").glob("*.md"):
+            (F / "10-people" / f.name).write_text(f.read_text(encoding="utf-8"), encoding="utf-8")
+        rs = _sp.run([sys.executable, str(S / "scout.py"), "starter"], cwd=F, env=dict(env, CLAUDE_PROJECT_DIR=str(F)),
+                     capture_output=True, text=True, timeout=60)
+        fpj = F / "48-sales/pipeline.json"
+        fj = _js.loads(fpj.read_text(encoding="utf-8")) if fpj.is_file() else {}
+        check("sales: the starter renders a dashboard from the brain alone",
+              rs.returncode == 0 and (F / "48-sales/Pipeline.md").is_file() and fj.get("starter") is True
+              and {"Globex", "Initech"} <= {i["title"] for i in fj.get("items", []) if "shortlist" in (i.get("flags") or [])}
+              and "Umbrella" not in {i["title"] for i in fj.get("items", [])} and fj.get("setup"), rs.stdout + rs.stderr)
+        check("sales: the starter's home note says what is missing", "## Start here" in (F / "48-sales/Pipeline.md").read_text(encoding="utf-8"))
+        check("sales: every worked account carries its panel detail",
+              all(isinstance(i.get("detail"), dict) and "team" in i["detail"] for i in pj["items"] if i["stage"] not in ("lead", "out", "parked", "lost")))
+        check("sales: a note the seller edited is never overwritten",
+              "my own note" in (B / "48-sales/accounts/Globex.md").read_text(encoding="utf-8") and "kept 1" in r3.stdout, r3.stdout)
+
+
 def _json_load(p):
     import json as _j
     return _j.loads(Path(p).read_text(encoding="utf-8"))
@@ -1693,6 +2034,11 @@ def test_plugins():
     fr = plugins / "fundraising"
     if fr.is_dir():
         _fundraising_checks(fr)
+
+    # --- sales specifics ------------------------------------------------------
+    sp = plugins / "sales"
+    if sp.is_dir():
+        _sales_checks(sp)
 
     import json as _json
     for name in names:
@@ -1888,6 +2234,12 @@ def test_plugins():
     check("plugins: jobs layer key resolves (company)", _bv.layout_for("company")["jobs"] == "45-hiring")
     check("plugins: fundraising layer key resolves (person)", _bv.layout_for("person")["fundraising"] == "46-fundraising")
     check("plugins: fundraising layer key resolves (company)", _bv.layout_for("company")["fundraising"] == "46-fundraising")
+    check("plugins: sales layer key resolves (person+company)",
+          _bv.layout_for("person")["sales"] == _bv.layout_for("company")["sales"] == "48-sales")
+    for _subj in ("person", "company"):
+        _nums = [v.split("-")[0] for v in _bv.layout_for(_subj).values() if v[:2].isdigit()]
+        check(f"plugins: no two layers share a number ({_subj})", len(_nums) == len(set(_nums)),
+              str(sorted(n for n in _nums if _nums.count(n) > 1)))
 
 
 
@@ -2002,6 +2354,24 @@ def test_travel_plugin():
         check("travel: manifest lives in the hidden ledger, not the layer",
               (brain / ".plugins" / "travel-planner" / "_TRAVEL_GENERATED.json").is_file()
               and not (layer / "_TRAVEL_GENERATED.json").exists())
+        pj = json.loads((layer / "pipeline.json").read_text()) if (layer / "pipeline.json").is_file() else {}
+        sys.path.insert(0, str(S))
+        try:
+            import pipeline_doc as _pd  # noqa
+            probs = _pd.check(pj) if pj else ["missing"]
+        finally:
+            sys.path.remove(str(S))
+            sys.modules.pop("pipeline_doc", None)
+        check("travel: render writes a valid sbl-pipeline/2 pipeline.json", not probs, str(probs)[:300])
+        keep_pipeline("travel-planner", layer / "pipeline.json")
+        tp = {i["id"]: i for i in pj.get("items") or []}
+        check("travel: every trip is a pipeline item with stops and note links",
+              "paris-test" in tp and "japan-test" in tp and tp["paris-test"]["stage"] == "draft"
+              and tp["paris-test"].get("detail", {}).get("stops")
+              and (brain / tp["paris-test"]["note"]).is_file(), str(tp.get("paris-test"))[:300])
+        check("travel: the pipeline has the five trip stages, booked behind a confirm gate",
+              [x["id"] for x in pj.get("stages") or []] == ["idea", "draft", "shopped", "booked", "past"]
+              and next(x for x in pj["stages"] if x["id"] == "booked")["gate"] == "confirm")
         places_titles = {p.stem.lower() for p in (brain / "85-places").glob("*.md")}
         shadow = [p.name for p in layer.rglob("*.md") if p.stem.lower() in places_titles]
         check("travel: no travel note shadows a place note", not shadow, str(shadow))

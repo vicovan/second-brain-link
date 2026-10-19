@@ -9,6 +9,7 @@
   "homeNote": "45-jobs/reports/Shortlist {date}.md",
   "homeNoteFallback": "45-jobs/Job Dashboard.md",
   "watchGlob": "45-jobs/**",
+  "pipeline": "45-jobs/pipeline.json",
   "tools": [
     "Skill",
     "Agent",

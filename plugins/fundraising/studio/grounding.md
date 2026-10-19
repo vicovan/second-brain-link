@@ -126,6 +126,20 @@ then verify survivors with at most `max_research_agents` parallel subagents (def
 `round.md`). **Say the fan-out before you spend it.** Subagents return claims; only you write the
 ledger.
 
+## The Pipeline canvas
+
+Studio's **Pipeline** canvas draws `46-fundraising/pipeline.json` — every target by status — screened, verified, queued, drafted, filed, contacted, replied, meeting, one tile
+each, beside the other agents' pipelines. `render_brain.py` writes it, so re-render after every change. A
+click or a drag there arrives here as an ordinary message ("Verify Beta Ventures on its own site", "Move Beta Ventures to Passed"): change it through the ledger (`ledger.py set-status …`); `contacted` is never a drop target — only the founder's own "I sent it" moves a record there. The canvas never writes
+a file itself.
+
+To point at items on it, end a reply with a transient fence (ids are target keys from `ledger.py list`; nothing in it is
+saved):
+
+```pipeline
+{"focus": "beta-ventures", "highlight": ["beta-ventures"]}
+```
+
 ## Working in the brain
 
 Everything you produce belongs in `46-fundraising/`: the Funding Plan (you write it), target notes,

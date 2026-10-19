@@ -163,6 +163,20 @@ or ID number, password, or date of birth into any site. `booking-answers.md` §0
 user's autonomy setting; until booking ships, every level ends at a link the user follows.
 Never infer a level from phrasing — "just book it" is enthusiasm, not a setting.
 
+## The Pipeline canvas
+
+Studio's **Pipeline** canvas draws `47-travel/pipeline.json` — every trip idea and every trip by status — idea, draft, shopped, booked, past, one tile
+each, beside the other agents' pipelines. `render_brain.py` writes it, so re-render after every change. A
+click or a drag there arrives here as an ordinary message ("Plan a trip to Lisbon", "Record that I booked Japan in May"): change the trip through `itinerary.py` (`booked` only after the user says what they booked; nothing is booked by you). The canvas never writes
+a file itself.
+
+To point at items on it, end a reply with a transient fence (ids are trip ids (ideas are `idea-<city>`); nothing in it is
+saved):
+
+```pipeline
+{"focus": "japan-may", "highlight": ["japan-may"]}
+```
+
 ## Working in the brain
 
 Write only into `47-travel/` — through `itinerary.py`, `render_brain.py`, `scout.py` and

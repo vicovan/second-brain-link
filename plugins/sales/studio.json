@@ -1,0 +1,276 @@
+{
+  "id": "sales",
+  "label": "Sales Agent",
+  "blurb": "Finds leads — your brain's warm ties and lost deals first, then companies with a reason to buy now — researches the buying team, runs your sequences from your own mailbox and browser within your caps, works the replies and books the meetings. No bought data.",
+  "icon": "target",
+  "grounding": "studio/grounding.md",
+  "entrySkill": "sales-pipeline",
+  "layer": "48-sales",
+  "homeNote": "48-sales/Pipeline.md",
+  "home": {
+    "cmd": "scout.py starter"
+  },
+  "watchGlob": "48-sales/**",
+  "pipeline": "48-sales/pipeline.json",
+  "tools": [
+    "Skill",
+    "Agent",
+    "mcp__claude-in-chrome__*"
+  ],
+  "chrome": true,
+  "requires": {
+    "profile": "48-sales/profile/offer.md",
+    "onboardSkill": "sales-onboarding"
+  },
+  "providers": [
+    "claudecode"
+  ],
+  "subjects": [
+    "personal",
+    "company"
+  ],
+  "color": "#d9480f",
+  "suggestions": [
+    {
+      "t": "Set me up",
+      "stage": "setup",
+      "short": "Pull my offer, customers and voice from this brain and my deck; ask only the decisions.",
+      "q": "Set up or update my sales profile. Read this brain first — my company, the deals I won and lost, how I write — and my deck and facts file, then ask me only the decisions: what I sell and to whom, my markets, the daily target and floor, how autonomous you should be, whether you may send social steps yourself, and my mailbox."
+    },
+    {
+      "t": "Who would take my call?",
+      "stage": "do",
+      "when": "onboarded",
+      "short": "The warm leads already in my brain — ties, lost deals, intro paths. No web, no cost.",
+      "q": "Who would take my call? Rank the leads my brain already holds — warm and dormant decision-makers, lost deals worth reopening, intro paths — with why each one, and nothing from the web."
+    },
+    {
+      "t": "Find me leads",
+      "stage": "do",
+      "when": "onboarded",
+      "short": "Today's sweep across my markets: coverage table, shortlist above my floor, knock-outs shown.",
+      "q": "Find me leads: run today's sweep — my brain first, then every market's sources (hiring signals, funding and news, directories, events, registries, public threads) and the companies' own sites. Show the coverage table, the shortlist above my floor with why now and the way in, and what was knocked out and why."
+    },
+    {
+      "t": "Who's hiring for what I sell?",
+      "stage": "do",
+      "when": "onboarded",
+      "short": "Companies posting my buyer and need roles, from public job search and their own boards.",
+      "q": "Who's hiring for what I sell? Run the hiring-signal pass only — LinkedIn's public job search and the companies' own careers boards — for my buyer and need roles in my markets, and add the matches as leads."
+    },
+    {
+      "t": "Build this week's pipeline",
+      "stage": "do",
+      "when": "has-work",
+      "short": "Research the approved leads — buying team, a way in, why now (fan-out told first).",
+      "q": "Build this week's pipeline: research the top leads from the latest lead report — the buying team, a reachable channel for each person with its evidence, the why now — tell me the fan-out before you spend it, then make them targets."
+    },
+    {
+      "t": "Start sequences",
+      "stage": "do",
+      "when": "has-work",
+      "short": "A cadence per target; the first touches come back as one approval batch.",
+      "q": "Start sequences for my targets that do not have one — the cadence that fits each account's origin, to the people research chose — and bring the first touches back to me as one approval batch."
+    },
+    {
+      "t": "Send what's due",
+      "stage": "do",
+      "when": "has-work",
+      "short": "Today's steps, each through the guard: email from my mailbox, social in my browser, forms.",
+      "q": "Send what's due today. Write each message from my voice and the account's evidence, lint it against my facts, run it through the send guard, batch anything gated into one approval card, and send the rest within my caps."
+    },
+    {
+      "t": "Work my replies",
+      "stage": "track",
+      "when": "has-work",
+      "short": "Read, classify, answer the routine ones, propose times, book — pricing and objections come to me.",
+      "q": "Work my replies: read new replies from the people I've written to, classify each one, stop their sequences, answer the routine ones and propose meeting times, book what's agreed, suppress any unsubscribe, and bring me pricing, legal and objections with a drafted answer."
+    },
+    {
+      "t": "Brief me for my next call",
+      "stage": "track",
+      "when": "has-work",
+      "short": "History, who's on the call, why now, what they'll ask, the one outcome to aim for.",
+      "q": "Brief me for my next call: the deal history from my brain, who is on the call and what they said, why now, what they'll ask with honest answers from my profile, and the one outcome to aim for."
+    },
+    {
+      "t": "How is it going?",
+      "stage": "track",
+      "when": "has-work",
+      "short": "Replies, meetings and what's working by origin, segment and step — rates only from 20 sends.",
+      "q": "How is it going? Show replies, meetings and opportunities by origin, segment, channel and step (rates only where there are at least 20 sends), what is working, and at most three changes you'd make."
+    }
+  ],
+  "settings": {
+    "title": "Sales Agent settings",
+    "blurb": "What the agent may do on your behalf, and the materials it may quote. It all lives in your brain, in the sales profile — nothing is uploaded anywhere. Your mailbox password is never stored here (macOS Keychain or SBL_MAIL_PASSWORD).",
+    "files": [
+      {
+        "id": "sending",
+        "label": "Sending settings",
+        "hint": "Written by the Sending tab.",
+        "dest": "48-sales/profile",
+        "accept": [
+          ".json"
+        ],
+        "hidden": true
+      },
+      {
+        "id": "deck",
+        "label": "Deck / one-pager",
+        "hint": "PDF, PPTX or Markdown. Onboarding reads it to draft your offer.",
+        "dest": "48-sales/profile/materials",
+        "accept": [
+          ".pdf",
+          ".pptx",
+          ".key",
+          ".md"
+        ],
+        "multiple": true
+      },
+      {
+        "id": "facts",
+        "label": "Facts file / case studies",
+        "hint": "The source of truth for every claim — the agent will not state a number that is not in here or your offer profile.",
+        "dest": "48-sales/profile/materials",
+        "accept": [
+          ".md",
+          ".markdown",
+          ".txt",
+          ".pdf",
+          ".docx"
+        ],
+        "multiple": true
+      }
+    ],
+    "form": {
+      "label": "Sending",
+      "store": {
+        "setting": "sending",
+        "file": "sending.json",
+        "schema": "sbl-sales-sending/1"
+      },
+      "groups": [
+        {
+          "label": "Autonomy",
+          "note": "Draft never sends. Supervised: every send waits for your OK. Autonomous: sends within your caps — first touches stay gated for the first batches.",
+          "type": "segmented",
+          "key": "level",
+          "default": "supervised",
+          "options": [
+            {
+              "value": "draft",
+              "label": "Draft"
+            },
+            {
+              "value": "supervised",
+              "label": "Supervised"
+            },
+            {
+              "value": "autonomous",
+              "label": "Autonomous"
+            }
+          ]
+        },
+        {
+          "label": "Social steps in your browser",
+          "note": "On: the agent sends LinkedIn, X and WhatsApp Web messages itself in your signed-in Chrome, at a human pace, and stops for 48 hours on any warning page. LinkedIn's terms do not allow automation — the account at risk is yours. Off: it prepares the message and you press Send.",
+          "type": "segmented",
+          "key": "social_auto",
+          "default": "off",
+          "options": [
+            {
+              "value": "off",
+              "label": "Off — I press Send"
+            },
+            {
+              "value": "on",
+              "label": "On — the agent sends"
+            }
+          ]
+        },
+        {
+          "label": "EU recipients",
+          "note": "On: a first touch to an EU or UK recipient always waits for your OK, at every level.",
+          "type": "segmented",
+          "key": "eu_gate",
+          "default": "on",
+          "options": [
+            {
+              "value": "on",
+              "label": "Always approve first touch"
+            },
+            {
+              "value": "off",
+              "label": "Same as everyone"
+            }
+          ]
+        },
+        {
+          "label": "Emails a day",
+          "note": "The most the agent sends from your mailbox in a day.",
+          "type": "segmented",
+          "key": "cap.email",
+          "default": "25",
+          "options": [
+            {
+              "value": "10",
+              "label": "10"
+            },
+            {
+              "value": "25",
+              "label": "25"
+            },
+            {
+              "value": "40",
+              "label": "40"
+            },
+            {
+              "value": "50",
+              "label": "50"
+            }
+          ]
+        },
+        {
+          "label": "LinkedIn invitations a day",
+          "type": "segmented",
+          "key": "cap.linkedin_invite",
+          "default": "10",
+          "options": [
+            {
+              "value": "5",
+              "label": "5"
+            },
+            {
+              "value": "10",
+              "label": "10"
+            },
+            {
+              "value": "20",
+              "label": "20"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "templates": "harness",
+  "outcomes": {
+    "replies": {
+      "label": "replies",
+      "cmd": "ledger.py count replies"
+    },
+    "meetings": {
+      "label": "meetings booked",
+      "cmd": "ledger.py count meetings"
+    },
+    "opportunities": {
+      "label": "opportunities",
+      "cmd": "ledger.py count opportunities"
+    }
+  },
+  "preflight": [
+    "profile_present",
+    "chrome_connected"
+  ]
+}

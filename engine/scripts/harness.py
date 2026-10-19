@@ -2,7 +2,8 @@
 """harness.py - the Second Brain Harness: goals, routines, reports and activity. Stdlib only,
 no network, no model calls.
 
-SHIPPED BYTE-IDENTICAL in the engine and every plugin (job-search, fundraising, travel-planner);
+SHIPPED BYTE-IDENTICAL in the engine and every plugin (job-search, fundraising, travel-planner,
+sales);
 the plugin build fails if the copies differ. Design + user model:
 second-brain-link-docs/docs-harness/SBL-HARNESS-USER-MODEL.md.
 
@@ -35,6 +36,7 @@ The five steps every run follows (the harness-engineering subsystems, made visib
     harness.py run-append RUN --line TEXT              harness.py run-close RUN --status S [...]
     harness.py last-report ROUTINE|AGENT               harness.py verify RUN
     harness.py goal-progress GOAL                      harness.py run ROUTINE --provider none
+    harness.py home AGENT [--force]                    (an agent's starter view, while its home note is missing)
     harness.py review add|list|resolve ...
 Global: --brain PATH (else $SBL_BRAIN, else walk up from the cwd), --json, --now ISO (tests).
 """
@@ -188,7 +190,8 @@ class Brain:
 # layer. Resolved per subject through the same layout (keys, never folder literals here).
 PROTECTED_KEYS = ("root", "people", "orgs", "reputation", "voice", "shopping", "career", "mirror",
                   "learning", "services", "search", "places", "synthesis")
-AGENT_LAYER_KEYS = {"job-search": "jobs", "fundraising": "fundraising", "travel-planner": "travel"}
+AGENT_LAYER_KEYS = {"job-search": "jobs", "fundraising": "fundraising", "travel-planner": "travel",
+                    "sales": "sales"}
 
 
 def layer_folder(b: "Brain", key: str) -> str:
@@ -621,6 +624,22 @@ def plugin_script(agent: str, name: str) -> pathlib.Path | None:
         if str(rp).startswith(str(d) + os.sep) and rp.is_file():
             return rp
     return None
+
+
+def agent_home(b: Brain, agent: str, force: bool = False) -> dict:
+    """An agent's starter view: studio.json `home: {"cmd": "<script.py args>"}`, run with the agent's
+    OWN scripts only (run_plugin_cmd), once - while its homeNote does not exist yet. Studio calls
+    it when the agent is opened, so a fresh brain opens on a real dashboard instead of nothing."""
+    sj = studio_json(agent)
+    h = sj.get("home") if isinstance(sj.get("home"), dict) else {}
+    cmd = str(h.get("cmd") or "")
+    if not cmd:
+        return {"ran": False, "why": "no home command"}
+    note = str(sj.get("homeNote") or "")
+    if note and not force and not re.search(r"(^|/)\.\.?(/|$)", note) and (b.root / note).is_file():
+        return {"ran": False, "why": "home note exists"}
+    rc, out = run_plugin_cmd(b, agent, cmd, timeout=180)
+    return {"ran": True, "code": rc, "out": out[-600:]}
 
 
 def run_plugin_cmd(b: Brain, agent: str, cmd: str, timeout: int = 60) -> tuple[int, str]:
@@ -1585,6 +1604,9 @@ def main(argv=None) -> int:
     g.add_argument("--routine", default="")
     g.add_argument("--agent", default="")
     g.add_argument("--block", action="store_true")
+    g = sub.add_parser("home")
+    g.add_argument("agent")
+    g.add_argument("--force", action="store_true")
     g = sub.add_parser("goal-progress")
     g.add_argument("goal", nargs="?", default="")
     g.add_argument("--check", action="store_true")
@@ -1749,6 +1771,8 @@ def main(argv=None) -> int:
                 txt = re.sub(r"( ✓| \(couldn't verify\))$", "", mm.group(1))
                 items.append({"text": txt, "evidence": mm.group(2) or ""})
         _out(verify_items(b, items), j)
+    elif a.cmd == "home":
+        _out(agent_home(b, a.agent, a.force), j)
     elif a.cmd == "goal-progress":
         goals = [find_note(b, "goals", a.goal)] if a.goal else [b.abs(n["path"]) for n in list_notes(b, "goals")]
         res = [goal_check(b, g) if a.check else goal_progress(b, g) for g in goals if g]

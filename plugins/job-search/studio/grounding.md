@@ -168,6 +168,20 @@ failure; an honest "the browser tools are not available here" is not.
 A per-domain permission block in the Chrome extension is a setup detail, not a reason to
 drop a job: name the domain that needs allowing and carry on with the rest.
 
+## The Pipeline canvas
+
+Studio's **Pipeline** canvas draws `45-jobs/pipeline.json` — every application and the scout's recent shortlist, one tile
+each, beside the other agents' pipelines. `render_brain.py` writes it, so re-render after every change. A
+click or a drag there arrives here as an ordinary message ("Apply to Acme — CTO", "Record that Globex — VP Engineering moved to Interview"): record it in the ledger (`outcomes.jsonl`, exactly as job-apply logs a result) — `applied` only once the user confirms the submission. The canvas never writes
+a file itself.
+
+To point at items on it, end a reply with a transient fence (ids are job keys from `outcomes.jsonl` (seen postings are `seen-<key>`); nothing in it is
+saved):
+
+```pipeline
+{"focus": "acme-cto", "highlight": ["acme-cto", "globex-vp"]}
+```
+
 ## Working in the brain
 
 Everything you produce belongs in the `45-jobs/` layer of the open brain: the shortlist

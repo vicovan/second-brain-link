@@ -9,6 +9,7 @@
   "homeNote": "46-fundraising/Funding Plan.md",
   "homeNoteFallback": "46-fundraising/Fundraising Dashboard.md",
   "watchGlob": "46-fundraising/**",
+  "pipeline": "46-fundraising/pipeline.json",
   "tools": [
     "Skill",
     "Agent",

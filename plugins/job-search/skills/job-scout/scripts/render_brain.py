@@ -35,7 +35,8 @@ import argparse, datetime, hashlib, json, os, pathlib, re, shutil, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from paths import (state_root, render_dir, surface_root, work_root, brain_at_cwd,  # noqa: E402
-                   brain_state_root, LEGACY_STATE_DIRNAME)
+                   brain_state_root, LEGACY_STATE_DIRNAME, is_brain)
+import pipeline_doc as pdoc  # noqa: E402
 
 MANIFEST = "_JOBS_GENERATED.json"
 # Names are prefixed on purpose. A vault root already has `Dashboard.md` and `_BUILD_REPORT.md`,
@@ -631,6 +632,161 @@ def pipeline_note(rows):
     return "".join(b)
 
 
+
+# ---------------------------------------------------------------- the Pipeline canvas
+# Studio's Pipeline canvas draws every agent's pipeline.json (schema sbl-pipeline/2, built and
+# checked by pipeline_doc.py). The Jobs Agent's: every posting it has seen, shortlisted, prepared,
+# sent or heard back about, as one item each, in the stages below.
+OUT_STATUSES = {"skipped_walled", "skipped_policy", "skipped_knockout", "skipped_review", "disqualified",
+                "excluded", "abandoned"}
+SHORTLIST_SCORE = 75     # the scoring rubric's default apply floor (profile/scoring.md may differ)
+SHORTLIST_DAYS = 14
+
+
+def _job_stage(r):
+    res = (r.get("result") or "").lower()
+    if res in ("screen", "interview", "offer", "rejected"):
+        return res
+    st = (r.get("status") or "").lower()
+    if st in ("not_started", "filled"):
+        return "prepared"
+    if st == "applied":
+        return "applied"
+    if st in ("drafted_linkedin", "handoff_portal"):
+        return "handoff"
+    if st == "prior_external":
+        return "prior"
+    if st in OUT_STATUSES or st.startswith("skipped"):
+        return "out"
+    return "prepared"
+
+
+def write_pipeline(w, root, rows, dest):
+    S, A = pdoc.stage, pdoc.action
+    dest = pathlib.Path(dest)
+    pre = dest.name + "/" if is_brain(dest.parent) else ""
+    doc = pdoc.new("job-search", "Jobs", "#3e6ae1")
+    rec = "Record that {title} moved to {stage_label}."
+    doc["stages"] = [
+        S("shortlist", "Shortlist", next=["prepared", "out"]),
+        S("prepared", "Prepared", next=["applied", "handoff", "out"], move_prompt="Prepare my application to {title}."),
+        S("applied", "Applied", next=["screen", "interview", "rejected"], gate="confirm",
+          move_prompt="Submit my application to {title}."),
+        S("handoff", "Hand-off", next=["applied", "out"], move_prompt="Hand {title} to me — I apply on the portal myself."),
+        S("screen", "Screen", next=["interview", "offer", "rejected"], move_prompt=rec),
+        S("interview", "Interview", next=["offer", "rejected"], move_prompt=rec),
+        S("offer", "Offer", "positive", gate="reason", move_prompt=rec),
+        S("rejected", "Rejected", "negative", gate="reason", move_prompt=rec),
+        S("out", "Out", "parked", gate="reason", move_prompt="Skip {title}."),
+        S("prior", "Applied myself", "parked"),
+        S("seen", "Seen", "parked", next=["shortlist"], move_prompt="Put {title} on my shortlist."),
+    ]
+    items, keys = [], set()
+    for r in rows:
+        key = str(r.get("job_key") or "")
+        if not key or key in keys:
+            continue
+        keys.add(key)
+        stage = _job_stage(r)
+        title = f"{r.get('company', '?')} — {r.get('role', '?')}"
+        try:
+            score = int(float(r.get("score"))) if r.get("score") not in (None, "") else None
+        except (TypeError, ValueError):
+            score = None
+        flags = []
+        needs = ""
+        if stage == "handoff":
+            flags, needs = ["needs-you"], "Apply on the portal yourself — the answers are prepared"
+        elif (r.get("status") or "") == "filled":
+            flags, needs = ["needs-you"], "Filled — waiting for your submit"
+        attrs = {"portal": r.get("portal") or "", "market": r.get("market") or "", "archetype": r.get("archetype") or "",
+                 "status": r.get("status") or ""}
+        it = pdoc.item(key, title, stage, sub=" · ".join(x for x in (r.get("location") or "", r.get("portal") or "") if x),
+                       score=score, flags=flags or None, needs=needs or None, url=r.get("url") or None,
+                       note=(pre + r["_note"]) if r.get("_note") else None, attrs=attrs,
+                       stage_since=str(r.get("result_date") or r.get("date") or "") or None, updated=str(r.get("date") or "") or None)
+        if stage not in ("out", "prior", "rejected", "seen"):
+            steps = [{"label": "Shortlisted", "status": "done"},
+                     {"label": "CV built", "status": "done" if r.get("_cv") else "upcoming"},
+                     {"label": "Filled", "status": "done" if (r.get("status") in ("filled", "applied")) else "upcoming"},
+                     {"label": "Sent", "status": "done" if r.get("status") == "applied" else ("due" if stage == "prepared" else "upcoming"),
+                      "date": str(r.get("date") or "") if r.get("status") == "applied" else ""},
+                     {"label": "Result", "status": "done" if r.get("result") else "waiting", "date": str(r.get("result_date") or "")}]
+            kv = {k: v for k, v in (("Applied", r.get("date")), ("Portal", r.get("portal")), ("Source", r.get("source")),
+                                    ("Location", r.get("location")), ("Comp", r.get("comp")), ("Result", r.get("result")))
+                  if v not in (None, "")}
+            cv = r.get("_cv")
+            it["detail"] = {"kv": kv, "steps": steps,
+                            "evidence": [{"label": "The posting", "url": r.get("url"), "seen": str(r.get("date") or "")}] if r.get("url") else [],
+                            "links": [pre + f"{pathlib.Path(r['_note']).parent}/{cv[0]}.md"] if cv and r.get("_note") else []}
+        items.append(it)
+    # the scout's seen postings: recent and above the floor = the shortlist, the rest = seen
+    try:
+        seen = json.loads((root / "seen.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        seen = {}
+    applied_urls = {str(r.get("url") or "").split("?")[0].rstrip("/") for r in rows}
+    today = datetime.date.today()
+    for k, v in sorted(seen.items()):
+        url = str(v.get("url") or "").split("?")[0].rstrip("/")
+        if url and url in applied_urls:
+            continue
+        iid = "seen-" + re.sub(r"[^a-z0-9]+", "-", k.lower()).strip("-")[:80]
+        if iid in keys:
+            continue
+        keys.add(iid)
+        try:
+            score = int(float(v.get("score"))) if v.get("score") not in (None, "") else None
+        except (TypeError, ValueError):
+            score = None
+        try:
+            age = (today - datetime.date.fromisoformat(str(v.get("first_seen"))[:10])).days
+        except ValueError:
+            age = 999
+        stage = "shortlist" if score is not None and score >= SHORTLIST_SCORE and age <= SHORTLIST_DAYS else "seen"
+        it = pdoc.item(iid, f"{v.get('company', '?')} — {v.get('title', '?')}", stage, score=score,
+                       url=v.get("url") or None, stage_since=v.get("first_seen"), updated=v.get("first_seen"),
+                       attrs={"status": "seen"})
+        if stage == "shortlist":
+            it["detail"] = {"evidence": [{"label": "The posting", "url": v.get("url"), "seen": v.get("first_seen")}] if v.get("url") else []}
+        items.append(it)
+    doc["items"] = items
+    sent = sum(1 for r in rows if r.get("status") == "applied")
+    interviews = sum(1 for r in rows if (r.get("result") or "") in ("interview", "offer"))
+    doc["headline"] = {"label": "interviews", "value": interviews, "n": sent, "period": "all time"}
+    doc["stats"] = [{"label": "interviews / applications", "num": interviews, "den": sent, "min_n": 20},
+                    {"label": "screens or better / applications", "num": sum(1 for r in rows if (r.get("result") or "") in ("screen", "interview", "offer")), "den": sent, "min_n": 20}]
+    doc["lenses"] = [pdoc.lens("score", "Score", "score", domain=[40, 100]),
+                     pdoc.lens("age", "Age in stage", "stage_since", scale="days", buckets=[3, 7, 14, 30]),
+                     pdoc.lens("needs", "Needs you", "flags", scale="flag", value="needs-you")]
+    doc["facets"] = [pdoc.facet("portal", "Portal", "attrs.portal"), pdoc.facet("market", "Market", "attrs.market"),
+                     pdoc.facet("archetype", "Role type", "attrs.archetype"), pdoc.facet("status", "Status", "attrs.status")]
+    doc["panel"] = {
+        "top": ["{stage_label}", "score {score}", "{attrs.portal}"],
+        "sections": [{"type": "kv", "label": "The role", "from": "detail.kv"},
+                     {"type": "steps", "label": "Application", "from": "detail.steps"},
+                     {"type": "evidence", "label": "Source", "from": "detail.evidence"},
+                     {"type": "links", "label": "CV sent", "from": "detail.links"}],
+        "actions": [
+            A("Apply to it", "Apply to {title}: build the tailored CV, fill the employer's form, verify every field, then finish the way my autonomy setting says.", "primary", stages=["shortlist", "seen"]),
+            A("Apply to these {n}", "Apply to these {n} roles, one by one, at my autonomy setting: {titles}.", "primary", stages=["shortlist"], bulk=True),
+            A("Tailor my CV", "Tailor my CV for {title} and show it to me.", stages=["shortlist", "prepared"]),
+            A("Finish and send", "Finish my application to {title} and send it the way my autonomy setting says.", "primary", stages=["prepared"]),
+            A("Open the portal", "Open the portal for {title} with my prepared answers — I will apply myself.", "primary", stages=["handoff"]),
+            A("Record what came back", "I heard back from {title} — I will paste the email or tell you what happened.", "primary", stages=["applied"]),
+            A("Prep me", "Prep me for my {stage_label} with {title}: the role, my stories that fit, and what they will ask.", "primary", stages=["screen", "interview"]),
+            A("Skip", "Skip {title} — ask me why first.", stages=["shortlist", "prepared"]),
+        ],
+    }
+    doc["actions"] = [A("Run today's search", "Run today's job search: sweep the boards against my criteria and give me today's ranked shortlist.", "primary"),
+                      A("How is it going?", "Show me the KPI: interview rate by archetype, score band and portal.")]
+    doc["generated"] = max([str(r.get("date") or "") for r in rows] + [str(v.get("first_seen") or "") for v in seen.values()] + [""])
+    probs = pdoc.check(doc)
+    if probs:
+        print("  ! pipeline.json not written: " + "; ".join(probs[:3]), file=sys.stderr)
+        return
+    w.text("pipeline.json", pdoc.dumps(doc))
+
 # ---------------------------------------------------------------- the run
 def render(dest, quiet=False):
     root = state_root()
@@ -686,11 +842,13 @@ def render(dest, quiet=False):
         if cvs:
             labels[key] = cvs[0]
         w.text(f"{base}/{note}.md", application_note(r, app, cvs, known))
+        r["_note"] = f"{base}/{note}.md"
 
     reports = sorted((root / "reports").glob("*.md")) if (root / "reports").is_dir() else []
     for p in reports:
         w.text(f"reports/Shortlist {p.stem}.md", report_note(p, labels))
 
+    write_pipeline(w, root, rows, dest)
     w.text(LESSONS, lessons_note(root, rows))
     w.text(KPI, pipeline_note(rows))
 

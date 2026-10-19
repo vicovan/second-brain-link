@@ -298,6 +298,7 @@ second-brain-link/
 │   │   ├── commands/  skills/{job-onboarding,job-scout,cv-tailor,job-apply,job-pipeline}/
 │   │   └── docs/scheduling.md
 │   ├── fundraising/              #   the Fundraising Agent → 46-fundraising/
+│   ├── sales/                    #   the Sales Agent → 48-sales/ (lead gen, send_guard, pipeline.json → Studio's Pipeline)
 │   └── travel-planner/           #   the Travel Agent → 47-travel/ (itinerary.json → Studio's Map)
 │       ├── skills/trip-planner/scripts/   #   the shared library: paths, places, taste, scout,
 │       │                                  #   itinerary, interline, geo, render_brain, learn
@@ -341,7 +342,9 @@ tree, graph and dashboard render it when present (the same arrangement as analyz
 **`47-travel/`** (both subjects) is the `travel` layer key, written by the `travel-planner` plugin
 (Travel Dashboard, Trip Ideas, Places I Love, `Current Trip.geojson`, and per trip
 `trips/<id>/itinerary.json` + `map.geojson` + title-prefixed notes; own `_TRAVEL_GENERATED.json`
-manifest in the hidden ledger). Place notes carry `kind`/`country`/`city`/`rating` as fields
+manifest in the hidden ledger). **`48-sales/`** (both subjects) is the `sales` layer key, written by the `sales`
+plugin (`Pipeline.md`, `pipeline.json` — the sbl-pipeline/2 file Studio's **Pipeline** canvas draws; `45-jobs/`, `46-fundraising/` and `47-travel/` each write one too, via the shared `pipeline_doc.py` — `accounts/`,
+`leads/Leads <date>.md`, `sequences/`, `profile/`; ledger + `_SALES_GENERATED.json` in `.plugins/sales/`). Place notes carry `kind`/`country`/`city`/`rating` as fields
 (country/city from the offline gazetteer's reverse lookup, `geocode.nearest`), and
 `graph.json` copies them onto place nodes. **Company brains use company-named folders** for the middle layers (20-brand, 30-content, 35-procurement, 40-pipeline w/ one note per deal, 50-market-view, 60-knowledge w/ meetings.md, 70-support, 80-signals, 85-locations) — driven by `mappings/brain/layout.json` `variants` via `VaultWriter.L(key)` (never hardcode a layer folder). Full field reference: `docs/ENTITY-MAP.md`.
 

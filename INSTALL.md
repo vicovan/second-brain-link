@@ -14,10 +14,10 @@
 |---|---|---|
 | **An AI tool** — Claude Code (recommended) or OpenAI Codex | The AI that builds and uses the brain, on the user's own plan | The vendor's standard location |
 | **The brain builder** (`second-brain-link` skill) | Turns data exports (LinkedIn, Google, Facebook…) into a private brain | `~/.claude/skills/second-brain-link` · Codex: `~/.agents/skills/second-brain-link` |
-| **Agents** — Jobs (`job-search`), Fundraising (`fundraising`), Travel (`travel-planner`) | Use the brain to do work | `~/.claude/skills/<name>` · Codex: `~/.agents/skills/<name>` |
+| **Agents** — Jobs (`job-search`), Fundraising (`fundraising`), Travel (`travel-planner`), Sales (`sales`) | Use the brain to do work | `~/.claude/skills/<name>` · Codex: `~/.agents/skills/<name>` |
 | **Python 3.8+** | Runs the brain builder and the agents' scripts | System (the desktop app has its own built in) |
 | **Second Brain Studio** (optional, recommended) | The app: see the brain, chat with it, run agents | Applications / Program Files / AppImage |
-| **Claude in Chrome** (optional) | Lets the Jobs and Travel agents fill forms and search flights in the browser | Chrome extension |
+| **Claude in Chrome** (optional) | Lets the Jobs, Travel and Sales agents fill forms, search flights and run social steps in the browser | Chrome extension |
 
 `~` is the user's home folder on every OS (Windows: `%USERPROFILE%`).
 
@@ -88,7 +88,7 @@ zip) and move the single folder inside to `~/<installs_to>`.
 **Developers:** `git clone https://github.com/vicovan/second-brain-link && cd second-brain-link && python3
 packaging/build_skill.py all --install && python3 packaging/build_plugin.py all --provider all --install`.
 
-## 5. Browser extension (only for the Jobs and Travel agents' browser steps)
+## 5. Browser extension (only for the Jobs, Travel and Sales agents' browser steps)
 
 1. Install **Claude in Chrome** from the Chrome Web Store and pin it.
 2. Sign in to it with the **same Claude account** as Claude Code.
@@ -103,14 +103,14 @@ packaging/build_skill.py all --install && python3 packaging/build_plugin.py all 
    **In the terminal:** put them in `data/personal/<your-name>/<source>/` and tell Claude Code / Codex:
    *"Build my second brain from data/"*.
 3. Agents: in Studio open the **Agents** tab → "Set up my profile". In Claude Code: `/job-search:onboard`,
-   `/fundraising:fund-onboard`, `/travel-planner:onboard`.
+   `/fundraising:fund-onboard`, `/travel-planner:onboard`, `/sales:sales-onboard`.
 
 ## 7. Verify
 
 | Check | Expect |
 |---|---|
-| `ls ~/.claude/skills` (or `~/.agents/skills`) | `second-brain-link` (+ `job-search`, `fundraising`, `travel-planner`) |
-| `claude plugin list` | `job-search@skills-dir`, `fundraising@skills-dir`, `travel-planner@skills-dir` |
+| `ls ~/.claude/skills` (or `~/.agents/skills`) | `second-brain-link` (+ `job-search`, `fundraising`, `travel-planner`, `sales`) |
+| `claude plugin list` | `job-search@skills-dir`, `fundraising@skills-dir`, `travel-planner@skills-dir`, `sales@skills-dir` |
 | `cat ~/.claude/skills/second-brain-link/VERSION` | a version number |
 | Studio → Help → Set up Second Brain | every step ✓ |
 

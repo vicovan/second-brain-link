@@ -8,6 +8,7 @@
   "layer": "47-travel",
   "homeNote": "47-travel/Travel Dashboard.md",
   "watchGlob": "47-travel/**",
+  "pipeline": "47-travel/pipeline.json",
   "canvas": "map",
   "canvasData": "47-travel/Current Trip.geojson",
   "canvasLayers": [

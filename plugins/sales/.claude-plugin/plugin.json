@@ -1,0 +1,32 @@
+{
+  "name": "sales",
+  "version": "0.1.0",
+  "description": "Run outbound from your Second Brain, from inside Claude Code or Second Brain Studio: generate leads (your brain's warm ties and lost deals first, then companies on the public web with a reason to buy now, per market, with a coverage gate), research the buying team, run multi-step sequences, send email from your own mailbox and social steps in your own browser within your caps, work the replies and book the meetings — tracked as an indexed layer of your brain. No bought data, no tracking.",
+  "author": {
+    "name": "Second Brain Link",
+    "url": "https://secondbrainlink.com"
+  },
+  "homepage": "https://secondbrainlink.com",
+  "license": "MIT",
+  "keywords": [
+    "sales",
+    "outbound",
+    "lead-generation",
+    "gtm",
+    "crm",
+    "second-brain",
+    "obsidian"
+  ],
+  "network": {
+    "required": true,
+    "why": "Lead generation reads public pages (company sites, careers boards, news, directories, registries, public threads) and LinkedIn's public no-login job search; email is sent and read through the seller's OWN mailbox (SMTP/IMAP); social steps and contact forms run in the seller's own signed-in Chrome; meetings use the seller's calendar connector. No data broker, no enrichment API, no tracking pixel. The Second Brain Link engine itself stays zero-network; this plugin is a separate distribution surface and declares its access here.",
+    "endpoints": [
+      "public company, news, directory, event and registry pages reached by WebSearch / WebFetch",
+      "www.linkedin.com/jobs-guest (public, no-login job search — read only, paced, capped)",
+      "public careers-board APIs: boards-api.greenhouse.io, api.lever.co, api.ashbyhq.com, api.smartrecruiters.com, *.recruitee.com, *.jobs.personio.de, *.teamtailor.com, *.myworkdayjobs.com",
+      "the seller's own SMTP and IMAP servers (mail.py — sends only after send_guard.py allows it)",
+      "linkedin.com, x.com, web.whatsapp.com and company contact forms through the Chrome integration, in the seller's own session (opt-in for sending)",
+      "the Google Calendar connector — free/busy and event creation for booked meetings"
+    ]
+  }
+}

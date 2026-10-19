@@ -19,7 +19,7 @@
 
 | You are… | Do this | You get |
 |---|---|---|
-| **Anyone** (no terminal) | Download **[Second Brain Studio](https://secondbrainlink.com/download)** for Mac, Windows or Linux and open it. Its **Setup wizard** installs your AI (Claude Code or Codex — or use an API key), signs you in, and installs the brain builder + all three agents in one click. **Python is built in.** | The app, the brain builder, the Jobs / Fundraising / Travel agents |
+| **Anyone** (no terminal) | Download **[Second Brain Studio](https://secondbrainlink.com/download)** for Mac, Windows or Linux and open it. Its **Setup wizard** installs your AI (Claude Code or Codex — or use an API key), signs you in, and installs the brain builder + all four agents in one click. **Python is built in.** | The app, the brain builder, the Jobs / Fundraising / Travel / Sales agents |
 | **Using Claude Code or Codex already** | macOS / Linux: `curl -fsSL https://secondbrainlink.com/install.sh \| sh` · Windows: `irm https://secondbrainlink.com/install.ps1 \| iex` | The brain builder + the agents, for every AI tool it finds, each file checksum-verified. Needs Python 3.8+ to build |
 | **Letting your AI do it** | Paste into Claude Code, Codex or Claude Desktop: *"Install Second Brain Link on this computer by following https://secondbrainlink.com/install.md"* | Your AI follows **[INSTALL.md](INSTALL.md)** for your OS, asking before each step |
 | **A developer** | `git clone` this repo → `python3 packaging/build_all.py` → `python3 packaging/build_skill.py all --install` and `python3 packaging/build_plugin.py all --provider all --install` | Everything, from source |
@@ -42,13 +42,14 @@ Full per-OS guide + troubleshooting: **[INSTALL.md](INSTALL.md)**.
 
 **Multi-source by design.** **27 sources ship today** — 13 personal (LinkedIn, Facebook, Instagram, Google Takeout, Amazon, X/Twitter, WhatsApp, GitHub, YouTube, Strava, Reddit, Spotify, TikTok) and 14 company (LinkedIn Company, Google Workspace, Slack, Notion, Confluence, Jira, Salesforce, HubSpot, Zendesk, Email/mbox, Microsoft 365, Teams, a Git docs repo, Google Drive) — with export + import steps for each in **[docs/SOURCES.md](docs/SOURCES.md)**. The architecture adds any future network with a data export through a drop-in adapter file or a declarative JSON mapping. One vault, every source — and every note tagged by source so the **graph** shows all of it connected.
 
-**Then put it to work — agents.** The engine *builds* a brain; an **agent** *uses* one to do a job and writes what it did back into the vault as ordinary notes. Three ship today as plugins (developer previews), each running in Studio's **Agents** tab and in Claude Code / Codex:
+**Then put it to work — agents.** The engine *builds* a brain; an **agent** *uses* one to do a job and writes what it did back into the vault as ordinary notes. Four ship today as plugins (developer previews), each running in Studio's **Agents** tab and in Claude Code / Codex:
 
 | Agent | The job | Writes |
 |---|---|---|
 | **Jobs Agent** · [`job-search`](plugins/job-search/) | Sweeps open ATS boards against your own criteria, tailors a CV per role, fills the application — behind approval gates | `45-jobs/` |
 | **Fundraising Agent** · [`fundraising`](plugins/fundraising/) | Screens funds and programs against your filter chain, verifies them on their own sites, writes a dated Funding Plan, drafts applications and investor emails — **never sends** | `46-fundraising/` |
 | **Travel Agent** · [`travel-planner`](plugins/travel-planner/) | Plans a trip from the places already in your brain, draws it on Studio's **Map**, then reads real flight and hotel prices in your own browser and lists them the way the sites do — **books nothing** | `47-travel/` |
+| **Sales Agent** · [`sales`](plugins/sales/) | Finds leads — the warm ties and lost deals already in your brain first, then companies with a reason to buy now — researches the buying team, runs sequences, sends from **your own** mailbox within your caps through a deterministic send guard, works the replies and books meetings; drawn on Studio's **Pipeline** board — **no bought data** | `48-sales/` |
 
 **…and let it keep working — the Harness** *(developer preview)*. Give an agent a **goal** with a finish line (*"3 interviews by Nov 30"*) or a **routine** that repeats (*"weekdays at 07:00, scout new jobs"*). Everything that needs you lands in one **Inbox**; **Activity** shows what each run did, step by step. It all lives in your brain's `96-agents/` folder as plain notes — see [The Harness](#the-harness--goals-routines-inbox-activity).
 
@@ -119,8 +120,9 @@ See [Agents — make the brain do work](#agents--make-the-brain-do-work) to inst
 | **Jobs** | [**job-search.zip**](https://github.com/vicovan/second-brain-link/raw/main/dist/plugins/claude/job-search.zip) | [**job-search.skill**](https://github.com/vicovan/second-brain-link/raw/main/dist/plugins/openai/job-search.skill) |
 | **Fundraising** | [**fundraising.zip**](https://github.com/vicovan/second-brain-link/raw/main/dist/plugins/claude/fundraising.zip) | [**fundraising.skill**](https://github.com/vicovan/second-brain-link/raw/main/dist/plugins/openai/fundraising.skill) |
 | **Travel** | [**travel-planner.zip**](https://github.com/vicovan/second-brain-link/raw/main/dist/plugins/claude/travel-planner.zip) | [**travel-planner.skill**](https://github.com/vicovan/second-brain-link/raw/main/dist/plugins/openai/travel-planner.skill) |
+| **Sales** | [**sales.zip**](https://github.com/vicovan/second-brain-link/raw/main/dist/plugins/claude/sales.zip) | [**sales.skill**](https://github.com/vicovan/second-brain-link/raw/main/dist/plugins/openai/sales.skill) |
 
-**Easiest:** the desktop app installs the skill and all three agents for you (Setup wizard, or **Install** on each agent's card). **One line, everything:** `curl -fsSL https://secondbrainlink.com/install.sh | sh` (macOS / Linux) · `irm https://secondbrainlink.com/install.ps1 | iex` (Windows). **By hand:** `unzip <agent>.zip -d ~/.claude/skills/` (Claude Code — the agent then appears in Studio's **Agents** tab) · `unzip <agent>.skill -d ~/.agents/skills/` (Codex); each archive unpacks into its own `<agent>/` folder. From a clone: `python3 packaging/build_plugin.py <agent> --provider claude|openai --install`. Every file with its version and checksum: [`dist/manifest.json`](dist/manifest.json).
+**Easiest:** the desktop app installs the skill and all four agents for you (Setup wizard, or **Install** on each agent's card). **One line, everything:** `curl -fsSL https://secondbrainlink.com/install.sh | sh` (macOS / Linux) · `irm https://secondbrainlink.com/install.ps1 | iex` (Windows). **By hand:** `unzip <agent>.zip -d ~/.claude/skills/` (Claude Code — the agent then appears in Studio's **Agents** tab) · `unzip <agent>.skill -d ~/.agents/skills/` (Codex); each archive unpacks into its own `<agent>/` folder. From a clone: `python3 packaging/build_plugin.py <agent> --provider claude|openai --install`. Every file with its version and checksum: [`dist/manifest.json`](dist/manifest.json).
 
 > **How it fits together:** Second Brain Link (this repo) **builds** the vault from your exports; **Studio** is how you **see and use** it. Build with the skill below (or the CLI), then open the vault in Studio — or in [Obsidian](https://obsidian.md), or any AI agent.
 
@@ -151,9 +153,9 @@ python3 packaging/build_skill.py all --install
 ```
 Now open **Claude Code** (or Codex) in this folder — the `second-brain-link` skill auto-loads. (Prefer not to install? The engine is plain Python: run the `python3 engine/scripts/…` commands below directly.)
 
-**Want an agent that works your brain?** The Jobs, Fundraising and Travel Agents are plugins, installed from the same checkout — then they appear in Studio's Agents tab:
+**Want an agent that works your brain?** The Jobs, Fundraising, Travel and Sales Agents are plugins, installed from the same checkout — then they appear in Studio's Agents tab:
 ```bash
-python3 packaging/build_plugin.py travel-planner --provider claude --install   # or job-search, fundraising
+python3 packaging/build_plugin.py travel-planner --provider claude --install   # or job-search, fundraising, sales
 python3 packaging/build_plugin.py travel-planner --provider openai --install   # Codex
 ```
 See [`plugins/`](plugins/) for what each one does.
@@ -661,13 +663,14 @@ ships, and each plugin declares its own network use in its manifest before you i
 | **Jobs** · [`job-search`](plugins/job-search/) | Sweeps open ATS boards against the criteria you set, scores and shortlists (knock-out and likelihood gates), tailors an ATS-first CV per role, fills the application in your browser at the autonomy level you choose, and tracks every outcome | `45-jobs/` |
 | **Fundraising** · [`fundraising`](plugins/fundraising/) | Screens funds and programs through your own ordered filter chain, verifies survivors on their own sites with dated evidence, writes a Funding Plan, drafts program applications and investor emails — never sends; a target is "contacted" only when you say so | `46-fundraising/` |
 | **Travel** · [`travel-planner`](plugins/travel-planner/) | Trip ideas from cities you saved and never visited; a day-by-day itinerary from your own places, drawn on Studio's Map; suggestions checked against real reviews and your taste; real flight and hotel prices read in your browser (Google Flights, Google Hotels, Booking.com, Agoda…) shown as familiar lists, each with when and where it was seen; stopover nights from separate tickets, with the self-transfer risk spelled out — books nothing | `47-travel/` |
+| **Sales** · [`sales`](plugins/sales/) | Lead generation the job-scout way — your brain's warm and dormant decision-makers, lost deals worth reopening and intro paths first, then per market: companies hiring for your buyer roles (LinkedIn's public job search, their own careers boards), funding and news, directories, events, registries and public threads, then each company's own site — merged, gated on coverage (a market searched by fewer than three sources is never called empty), knock-outs removed, scored on fit · signal · warmth · reachability. Then research, multi-step sequences, **real sending** (email from your own mailbox; LinkedIn / X / WhatsApp in your own browser only if you switch it on; contact forms), replies, meeting booking — every outward act through `send_guard.py` (your autonomy level, do-not-contact, stop-on-reply, caps, working hours, the claims linter). No bought data, no tracking pixels. Studio draws it on the **Pipeline** board, with an account panel and a Sending settings tab; Nadia is its voice in the **Avatar** tab | `48-sales/` |
 | **Docs connector** · [`docs-connector`](plugins/docs-connector/) | The networked half of the document stores: clones / fast-forwards a Git docs repository, or pulls a Google Drive folder with your own read-only credentials, into a mirror the engine then links — the engine itself never touches the network | `65-documents/` (via the engine) |
 **Install** (from a checkout; one Claude install serves the CLI and both Studios):
 
 ```bash
 python3 packaging/build_plugin.py travel-planner --provider claude --install   # → ~/.claude/skills/<name>
 python3 packaging/build_plugin.py travel-planner --provider openai --install   # → ~/.agents/skills/<name>
-#   or job-search, fundraising — or build every plugin for both: python3 packaging/build_plugin.py all
+#   or job-search, fundraising, sales — or build every plugin for both: python3 packaging/build_plugin.py all
 ```
 
 Then open Studio's **Agents** tab (or run the plugin's commands in Claude Code).
@@ -676,7 +679,8 @@ Studio won't list it.
 
 **How they stay honest:**
 - **Approval gates.** Anything that leaves your machine or can't be undone — submitting a
-  form, sending, booking — waits for you; the question arrives in Studio as buttons.
+  form, sending, booking — waits for you (or for the autonomy level you set); the question
+  arrives in Studio as an approval card with the real artifact to open.
 - **Nothing personal ships in a plugin.** Everything an agent knows about you comes from
   files its own onboarding writes into your vault; its working ledger lives in a hidden
   `.plugins/<name>/` folder of your brain, never in the code you installed.
