@@ -1,6 +1,6 @@
 ---
 name: trip-pipeline
-description: Run a whole trip end to end from the user's Second Brain — onboard if needed, suggest where to go from their own places, build the itinerary on the Map, then shop flights (with stopover nights), stays, ground transport and food on public sites — holding the approval gates and the single ledger. Use for "plan me a trip", "plan my next holiday", "take me somewhere I've been meaning to go", or anything that spans more than one travel skill.
+description: Run the Travel Agent's loops from the user's Second Brain — the daily "Today near me" (what to try near where they are, from their own places first, on the Map), the weekend edition, the weekly trip check, and a whole trip end to end (ideas from their places, the itinerary on the Map, flights with stopover nights, stays, ground and food on public sites) — holding the gates and the single ledger. Use for "what should I do today", "plan me a trip", "plan my next holiday", the daily or weekly travel routine, or anything that spans more than one travel skill.
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, Skill, Agent, TodoWrite, mcp__claude-in-chrome__*
 ---
 
@@ -15,8 +15,50 @@ Follow `memory-protocol.md` (in `skills/flight-search/references/`). Tool:
 4. **Last:** at most 3 inferred lessons → `observe --source agent` (saved and used at once, flagged as inferred — the user can edit or remove them); end with *"Learned: …"*.
 
 
-The whole trip, start to finish. This skill **owns no logic of its own** — it sequences the
-others and holds the gates.
+The whole trip, start to finish — and the daily. This skill **owns no logic of its own** — it
+sequences the others and holds the gates. Two loops, two funnels: **trips** (idea → planned →
+shopped → booked → done) and **picks** (suggested → saved → went → loved / not for me / expired).
+
+## The modes
+
+| Asked | Mode |
+|---|---|
+| the daily routine (*Today near me*), "what should I do today", "anything new near me" | **today** — below |
+| the Friday routine (*This weekend*), "what should I do this weekend" | **weekend** — `today-scout`'s weekend edition, `--mode weekend` |
+| the Monday routine (*Weekly trip check*) | **recheck** — below |
+| "plan me a trip", "where should I go", "find flights" … | the **trip** loop (the rest of this file) |
+
+### today — the shared runner (`daily.py`)
+
+`S=${CLAUDE_PLUGIN_ROOT}/skills/trip-planner/scripts`:
+
+```bash
+python3 $S/today.py here        # where today is built for - the trip's stop, home_city, or what they said; never the device
+python3 $S/daily.py start --agent travel-planner --routine "Today near me"   # 0-3: preflight · recall · orient (here, current trip, went this week, goal pace) · OPEN THE DATED NOTE
+```
+
+The note is **`47-travel/reports/Today near me <date>.md`** — a structured shortlist like the other
+agents' daily notes (`## Status` first; one section per slot *Coffee · Food · Activity · Event ·
+Social · Wildcard*, then *This week's events · Trip day · Yesterday · Needs you · Explored today*);
+the Map (`Today.geojson`) is the alternate view, one click away. Then `today-scout`
+(the Skill tool) does steps 4–6: the brain half (`today.py picks`), the web half with `seen_at`
+(`today.py add`), `today.py note` fills the slot sections; the pins land in `Today.geojson` for the Map. Mark progress with `daily.py status "…"
+--phase discovering|shortlisting`. Step 7 (act) is **nothing** — no booking, no buying; the only
+feedback is the user's *went / save / loved / not for me* (`learn.py`). Steps 8–11: render
+(`render_brain.py --quiet`), reflect (the memory block), and
+`python3 $S/daily.py close --agent travel-planner --report report.json` — paste the chat report
+(places tried · today's picks · needs you) and the ```report fence last. Then `today.py mark-run`.
+
+### recheck — the weekly trip check
+
+`python3 $S/daily.py start --agent travel-planner --routine "Weekly trip check" --mode week` →
+for each upcoming trip (`itinerary.py count upcoming`): quotes older than a week (`quotes.py`),
+what still needs the user (a self-transfer leg, "I booked it"), then the picks funnel's week:
+`python3 $S/kpi.py --pipeline 47-travel/pipeline.json --signals kind,slot,source --md --label Travel`
+and `python3 $S/optimize.py apply --pipeline 47-travel/pipeline.json --profile 47-travel/profile
+--contract ${CLAUDE_PLUGIN_ROOT}/studio.json --level research --review-out "47-travel/reports/Trip
+check <date>.md" --label Travel` (the kinds and sources the user actually went to — proposals only;
+nothing here changes a gate). Close with `daily.py close`.
 
 ```
 lessons → [profile?] → scout → [USER PICKS] → plan + map → flights → [USER PICKS] →

@@ -1,15 +1,412 @@
 {
+  "schema": "sbl-agent/1",
   "id": "fundraising",
   "label": "Fundraising Agent",
   "blurb": "Screens funds and programs against your own filter, builds a dated funding plan, drafts applications, investor emails and comments for the threads your investors are in — never sends or posts them — and tracks every conversation.",
   "icon": "rocket",
+  "color": "#0f9d74",
   "grounding": "studio/grounding.md",
   "entrySkill": "raise-pipeline",
+  "subjects": [
+    "personal",
+    "company"
+  ],
+  "providers": [
+    "claudecode"
+  ],
+  "network": {
+    "declared": true,
+    "what": "public web reads to find and verify programs and investors; Chrome for program forms; Gmail drafts when the tool is available. Never sends, never posts."
+  },
   "layer": "46-fundraising",
-  "homeNote": "46-fundraising/Funding Plan.md",
+  "layout": {
+    "dashboard": "Fundraising Dashboard.md",
+    "kpi": "Fundraising KPI.md",
+    "lessons": "Fundraising Lessons.md",
+    "profile": "profile",
+    "reports": "reports",
+    "items": {
+      "programs": "programs",
+      "investors": "investors"
+    },
+    "work": {
+      "applications": "applications",
+      "outreach": "outreach"
+    },
+    "extras": [
+      "Funding Plan.md",
+      "plans",
+      "research",
+      "engage"
+    ]
+  },
+  "homeNote": "46-fundraising/reports/Raise today {date}.md",
   "homeNoteFallback": "46-fundraising/Fundraising Dashboard.md",
+  "plan": "46-fundraising/Funding Plan.md",
+  "daily": {
+    "note": "Raise today {date}",
+    "weekly": "Raise update {date}",
+    "steps": [
+      "discover",
+      "screen",
+      "apply",
+      "outreach",
+      "followups",
+      "engage"
+    ],
+    "sections": [
+      "New today",
+      "Due",
+      "Angles today",
+      "Threads worth a comment",
+      "Needs you",
+      "Explored today"
+    ],
+    "orient": [
+      "ledger.py stats",
+      "ledger.py due --days 14 --count"
+    ],
+    "settings": "46-fundraising/profile/answers.md"
+  },
   "watchGlob": "46-fundraising/**",
   "pipeline": "46-fundraising/pipeline.json",
+  "render": {
+    "cmd": "render_brain.py --quiet"
+  },
+  "canvas": "lines",
+  "funnels": [
+    {
+      "id": "programs",
+      "label": "Programs",
+      "item": "program",
+      "success": "accepted",
+      "stages": [
+        {
+          "id": "screened",
+          "label": "Found",
+          "role": "open"
+        },
+        {
+          "id": "verified",
+          "label": "Verified",
+          "role": "open"
+        },
+        {
+          "id": "queued",
+          "label": "Queued",
+          "role": "open"
+        },
+        {
+          "id": "drafted",
+          "label": "Drafted",
+          "role": "open"
+        },
+        {
+          "id": "draft_ready",
+          "label": "Draft ready",
+          "role": "open",
+          "collapsed": true
+        },
+        {
+          "id": "filed",
+          "label": "Filed",
+          "role": "open",
+          "gate": "confirm"
+        },
+        {
+          "id": "contacted",
+          "label": "Contacted",
+          "role": "open",
+          "gate": "owner",
+          "collapsed": true
+        },
+        {
+          "id": "no_reply",
+          "label": "No reply",
+          "role": "open",
+          "collapsed": true
+        },
+        {
+          "id": "replied",
+          "label": "Replied",
+          "role": "open",
+          "collapsed": true
+        },
+        {
+          "id": "meeting",
+          "label": "Meeting",
+          "role": "open",
+          "collapsed": true
+        },
+        {
+          "id": "accepted",
+          "label": "Accepted",
+          "role": "positive"
+        },
+        {
+          "id": "term_sheet",
+          "label": "Term sheet",
+          "role": "positive",
+          "collapsed": true
+        },
+        {
+          "id": "rejected",
+          "label": "Rejected",
+          "role": "negative",
+          "gate": "reason"
+        },
+        {
+          "id": "passed",
+          "label": "Passed",
+          "role": "negative",
+          "gate": "reason",
+          "collapsed": true
+        },
+        {
+          "id": "withdrawn",
+          "label": "Withdrawn",
+          "role": "parked",
+          "gate": "confirm"
+        },
+        {
+          "id": "out",
+          "label": "Out",
+          "role": "parked"
+        }
+      ]
+    },
+    {
+      "id": "investors",
+      "label": "Investors",
+      "item": "investor",
+      "success": "meeting",
+      "success2": "term_sheet",
+      "stages": [
+        {
+          "id": "screened",
+          "label": "Found",
+          "role": "open"
+        },
+        {
+          "id": "verified",
+          "label": "Verified",
+          "role": "open"
+        },
+        {
+          "id": "queued",
+          "label": "Angle",
+          "role": "open"
+        },
+        {
+          "id": "drafted",
+          "label": "Drafted",
+          "role": "open"
+        },
+        {
+          "id": "draft_ready",
+          "label": "Draft ready",
+          "role": "open"
+        },
+        {
+          "id": "filed",
+          "label": "Filed",
+          "role": "open",
+          "gate": "confirm",
+          "collapsed": true
+        },
+        {
+          "id": "contacted",
+          "label": "Contacted",
+          "role": "open",
+          "gate": "owner"
+        },
+        {
+          "id": "no_reply",
+          "label": "No reply",
+          "role": "open"
+        },
+        {
+          "id": "replied",
+          "label": "Replied",
+          "role": "open"
+        },
+        {
+          "id": "meeting",
+          "label": "Meeting",
+          "role": "open"
+        },
+        {
+          "id": "term_sheet",
+          "label": "Term sheet",
+          "role": "positive"
+        },
+        {
+          "id": "accepted",
+          "label": "Accepted",
+          "role": "positive",
+          "collapsed": true
+        },
+        {
+          "id": "passed",
+          "label": "Passed",
+          "role": "negative",
+          "gate": "reason"
+        },
+        {
+          "id": "rejected",
+          "label": "Rejected",
+          "role": "negative",
+          "gate": "reason",
+          "collapsed": true
+        },
+        {
+          "id": "withdrawn",
+          "label": "Withdrawn",
+          "role": "parked",
+          "gate": "confirm"
+        },
+        {
+          "id": "out",
+          "label": "Out",
+          "role": "parked"
+        }
+      ]
+    }
+  ],
+  "floor": [
+    {
+      "id": "found",
+      "label": "Found",
+      "stages": [
+        "screened"
+      ]
+    },
+    {
+      "id": "verified",
+      "label": "Verified",
+      "stages": [
+        "verified"
+      ]
+    },
+    {
+      "id": "queued",
+      "label": "Queued",
+      "stages": [
+        "queued"
+      ]
+    },
+    {
+      "id": "drafted",
+      "label": "Drafted",
+      "stages": [
+        "drafted",
+        "draft_ready"
+      ]
+    },
+    {
+      "id": "filed",
+      "label": "Filed",
+      "funnel": "programs",
+      "stages": [
+        "filed"
+      ]
+    },
+    {
+      "id": "sent",
+      "label": "Sent",
+      "funnel": "investors",
+      "stages": [
+        "contacted",
+        "no_reply"
+      ]
+    },
+    {
+      "id": "replied",
+      "label": "Replied",
+      "funnel": "investors",
+      "stages": [
+        "replied"
+      ]
+    },
+    {
+      "id": "meeting",
+      "label": "Meeting",
+      "funnel": "investors",
+      "stages": [
+        "meeting"
+      ]
+    }
+  ],
+  "goals": [
+    {
+      "template": "Raise my round",
+      "metric": "meetings",
+      "target": 5
+    },
+    {
+      "template": "Get into a program",
+      "metric": "accepted",
+      "target": 1
+    }
+  ],
+  "outcomes": {
+    "meetings": {
+      "label": "investor meetings",
+      "cmd": "ledger.py count meetings"
+    },
+    "accepted": {
+      "label": "acceptances",
+      "cmd": "ledger.py count accepted"
+    },
+    "term_sheets": {
+      "label": "term sheets",
+      "cmd": "ledger.py count term_sheets"
+    },
+    "filed": {
+      "label": "applications filed",
+      "cmd": "ledger.py count filed"
+    },
+    "contacted": {
+      "label": "investors contacted",
+      "cmd": "ledger.py count contacted"
+    }
+  },
+  "throughput": {
+    "label": "filed + drafted / day",
+    "cmd": "ledger.py count actions --days 1"
+  },
+  "routines": [
+    {
+      "template": "Daily raise",
+      "kind": "daily"
+    },
+    {
+      "template": "Weekly raise update",
+      "kind": "weekly"
+    }
+  ],
+  "optimize": {
+    "sources": "profile/sources.md",
+    "scoring": "profile/scoring.md",
+    "signals": [
+      "origin",
+      "kind",
+      "tier",
+      "channel",
+      "angle"
+    ],
+    "explore": 0.2
+  },
+  "concurrency": {
+    "weight": "heavy",
+    "browser": true,
+    "parallel_items": 2
+  },
+  "inspector": {
+    "program": "target",
+    "investor": "target"
+  },
+  "persona": "fundraising-advisor",
   "tools": [
     "Skill",
     "Agent",
@@ -20,20 +417,98 @@
     "profile": "46-fundraising/profile/round.md",
     "onboardSkill": "raise-onboarding"
   },
-  "providers": [
-    "claudecode"
+  "preflight": [
+    "profile_present",
+    "chrome_connected"
   ],
-  "subjects": [
-    "personal",
-    "company"
-  ],
-  "color": "#0f9d74",
+  "templates": "harness",
+  "settings": {
+    "title": "Fundraising Agent settings",
+    "blurb": "Materials the agent reads when it drafts applications and emails. They live in your brain, in the fundraising profile — nothing is uploaded anywhere.",
+    "files": [
+      {
+        "id": "deck",
+        "label": "Pitch deck",
+        "hint": "PDF or PPTX. Onboarding reads it to fill your company facts; applications link or attach it.",
+        "dest": "46-fundraising/profile/materials",
+        "accept": [
+          ".pdf",
+          ".pptx",
+          ".key",
+          ".md"
+        ],
+        "multiple": true
+      },
+      {
+        "id": "facts",
+        "label": "Facts file / one-pager",
+        "hint": "The source of truth for every claim — the agent will not state a number that is not in here or your profile.",
+        "dest": "46-fundraising/profile/materials",
+        "accept": [
+          ".md",
+          ".markdown",
+          ".txt",
+          ".pdf",
+          ".docx"
+        ],
+        "multiple": true
+      },
+      {
+        "id": "cv",
+        "label": "Founder CV",
+        "hint": "Used for the founder bio and for 'why you' answers.",
+        "dest": "46-fundraising/profile/materials",
+        "accept": [
+          ".pdf",
+          ".docx",
+          ".md",
+          ".txt"
+        ],
+        "multiple": true
+      }
+    ],
+    "daily": true
+  },
   "suggestions": [
     {
       "t": "Set me up",
       "stage": "setup",
       "short": "Pull the facts from this brain, my deck and my facts file; ask me only the decisions.",
       "q": "Set up or update my fundraising profile. Pull everything you can from this brain, my deck and my facts file first — then ask me only the decisions: the round, my minimum cheque, where I can raise from, entity, cofounder stance, exclusions and how autonomous you should be."
+    },
+    {
+      "t": "Run today's raise",
+      "stage": "do",
+      "short": "Discover new programs and investors, screen them, apply and draft angles within my level, what's due.",
+      "q": "Run today's raise: find new programs and investors from my proven sources and today's explore slice, screen them against my filter chain, open today's note, apply to the programs and draft the angles my autonomy level allows, draft what is due, and give me the dated note."
+    },
+    {
+      "t": "New programs today",
+      "stage": "today",
+      "when": "onboarded",
+      "short": "Accelerators and programs that opened, or are new to my plan, screened against my filter.",
+      "q": "Find new programs and accelerators today: search my proven sources plus one new one, screen each against my filter chain, verify the survivors on their own sites and add them to today's section of my Funding Plan with their deadlines."
+    },
+    {
+      "t": "Apply to today's programs",
+      "stage": "today",
+      "when": "has-work",
+      "short": "Each program's real form in my browser, every answer from my facts — then my gate.",
+      "q": "Apply to the programs on today's list: find each one's real application form, draft every answer from my facts, fill and verify it in my browser, then stop at my gate. Log each one in the plan."
+    },
+    {
+      "t": "Email angles for today's investors",
+      "stage": "today",
+      "when": "has-work",
+      "short": "An angle for each new investor: why them, why now, what to lead with. Drafts only.",
+      "q": "For the investors added today, give me an email angle each — why them (thesis, portfolio, a recent post), why now, and what to lead with — then draft the email. Drafts only; I press Send."
+    },
+    {
+      "t": "Follow-ups due today",
+      "stage": "today",
+      "when": "has-work",
+      "short": "Investors and programs waiting on me, and deadlines coming up — a draft for each.",
+      "q": "What is due today in my raise? Follow-ups that are due, program deadlines in the next two weeks, and claims to re-verify — with a draft for each follow-up. Drafts only."
     },
     {
       "t": "Build my funding plan",
@@ -83,71 +558,13 @@
       "when": "has-work",
       "short": "Paste it; I log it against the target, update the plan, and prep me if it is a meeting.",
       "q": "I heard back from an investor or a program. I'll paste the email or tell you what happened — log it against the right target, update the plan, and if it's a meeting, prep me from the target note and my stories."
-    }
-  ],
-  "settings": {
-    "title": "Fundraising Agent settings",
-    "blurb": "Materials the agent reads when it drafts applications and emails. They live in your brain, in the fundraising profile — nothing is uploaded anywhere.",
-    "files": [
-      {
-        "id": "deck",
-        "label": "Pitch deck",
-        "hint": "PDF or PPTX. Onboarding reads it to fill your company facts; applications link or attach it.",
-        "dest": "46-fundraising/profile/materials",
-        "accept": [
-          ".pdf",
-          ".pptx",
-          ".key",
-          ".md"
-        ],
-        "multiple": true
-      },
-      {
-        "id": "facts",
-        "label": "Facts file / one-pager",
-        "hint": "The source of truth for every claim — the agent will not state a number that is not in here or your profile.",
-        "dest": "46-fundraising/profile/materials",
-        "accept": [
-          ".md",
-          ".markdown",
-          ".txt",
-          ".pdf",
-          ".docx"
-        ],
-        "multiple": true
-      },
-      {
-        "id": "cv",
-        "label": "Founder CV",
-        "hint": "Used for the founder bio and for 'why you' answers.",
-        "dest": "46-fundraising/profile/materials",
-        "accept": [
-          ".pdf",
-          ".docx",
-          ".md",
-          ".txt"
-        ],
-        "multiple": true
-      }
-    ]
-  },
-  "templates": "harness",
-  "outcomes": {
-    "meetings": {
-      "label": "investor meetings",
-      "cmd": "ledger.py count meetings"
     },
-    "accepted": {
-      "label": "acceptances",
-      "cmd": "ledger.py count accepted"
-    },
-    "term_sheets": {
-      "label": "term sheets",
-      "cmd": "ledger.py count term_sheets"
+    {
+      "t": "Weekly raise review",
+      "stage": "track",
+      "when": "has-work",
+      "short": "What moved, what stalled, and the changes I'd make to sources and filters — you decide.",
+      "q": "Run my weekly raise review: what moved and what stalled in programs and investors, conversion by source, then propose changes to my sources and filters for me to approve. Caps and gates never loosen."
     }
-  },
-  "preflight": [
-    "profile_present",
-    "chrome_connected"
   ]
 }

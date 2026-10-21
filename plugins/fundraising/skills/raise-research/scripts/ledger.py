@@ -37,16 +37,20 @@ Subcommands (all print JSON or a short table; all exit non-zero on a refused cha
     show KEY
     stale                              claims past their re-verification age
     kpi                                reply / meeting / acceptance rates by tier, channel, kind
+    count meetings|replies|accepted|term_sheets|filed|contacted|actions [--days N]
+    table ledger|shortlist [--kind k]  a Markdown table, script-rendered (the Funding Plan's §0)
+    since DATE                         what changed since a date (events by target)
     add-lesson TEXT
     stats
     remove KEY --why TEXT              archive a duplicate/junk record to removed.jsonl (never deleted)
     snooze | mark-run                  silence the daily nudge for today / record a run
 """
-import argparse, collections, csv, datetime, fcntl, json, os, pathlib, re, sys
+import argparse, collections, csv, datetime, json, os, pathlib, re, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from paths import state_root, render_dir  # noqa: E402
 import founder_profile as prof  # noqa: E402
+import ledger_base as LB  # noqa: E402  - the shared lock, tables and event queries (R7, R2)
 
 TODAY = datetime.date.today()
 NOW = lambda: datetime.datetime.now().replace(microsecond=0).isoformat()  # noqa: E731
@@ -129,14 +133,15 @@ def root():
 
 
 class Lock:
+    """The plugin's one writer lock (ledger_base.lock on <state root>/lock)."""
+
     def __enter__(self):
-        self.f = open(root() / ".ledger.lock", "w")
-        fcntl.flock(self.f, fcntl.LOCK_EX)
+        self._cm = LB.lock(root())
+        self._cm.__enter__()
         return self
 
     def __exit__(self, *a):
-        fcntl.flock(self.f, fcntl.LOCK_UN)
-        self.f.close()
+        self._cm.__exit__(*a)
 
 
 def load():
@@ -873,15 +878,87 @@ def cmd_remove(a):
 
 def cmd_count(a):
     """One number for a Harness goal's progress bar - outcomes the founder confirmed (a meeting,
-    a yes, a term sheet), never activity such as applications filed or emails drafted."""
+    a yes, a term sheet), never activity such as applications filed or emails drafted; plus the
+    activity counters the contract's throughput reads (`filed`, `contacted`, `actions`, with
+    --days = events in the window)."""
     recs = list(load().values())
     meet = ("meeting", "term_sheet", "accepted")
     replied = ("replied", "meeting", "passed", "accepted", "rejected", "term_sheet")
+    reached_filed = ("filed", "accepted", "rejected")
+    reached_contact = ("contacted", "no_reply", "replied", "meeting", "term_sheet", "passed")
+    days = getattr(a, "days", None)
+    if days is not None:
+        since = (TODAY - datetime.timedelta(days=max(0, days - 1))).isoformat()
+        evs = [e for e in events() if str(e.get("at") or "")[:10] >= since]
+        into = {"filed": ("filed",), "contacted": ("contacted",), "actions": ("filed", "drafted", "draft_ready"),
+                "meetings": ("meeting",), "replies": ("replied",), "accepted": ("accepted",), "term_sheets": ("term_sheet",)}[a.what]
+        print(sum(1 for e in evs if e.get("to") in into))
+        return
     n = {"meetings": sum(1 for r in recs if r["status"] in meet),
          "replies": sum(1 for r in recs if r["status"] in replied),
          "accepted": sum(1 for r in recs if r["status"] == "accepted"),
-         "term_sheets": sum(1 for r in recs if r["status"] == "term_sheet")}[a.what]
+         "term_sheets": sum(1 for r in recs if r["status"] == "term_sheet"),
+         "filed": sum(1 for r in recs if r["status"] in reached_filed or r.get("apps")),
+         "contacted": sum(1 for r in recs if r["status"] in reached_contact),
+         "actions": sum(1 for e in events() if e.get("to") in ("filed", "drafted", "draft_ready"))}[a.what]
     print(n)
+
+
+LEDGER_STATUSES = ("drafted", "draft_ready", "filed", "contacted", "no_reply", "replied", "meeting",
+                   "passed", "accepted", "rejected", "term_sheet", "withdrawn")
+
+
+def ledger_rows(kind=None):
+    """The §0 ledger: every record with an application or a contact (R2 - rendered, never typed)."""
+    rows = []
+    evs = events()
+    for r in load().values():
+        if kind and r.get("kind") != kind:
+            continue
+        if r["status"] not in LEDGER_STATUSES and not r.get("apps") and not r.get("drafts"):
+            continue
+        mine = [e for e in evs if e.get("key") == r["key"]]
+        filed = next((str(e.get("at") or "")[:10] for e in mine if e.get("to") in ("filed", "contacted")), "")
+        outcome = next((e["to"] for e in reversed(mine) if e.get("to") in ("replied", "meeting", "passed", "accepted", "rejected", "term_sheet", "no_reply")), "")
+        nx = r.get("next") or {}
+        rows.append({"target": r["name"], "kind": r["kind"], "status": r["status"].replace("_", " "),
+                     "filed": filed, "outcome": outcome.replace("_", " "),
+                     "next": (f"{nx.get('action')} · {str(nx.get('due') or '')[:10]}" if nx else ""),
+                     "tier": f"T{r['tier']}" if r.get("tier") else ""})
+    return sorted(rows, key=lambda x: (x["filed"] or "9999", x["target"].lower()))
+
+
+def cmd_table(a):
+    if a.which == "ledger":
+        rows = ledger_rows(a.kind)
+        print(LB.Ledger.table(["target", "kind", "tier", "status", "filed", "outcome", "next"], rows,
+                              labels=["Target", "Kind", "Tier", "Status", "Filed / sent", "Outcome", "Next"],
+                              empty="_No application filed and no investor contacted yet._"), end="")
+    else:   # shortlist: today's new targets, best fit first
+        today = TODAY.isoformat()
+        rows = [r for r in load().values() if str(r.get("created") or "")[:10] == today and r["status"] != "out"
+                and (not a.kind or r.get("kind") == a.kind)]
+        rows = sorted(rows, key=lambda r: (-(r.get("fit") or 0), r["name"].lower()))
+        dl = lambda r: (lambda d: d[0].isoformat() if d[0] else "")(deadline_of(r))  # noqa: E731
+        print(LB.Ledger.table(["name", "kind", "status", "fit", "deadline", "why"],
+                              [{**r, "deadline": dl(r), "status": r["status"].replace("_", " ")} for r in rows],
+                              labels=["Target", "Kind", "Status", "Fit", "Deadline", "Why it fits"],
+                              empty="_Nothing new today._"), end="")
+
+
+def cmd_since(a):
+    evs = [e for e in events() if str(e.get("at") or "")[:10] >= a.date]
+    by = {}
+    for e in evs:
+        by.setdefault(e["key"], []).append(e)
+    if getattr(a, "json", False):
+        out(by)
+        return
+    if not by:
+        print(f"_Nothing changed since {a.date}._")
+        return
+    for k, es in sorted(by.items()):
+        print(f"- **{k}**: " + " · ".join(f"{e.get('from') or '∅'} → {e['to']} ({str(e.get('at') or '')[:10]})" for e in es))
 
 
 def cmd_stats(a):
@@ -941,8 +1018,10 @@ def main():
     g.add_argument("--by", default="agent", choices=["founder", "agent"]); g.set_defaults(f=cmd_remove)
     sub.add_parser("snooze").set_defaults(f=cmd_stamp)
     sub.add_parser("mark-run").set_defaults(f=cmd_stamp)
-    g = sub.add_parser("count"); g.add_argument("what", choices=["meetings", "replies", "accepted", "term_sheets"])
-    g.set_defaults(f=cmd_count)
+    g = sub.add_parser("count"); g.add_argument("what", choices=["meetings", "replies", "accepted", "term_sheets", "filed", "contacted", "actions"])
+    g.add_argument("--days", type=int, default=None); g.set_defaults(f=cmd_count)
+    g = sub.add_parser("table"); g.add_argument("which", choices=["ledger", "shortlist"]); g.add_argument("--kind"); g.set_defaults(f=cmd_table)
+    g = sub.add_parser("since"); g.add_argument("date"); g.add_argument("--json", action="store_true"); g.set_defaults(f=cmd_since)
     a = ap.parse_args()
     a.f(a)
 

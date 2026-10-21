@@ -23,6 +23,7 @@ off_thesis: [consumer, health, climate, proptech, hardware]
 filter_order: [floor, geo, thesis, access, entity, exclusions]
 max_research_agents: 3
 followup_days: 7
+sweep: [a public accelerator directory, a grants calendar for the founder's region]
 ---
 
 # The round
@@ -36,3 +37,5 @@ Notes:
 - `min_net_cash` is **net**: a program that pays 50K and charges a 35K fee is a 15K cheque.
 - Region tags the screen understands: global, us, europe, cee, nordics, mena, israel, anz, asia, latam.
 - `relocation: ok` makes a US-only fund *conditional* ("only after relocating") instead of *out*.
+- `sweep:` names the directories, cohort calendars and public lists the daily raise sweeps for new
+  programs; onboarding seeds them into `profile/sources.md` (Proven) with `explore.py add`.

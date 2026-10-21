@@ -49,7 +49,8 @@ plugins/<name>/
   skills/<skill>/SKILL.md        the actual capability
   commands/*.md                  optional — slash commands
   studio.json                    optional — makes it an Agent in Second Brain Studio
-                                 (Studio reads your INSTALL; it bundles no copy)
+                                 (contract sbl-agent/1 — see "Build an agent" below;
+                                 Studio reads your INSTALL; it bundles no copy)
   studio/grounding.md            required when studio.json is present
   providers/openai/SKILL.md      optional — the Codex packaging's manifest
   providers/openai/agents/*.yaml optional — Codex skill metadata
@@ -175,6 +176,37 @@ A plugin agent must get better with use. The memory layer
   at once; an agent item stays flagged as inferred so the user can edit or remove it, and a brain
   set to review-first (`memory.py policy review`) holds inferences until approved. Never mark an
   inference `user`/`outcome`.
+
+## Build an agent (the `sbl-agent/1` contract)
+
+Every agent in this repo is one instance of the same model — a goal counted from its ledger, a
+daily routine, a dated daily note opened first, funnels with fixed stage IDs, a weekly optimize step,
+memory — declared in `studio.json` (contract `sbl-agent/1`, reference:
+`engine/references/agent-contract.md`) and run through the shared libraries every plugin ships
+byte-identical (`daily.py`, `ledger_base.py`, `kpi.py`, `optimize.py`, `explore.py`, `report.py`,
+`stages.py`, plus `pipeline_doc.py`, `harness.py`, `memory.py`). Studio reads only the contract.
+
+```bash
+# 1. scaffold a contract-complete plugin with stub domain logic
+python3 packaging/new_agent.py --id briefing --label "Briefing Agent" --layer 49-briefs \
+    --funnel "meetings=upcoming>briefed>held*;cancelled~" --what briefing [--browser]
+#    funnel grammar: open stages chained with >, * marks the success stage, - negative, ~ parked, ; side stages
+# 2. it already passes the validator and the daily dry-run
+python3 engine/scripts/validate_agent.py plugins/briefing
+# 3. fill in the domain: sources.py (discover) · score.py (the rubric) · actions.py (act, behind the gates)
+#    · the words of skills/briefing-pipeline/SKILL.md · the profile files briefing-onboarding writes
+# 4. package (the build refuses a plugin that is not contract-complete or whose shared libs drifted)
+python3 packaging/build_plugin.py briefing
+```
+
+What a new agent supplies: its discovery, its rubric, its actions, its profile, the words of its
+skills, its funnels and floor, its goal and routine templates (`harness/`), its grounding. What it
+gets for free: the loop (`daily.py`), the ledger with one writer and a lock, the R6 writer that never
+destroys a hand edit, the KPI note, the weekly optimizer that cannot touch a cap or a gate, the
+explore/exploit rotation over `profile/sources.md`, the report fence, the Studio surfaces (Agents
+card, Floor, Lines, Worker, Inbox, Goals, Routines, the Daily settings tab).
+
+Templates live in `plugins/_template/` (not a plugin itself — the packager skips `_` folders).
 
 ## Plugins in this repo
 

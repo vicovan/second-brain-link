@@ -1469,17 +1469,23 @@ def _fundraising_checks(fr):
         check("fundraising: manifest kept beside the ledger, not in the layer",
               (tmp / "state" / "_FUNDRAISE_GENERATED.json").is_file()
               and not (tmp / "46-fundraising" / "_FUNDRAISE_GENERATED.json").exists())
-        check("fundraising: target note titled '(target)' so it never shadows an org note",
-              (tmp / "46-fundraising" / "targets" / "Beta Ventures (target).md").is_file())
+        check("fundraising: target note titled '(target)' so it never shadows an org note, under investors/ (the standard layout)",
+              (tmp / "46-fundraising" / "investors" / "Beta Ventures (target).md").is_file())
+        check("fundraising: programs render under programs/ (two folders, one ledger)",
+              (tmp / "46-fundraising" / "programs" / "Epsilon Labs (target).md").is_file())
         fpp = tmp / "46-fundraising" / "pipeline.json"
         fb1 = fpp.read_bytes() if fpp.is_file() else b""
         rv = run(S / "pipeline_doc.py", "check", str(fpp))
         check("fundraising: render writes a valid sbl-pipeline/2 pipeline.json", rv.returncode == 0, rv.stdout[-300:])
         fpj = _js.loads(fb1 or b"{}")
-        fst = {x["id"]: x for x in fpj.get("stages") or []}
+        finv = next((f for f in fpj.get("funnels") or [] if f["id"] == "investors"), {})
+        fst = {x["id"]: x for x in finv.get("stages") or []}
         check("fundraising: 'contacted' is founder-only on the canvas (never a drop target)",
-              fst.get("contacted", {}).get("gate") == "owner" and any(i["id"] == "beta-ventures" for i in fpj.get("items") or []),
+              fst.get("contacted", {}).get("gate") == "owner" and any(i["id"] == "beta-ventures" and i.get("funnel") == "investors" for i in fpj.get("items") or []),
               str(fst.get("contacted"))[:200])
+        check("fundraising: two funnels (programs · investors) and an 8-machine floor; a program sits in the programs funnel",
+              {f["id"] for f in fpj.get("funnels") or []} == {"programs", "investors"} and len(fpj.get("floor") or []) == 8
+              and any(i["id"] == "epsilon-labs" and i.get("funnel") == "programs" for i in fpj.get("items") or []))
         run(S / "render_brain.py", "--quiet")
         check("fundraising: a second render leaves pipeline.json byte-identical", fb1 and fpp.read_bytes() == fb1)
         keep_pipeline("fundraising", fpp)
@@ -1655,9 +1661,13 @@ def _fundraising_checks(fr):
     eng = (fr / "skills/raise-engage/SKILL.md").read_text(encoding="utf-8")
     check("fundraising: raise-engage never grants itself the browser and says it never posts",
           "mcp__claude-in-chrome" not in eng.split("---")[1] and "Nothing is posted" in eng)
-    rt = (fr / "harness/routines/Threads worth a comment.md").read_text(encoding="utf-8")
-    check("fundraising: the engagement routine ships off and gated on its own stamp",
-          "enabled: false" in rt and "engage-run.txt" in rt and "skill: raise-engage" in rt)
+    rt = (fr / "harness/routines/Daily raise.md").read_text(encoding="utf-8")
+    check("fundraising: the daily raise ships off, on its own stamp, and folds engagement in as drafts only",
+          "enabled: false" in rt and "last-run.txt" in rt and "skill: raise-pipeline" in rt and "never sent" in rt)
+    check("fundraising: the retired routines are not seeded again (moved out of harness/routines)",
+          not (fr / "harness/routines/Threads worth a comment.md").exists()
+          and not (fr / "harness/routines/What's due in my raise.md").exists()
+          and (fr / "harness/retired/Threads worth a comment.md").is_file())
     check("fundraising: studio tools never include a send-capable wildcard",
           not any("gmail" in t.lower() and t.endswith("*") for t in sj.get("tools", [])))
     # Personal needles are NOT listed here — this file is public, and a list of words to
@@ -1822,8 +1832,8 @@ def _sales_checks(sp):
               set(names) <= still and not (set(names) & again), f"short={again} still={still}")
 
         # sequences and the guard
-        run("ledger.py", "stage", "globex", "target")
-        run("ledger.py", "stage", "hooli", "target")
+        run("ledger.py", "stage", "globex", "researched")
+        run("ledger.py", "stage", "hooli", "target")      # the old id is still accepted (mapped)
         r = run("sequence.py", "seed")
         check("sales: sequence templates seed into the layer", r.returncode == 0 and len(list((B / "48-sales/sequences").glob("*.md"))) == 5, r.stdout + r.stderr)
         run("sequence.py", "start", "globex", "--sequence", "Warm — new offer", "--contacts", "Dana Reyes")
@@ -1937,15 +1947,17 @@ def _sales_checks(sp):
         check("sales: won / lost are the owner's call only", r.returncode != 0)
         r1 = run("render_sales.py")
         r2 = run("render_sales.py")
-        check("sales: render writes the layer", r1.returncode == 0 and (B / "48-sales/Pipeline.md").is_file()
+        check("sales: render writes the layer", r1.returncode == 0 and (B / "48-sales/Sales Dashboard.md").is_file()
               and (B / "48-sales/pipeline.json").is_file(), r1.stderr[-300:])
         check("sales: a re-render with no new events writes nothing", "rendered 0 files" in r2.stdout, r2.stdout)
         pj = _js.loads((B / "48-sales/pipeline.json").read_text(encoding="utf-8"))
         keep_pipeline("sales", B / "48-sales/pipeline.json")
         items = {i["title"]: i for i in pj.get("items", [])}
-        check("sales: pipeline.json is sbl-pipeline/2 with stages, items and coverage",
-              pj.get("schema") == "sbl-pipeline/2" and "Globex" in items and items["Globex"]["stage"] == "sequenced"
-              and any(s["role"] == "positive" for s in pj["stages"]) and pj.get("coverage") is not None)
+        check("sales: pipeline.json is sbl-pipeline/2 with the accounts funnel, items and coverage; the first real send made Globex `contacted`",
+              pj.get("schema") == "sbl-pipeline/2" and "Globex" in items and items["Globex"]["stage"] == "contacted"
+              and items["Globex"].get("funnel") == "accounts" and not pj.get("stages")
+              and any(s["role"] == "positive" for s in pj["funnels"][0]["stages"]) and len(pj.get("floor") or []) == 8
+              and pj.get("coverage") is not None)
         rv = run("pipeline_doc.py", "check", str(B / "48-sales/pipeline.json"))
         check("sales: the pipeline file passes the shared schema check", rv.returncode == 0, rv.stdout)
         check("sales: knocked-out leads sit in a parked stage without detail",
@@ -1970,12 +1982,12 @@ def _sales_checks(sp):
         fpj = F / "48-sales/pipeline.json"
         fj = _js.loads(fpj.read_text(encoding="utf-8")) if fpj.is_file() else {}
         check("sales: the starter renders a dashboard from the brain alone",
-              rs.returncode == 0 and (F / "48-sales/Pipeline.md").is_file() and fj.get("starter") is True
+              rs.returncode == 0 and (F / "48-sales/Sales Dashboard.md").is_file() and fj.get("starter") is True
               and {"Globex", "Initech"} <= {i["title"] for i in fj.get("items", []) if "shortlist" in (i.get("flags") or [])}
               and "Umbrella" not in {i["title"] for i in fj.get("items", [])} and fj.get("setup"), rs.stdout + rs.stderr)
-        check("sales: the starter's home note says what is missing", "## Start here" in (F / "48-sales/Pipeline.md").read_text(encoding="utf-8"))
+        check("sales: the starter's dashboard says what is missing", "## Start here" in (F / "48-sales/Sales Dashboard.md").read_text(encoding="utf-8"))
         check("sales: every worked account carries its panel detail",
-              all(isinstance(i.get("detail"), dict) and "team" in i["detail"] for i in pj["items"] if i["stage"] not in ("lead", "out", "parked", "lost")))
+              all(isinstance(i.get("detail"), dict) and "team" in i["detail"] for i in pj["items"] if i["stage"] not in ("lead", "out", "nurture", "lost")))
         check("sales: a note the seller edited is never overwritten",
               "my own note" in (B / "48-sales/accounts/Globex.md").read_text(encoding="utf-8") and "kept 1" in r3.stdout, r3.stdout)
 
@@ -2366,12 +2378,16 @@ def test_travel_plugin():
         keep_pipeline("travel-planner", layer / "pipeline.json")
         tp = {i["id"]: i for i in pj.get("items") or []}
         check("travel: every trip is a pipeline item with stops and note links",
-              "paris-test" in tp and "japan-test" in tp and tp["paris-test"]["stage"] == "draft"
+              "paris-test" in tp and "japan-test" in tp and tp["paris-test"]["stage"] == "planned" and tp["paris-test"].get("funnel") == "trips"
               and tp["paris-test"].get("detail", {}).get("stops")
               and (brain / tp["paris-test"]["note"]).is_file(), str(tp.get("paris-test"))[:300])
-        check("travel: the pipeline has the five trip stages, booked behind a confirm gate",
-              [x["id"] for x in pj.get("stages") or []] == ["idea", "draft", "shopped", "booked", "past"]
-              and next(x for x in pj["stages"] if x["id"] == "booked")["gate"] == "confirm")
+        _trips = next((f for f in pj.get("funnels") or [] if f["id"] == "trips"), {})
+        _picks = next((f for f in pj.get("funnels") or [] if f["id"] == "picks"), {})
+        check("travel: two funnels - the five trip stages (booked behind a confirm gate) and the picks funnel - and a six-machine floor",
+              [x["id"] for x in _trips.get("stages") or []] == ["idea", "planned", "shopped", "booked", "done"]
+              and next(x for x in _trips["stages"] if x["id"] == "booked")["gate"] == "confirm"
+              and [x["id"] for x in _picks.get("stages") or []] == ["suggested", "saved", "went", "loved", "not_for_me", "expired"]
+              and len(pj.get("floor") or []) == 6 and not pj.get("stages"))
         places_titles = {p.stem.lower() for p in (brain / "85-places").glob("*.md")}
         shadow = [p.name for p in layer.rglob("*.md") if p.stem.lower() in places_titles]
         check("travel: no travel note shadows a place note", not shadow, str(shadow))
@@ -2490,6 +2506,18 @@ def test_harness():
     spec = _iu.spec_from_file_location("harness_t", SCRIPTS / "harness.py")
     H = _iu.module_from_spec(spec)
     spec.loader.exec_module(H)
+    # Runtime's "Draw it now": every agent with a pipeline declares its own deterministic render, and
+    # that script is inside its plugin (harness.py agent_render runs it with run_plugin_cmd)
+    _rok = True
+    for _sj in sorted((REPO / "plugins").glob("*/studio.json")):
+        _d = json.loads(_sj.read_text(encoding="utf-8"))
+        if not _d.get("pipeline"):
+            continue
+        _cmd = str((_d.get("render") or {}).get("cmd") or "")
+        _name = _cmd.split()[0] if _cmd else ""
+        if not _name or not list(_sj.parent.glob("skills/*/scripts/" + _name)):
+            _rok = False
+    check("harness: every pipeline agent declares a render script it ships", _rok)
     import datetime as _d
     # schedules
     ps = H.parse_schedule
@@ -2610,6 +2638,18 @@ def test_harness():
         check("harness: a condition can't run a script outside its own plugin", ok is False, why)
         ok, why = H.eval_condition(H.Brain(str(brain)), "job-search", "cmd: ../../evil.py | exit 0")
         check("harness: a condition rejects path tricks", ok is False, why)
+        # Runtime's missing line: render only a started layer without its pipeline file, then never again while fresh
+        _B = H.Brain(str(brain))
+        r0 = H.agent_render(_B, "fundraising")
+        (brain / "46-fundraising").mkdir(parents=True, exist_ok=True)
+        (brain / "46-fundraising" / "Seed note.md").write_text("# seed\n", encoding="utf-8")
+        r1 = H.agent_render(_B, "fundraising")
+        r2 = H.agent_render(_B, "fundraising")
+        check("harness: render draws a started layer's missing pipeline.json once, deterministically",
+              r0.get("ran") is False and r1.get("ran") is True and r1.get("code") == 0
+              and (brain / "46-fundraising" / "pipeline.json").is_file() and r2.get("ran") is False, str((r0, r1, r2)))
+        import shutil as _sh
+        _sh.rmtree(brain / "46-fundraising", ignore_errors=True)  # (this test brain's later link checks stay about the harness)
         sd = brain / ".plugins" / "job-search"
         sd.mkdir(parents=True, exist_ok=True)
         (sd / "last-run.txt").write_text(H.now().date().isoformat(), encoding="utf-8")
@@ -2748,6 +2788,439 @@ def test_harness():
         okg = all(str(H.read_note(p)[0].get("metric")) in (sj.get("outcomes") or {}) for p in gls)
         check(f"harness: {name} ships routine + goal templates (valid, off, counted)", rts and gls and okr and okg)
 
+
+
+def test_agent_platform():
+    """The agent operating model's platform layer (O-E): the shared libraries' selftests, the
+    pipeline funnels/floor rules, the harness cap/queue/cadence/profile-set, the scaffolder's
+    sample agent run end to end with no AI and no network, the optimizer's determinism and
+    safety, and the single-writer ledger under concurrent writers. Everything in scratch dirs."""
+    import filecmp as _fc, json as _js, os as _os, subprocess as _sp, tempfile as _tf
+    print("\n[agent platform]")
+    libs = ("pipeline_doc", "ledger_base", "stages", "kpi", "explore", "report", "optimize", "daily", "validate_agent")
+    for name in libs:
+        r = _sp.run([sys.executable, str(SCRIPTS / f"{name}.py"), "--selftest"], capture_output=True, text=True,
+                    env={k: v for k, v in _os.environ.items() if not k.endswith("_HOME")})
+        check(f"platform: {name}.py --selftest", r.returncode == 0, (r.stderr or r.stdout)[-400:])
+    # every shared library ships byte-identical in every agent plugin (and matches the engine)
+    sys.path.insert(0, str(REPO / "packaging"))
+    import build_plugin as _bp
+    names = [n for n in _bp.discover() if (REPO / "plugins" / n / "studio.json").is_file()]
+    check("platform: build_plugin.check_shared passes", _bp.check_shared(names))
+    for fname in ("daily.py", "ledger_base.py", "kpi.py", "optimize.py", "explore.py", "report.py", "stages.py", "pipeline_doc.py"):
+        copies = [REPO / "plugins" / n / rel for n, rel in _bp.SHARED_FILES[fname].items()]
+        check(f"platform: {fname} byte-identical in {len(copies)} plugins + engine",
+              all(c.is_file() and _fc.cmp(SCRIPTS / fname, c, shallow=False) for c in copies))
+    # the validator on every agent plugin
+    sys.path.insert(0, str(SCRIPTS))
+    import validate_agent as _va
+    for n in names:
+        probs, _w = _va.validate(REPO / "plugins" / n, REPO)
+        check(f"platform: validate_agent {n}", not probs, "; ".join(probs[:4]))
+
+    import importlib.util as _iu
+    spec = _iu.spec_from_file_location("harness_p", SCRIPTS / "harness.py")
+    H = _iu.module_from_spec(spec)
+    spec.loader.exec_module(H)
+    import datetime as _d
+    with _tf.TemporaryDirectory() as d:
+        d = Path(d)
+        # --- the scaffolder: a contract-complete sample agent with stub logic ---------------
+        plug = d / "plugins"
+        plug.mkdir()
+        r = _sp.run([sys.executable, str(REPO / "packaging" / "new_agent.py"), "--id", "sample-agent", "--label", "Sample Agent",
+                     "--layer", "49-samples", "--funnel", "meetings=upcoming>briefed>held*;cancelled~", "--what", "briefing",
+                     "--out", str(plug)], capture_output=True, text=True)
+        check("platform: new_agent.py scaffolds a validator-clean plugin", r.returncode == 0 and "validate_agent: ok" in r.stdout, r.stdout[-400:] + r.stderr[-400:])
+        P = plug / "sample-agent"
+        S = P / "skills" / "sample-agent-core" / "scripts"
+        B = d / "brain"
+        (B / "00-me").mkdir(parents=True)
+        (B / "00-me" / "identity.md").write_text("---\ntype: identity\ntitle: Jane Doe\n---\n", encoding="utf-8")
+        (B / "96-agents").mkdir()
+        (B / "49-samples" / "profile").mkdir(parents=True)
+        (B / "49-samples" / "profile" / "profile.md").write_text("# p\n```settings\nlevel: supervised\n```\n", encoding="utf-8")
+        env = {k: v for k, v in _os.environ.items() if not k.endswith("_HOME")}
+        env.update(SBL_BRAIN=str(B), CLAUDE_PROJECT_DIR=str(B), SAMPLE_AGENT_HOME=str(B / ".plugins" / "sample-agent"),
+                   SBL_PLUGINS_DIR=str(plug))
+
+        def run(*args, inp=None):
+            return _sp.run([sys.executable, str(S / args[0]), *args[1:]], cwd=str(B), env=env, capture_output=True, text=True, input=inp)
+
+        run("stages.py", "init", "--contract", str(P / "studio.json"), "--profile", "49-samples/profile")
+        run("explore.py", "add", "--sources", "49-samples/profile/sources.md", "--source", "Northwind board", "--proven")
+        for c in ("Globex list", "Acme digest", "Tidewater calendar"):
+            run("explore.py", "add", "--sources", "49-samples/profile/sources.md", "--source", c)
+        r = run("harness.py", "--brain", str(B), "seed", "sample-agent", "--json")
+        seeded = _js.loads(r.stdout or "[]")
+        check("platform: harness seed <agent> reads the plugin's own templates (not an install)",
+              {x["name"] for x in seeded} == {"Daily briefing", "Weekly briefing review", "Sample outcomes"}, r.stdout[-300:] + r.stderr[-300:])
+        r0 = run("render.py", "--quiet")
+        check("platform: first render on an empty ledger succeeds", r0.returncode == 0, r0.stderr[-300:])
+        r = run("daily.py", "start", "--agent", "sample-agent", "--routine", "Daily briefing", "--dry", "--json", "--date", "2026-10-20")
+        st = _js.loads(r.stdout or "{}") if r.returncode == 0 else {}
+        note = B / "49-samples" / "reports" / "Sample today 2026-10-20.md"
+        check("platform: daily.py start opens the dated note FIRST with ## Status", r.returncode == 0 and note.is_file()
+              and note.read_text(encoding="utf-8").index("## Status") < note.read_text(encoding="utf-8").index("## Goal"), r.stderr[-300:])
+        check("platform: the dated note names its run and routine", 'routine: "[[Daily briefing]]"' in note.read_text(encoding="utf-8") and st.get("run", "").startswith("96-agents/Activity/"))
+        r = run("daily.py", "explore", "--agent", "sample-agent", "--date", "2026-10-20", "--budget", "10")
+        picks = r.stdout.strip().splitlines()
+        r2 = run("daily.py", "explore", "--agent", "sample-agent", "--date", "2026-10-20", "--budget", "10")
+        check("platform: the explore slice is deterministic by date and 20 % of the budget", picks == r2.stdout.strip().splitlines() and len(picks) == 2, r.stdout)
+        run("ledger.py", "upsert", "--json", _js.dumps({"key": "acme-sync", "title": "Acme sync", "kind": "meeting", "score": 80, "why": "stub", "source": "Northwind board"}))
+        run("ledger.py", "upsert", "--json", _js.dumps({"key": "globex-review", "title": "Globex review", "kind": "meeting", "score": 65, "why": "stub", "source": "Globex list"}))
+        r = run("ledger.py", "stage", "acme-sync", "briefed")
+        bad = run("ledger.py", "stage", "acme-sync", "upcoming")
+        check("platform: the ledger refuses a move its transitions table does not allow", r.returncode == 0 and bad.returncode != 0)
+        run("actions.py", "prepare", "acme-sync")
+        r = run("daily.py", "status", "--agent", "sample-agent", "--date", "2026-10-20", "briefed 1 of 2", "--phase", "acting", "--render-now")
+        act = next((B / "96-agents" / "Activity").glob("*.md")).read_text(encoding="utf-8")
+        check("platform: daily.py status rewrites ## Status and appends a [phase] step", r.returncode == 0
+              and "_briefed 1 of 2 ·" in note.read_text(encoding="utf-8") and "[acting] briefed 1 of 2" in act)
+        tbl = run("ledger.py", "table", "shortlist").stdout
+        r = run("daily.py", "section", "--agent", "sample-agent", "--date", "2026-10-20", "New today", "--file", "-", inp=tbl)
+        check("platform: daily.py section drops script text between markers", r.returncode == 0 and "<!-- new-today:begin -->" in note.read_text(encoding="utf-8")
+              and "| Acme sync |" in note.read_text(encoding="utf-8"))
+        rep = d / "report.json"
+        rep.write_text(_js.dumps({"done": [{"text": "briefed Acme sync", "evidence": "work/"}], "needs_you": ["approve the Globex brief"], "news": True}), encoding="utf-8")
+        r = run("daily.py", "close", "--agent", "sample-agent", "--date", "2026-10-20", "--report", str(rep))
+        reports = list((B / "96-agents" / "Reports").glob("*.md"))
+        check("platform: daily.py close writes the sbl-report and prints the fence", r.returncode == 0 and "```report" in r.stdout and reports
+              and "approve the Globex brief" in reports[0].read_text(encoding="utf-8"), r.stderr[-300:])
+        r = run("harness.py", "--brain", str(B), "inbox", "--count", "--agent", "sample-agent", "--json")
+        check("platform: inbox --count --agent counts the parked run once", _js.loads(r.stdout or "{}").get("count") == 1, r.stdout)
+        pipe = B / "49-samples" / "pipeline.json"
+        doc = _js.loads(pipe.read_text(encoding="utf-8"))
+        check("platform: the sample agent's pipeline.json carries funnels + floor and is valid",
+              doc.get("funnels") and doc.get("floor") and not doc.get("stages") and all(it.get("funnel") for it in doc["items"])
+              and run("pipeline_doc.py", "check", str(pipe)).returncode == 0)
+        layer = B / "49-samples"
+        std = {"Sample Dashboard.md", "Sample KPI.md", "Sample Lessons.md", "pipeline.json", "profile", "reports", "meetings", "work"}
+        check("platform: the standard top-level layout set is present", std <= {p.name for p in layer.iterdir()}, str(sorted(p.name for p in layer.iterdir())))
+        keep_pipeline("sample-agent", pipe)
+        before = pipe.read_bytes()
+        run("render.py", "--quiet")
+        check("platform: a second render is byte-identical", pipe.read_bytes() == before)
+        # R6: an edited note is kept, the fresh render lands beside it
+        dash = layer / "Sample Dashboard.md"
+        dash.write_text(dash.read_text(encoding="utf-8") + "\nmy own line\n", encoding="utf-8")
+        run("ledger.py", "stage", "globex-review", "briefed")
+        run("render.py", "--quiet")
+        check("platform: R6 keeps the edited dashboard and writes .new.md beside it",
+              "my own line" in dash.read_text(encoding="utf-8") and (layer / "Sample Dashboard.new.md").is_file())
+        # a renamed + hidden stage still renders, counts and draws
+        (layer / "profile" / "stages.json").write_text(_js.dumps({"schema": "sbl-stages/1", "funnels": {"meetings": {"briefed": {"label": "Prepped"}, "upcoming": {"hidden": True}}}}), encoding="utf-8")
+        r = run("render.py", "--quiet")
+        doc = _js.loads(pipe.read_text(encoding="utf-8"))
+        f0 = doc["funnels"][0]
+        stg = {s["id"]: s for s in f0["stages"]}
+        check("platform: a renamed / hidden stage profile still renders (label kept id, hidden collapsed, items counted)",
+              r.returncode == 0 and stg["briefed"]["label"] == "Prepped" and stg["upcoming"].get("collapsed") is True
+              and not any("upcoming" in g["stages"] for g in doc["floor"]) and run("pipeline_doc.py", "check", str(pipe)).returncode == 0)
+        # kpi + optimize over the sample ledger: deterministic, safe
+        evs = B / ".plugins" / "sample-agent" / "events.jsonl"
+        k1 = run("kpi.py", "--pipeline", str(pipe), "--events", str(evs), "--json", "--today", "2026-10-20").stdout
+        k2 = run("kpi.py", "--pipeline", str(pipe), "--events", str(evs), "--json", "--today", "2026-10-20").stdout
+        check("platform: kpi.py is deterministic and gives no rate below n=20", k1 == k2 and _js.loads(k1)["funnels"][0]["success_rate"]["rate"] is None)
+        o1 = run("optimize.py", "propose", "--pipeline", str(pipe), "--events", str(evs), "--signals", "source,kind", "--today", "2026-10-20", "--json").stdout
+        o2 = run("optimize.py", "propose", "--pipeline", str(pipe), "--events", str(evs), "--signals", "source,kind", "--today", "2026-10-20", "--json").stdout
+        props = _js.loads(o1 or "[]")
+        check("platform: optimize.py is deterministic and proposes nothing below the evidence threshold",
+              o1 == o2 and not [p for p in props if p["kind"] == "reweight"])
+        scoring = layer / "profile" / "scoring.md"
+        scoring.write_text("# Scoring\n\n```scoring\nweight.fit: 3\nfloor: 60\ncap.email: 25\n```\n", encoding="utf-8")
+        r = run("optimize.py", "apply", "--pipeline", str(pipe), "--events", str(evs), "--profile", str(layer / "profile"), "--contract", str(P / "studio.json"),
+                "--level", "autonomous", "--today", "2026-10-20", "--review-out", str(layer / "reports" / "Sample review 2026-10-20.md"), "--label", "Sample")
+        check("platform: optimize.py apply writes the review note and never touches a cap",
+              r.returncode == 0 and (layer / "reports" / "Sample review 2026-10-20.md").is_file() and "cap.email: 25" in scoring.read_text(encoding="utf-8"))
+        # harness: cap 10, the queue, schedule order, cadence, routine-set / goal-set, profile-set
+        H._NOW = _d.datetime(2026, 10, 19, 9, 0)   # a Monday
+        (B / "_STRUCTURE.md").write_text("# built\n", encoding="utf-8")   # preflight: the brain is built
+        _os.environ["SBL_PLUGINS_DIR"] = str(plug)
+        b = H.Brain(str(B))
+        for i in range(12):
+            H.write_note(b.dir("routines") / f"R{i:02d}.md", *H.routine_note("brain", f"R{i:02d}", "", f"WEEKDAYS 0{i % 10}:{(i * 5) % 60:02d}", "", [], 1, 10, "news", True))
+        rows = H.due(b, 10, 20, 20)
+        runs = [r_ for r_ in rows if r_["action"] == "run"]
+        check("platform: a sim Monday with 12 routines offers all 12 (nothing ran yet)", len(runs) == 12, f"{len(runs)} run")
+        check("platform: due returns the missed slots in schedule order", [r_["slot"] for r_ in runs] == sorted(r_["slot"] for r_ in runs))
+        # concurrency: with two heavy runs live, a heavy routine queues ("waiting for a slot")
+        hv = plug / "heavy-one"
+        (hv).mkdir()
+        (hv / "studio.json").write_text(_js.dumps({"id": "heavy-one", "label": "Heavy", "concurrency": {"weight": "heavy", "browser": True}}), encoding="utf-8")
+        H.write_note(b.dir("routines") / "Heavy daily.md", *H.routine_note("heavy-one", "Heavy daily", "", "WEEKDAYS 07:00", "", [], 1, 10, "news", True))
+        for i in range(2):
+            rp = H.run_open(b, "heavy-one", "", "", "schedule")
+        rows = H.due(b, 10, 2, 20)
+        hrow = next(r_ for r_ in rows if r_["routine"] == "Heavy daily")
+        check("platform: a heavy routine waits for a slot when max_concurrent heavy runs are live", hrow["action"] == "queued" and hrow["why"] == "waiting for a slot", str(hrow))
+        # queued runs own no slot: with the two live runs closed and two QUEUED notes left, the routine runs
+        for n in H.list_notes(b, "activity"):
+            if str(n["fm"].get("agent")) == "heavy-one":
+                H.set_fm(b.abs(n["path"]), status="queued")
+        rows = H.due(b, 10, 2, 20)
+        hrow = next(r_ for r_ in rows if r_["routine"] == "Heavy daily")
+        check("platform: queued runs never starve the queue (only running / awaiting runs hold a slot)", hrow["action"] == "run", str(hrow))
+        for i in range(8):   # 2 heavy runs are live already: 10 scheduled runs today = the brain's cap
+            H.run_open(b, "brain", f"R{i:02d}", "", "schedule")
+        rows = H.due(b, 10, 20, 20)
+        capped = [r_ for r_ in rows if r_["action"] == "skip" and "Daily limit of 10" in r_["why"]]
+        check("platform: harness due caps a brain at 10 scheduled runs a day", not [r_ for r_ in rows if r_["action"] == "run"] and len(capped) >= 4, f"{len(capped)} capped")
+        cad = H.cadence(b, "sample-agent")
+        check("platform: harness cadence gives the same line for every surface", any(c["routine"] == "Daily briefing" and c["line"].startswith("off · weekdays at") for c in cad), str(cad)[:300])
+        r = run("harness.py", "--brain", str(B), "routine-set", "Daily briefing", "enabled", "true", "--json")
+        r2 = run("harness.py", "--brain", str(B), "goal-set", "Sample outcomes", "by", "2026-12-31", "--json")
+        r3 = run("harness.py", "--brain", str(B), "goal-set", "Sample outcomes", "enabled", "true")
+        check("platform: routine-set / goal-set take their own keys and refuse the others", r.returncode == 0 and r2.returncode == 0 and r3.returncode != 0)
+        cad = H.cadence(b, "sample-agent")
+        check("platform: cadence shows the next slot once a routine is on", any(c["routine"] == "Daily briefing" and c["enabled"] and c["next"] for c in cad))
+        r = run("harness.py", "--brain", str(B), "profile-set", "--agent", "sample-agent", "level", "autonomous", "--json")
+        check("platform: profile-set rewrites the level line in the agent's own settings file",
+              r.returncode == 0 and "level: autonomous" in (B / "49-samples" / "profile" / "profile.md").read_text(encoding="utf-8"), r.stderr[-200:])
+        # --- the single-writer ledger under concurrent writers ----------------------------------
+        root = d / "ledger"
+        worker = d / "w.py"
+        worker.write_text(
+            "import sys, json\nsys.path.insert(0, sys.argv[1])\nfrom ledger_base import Ledger\n"
+            "L = Ledger(sys.argv[2], 'items.jsonl', transitions={'a': {'b'}, 'b': {'a'}})\n"
+            "me = sys.argv[3]\n"
+            "for i in range(40):\n"
+            "    from ledger_base import lock\n"
+            "    with lock(L.root):\n"
+            "        recs = L.load()\n"
+            "        rec = next((r for r in recs if r['key'] == me), None)\n"
+            "        if rec is None:\n"
+            "            rec = {'key': me, 'status': 'a', 'n': 0}\n"
+            "            recs.append(rec)\n"
+            "        rec['n'] += 1\n"
+            "        from ledger_base import write_jsonl\n"
+            "        write_jsonl(L.record_file, recs)\n"
+            "    L.event(me, 'a', 'b', 'w', 'tick ' + str(i))\n", encoding="utf-8")
+        procs = [_sp.Popen([sys.executable, str(worker), str(SCRIPTS), str(root), f"w{i}"], stdout=_sp.PIPE, stderr=_sp.PIPE) for i in range(6)]
+        outs = [pr.communicate(timeout=120) for pr in procs]
+        import ledger_base as _lb
+        recs = _lb.read_jsonl(root / "items.jsonl")
+        evs_ = _lb.read_jsonl(root / "events.jsonl")
+        raw = (root / "events.jsonl").read_text(encoding="utf-8").splitlines()
+        check("platform: six concurrent writers leave the ledger intact (every record, every event, no torn line)",
+              all(pr.returncode == 0 for pr in procs) and len(recs) == 6 and all(r_["n"] == 40 for r_ in recs)
+              and len(evs_) == 240 and len(raw) == 240, str([o[1][-120:] for o in outs if o[1]]))
+    H._NOW = None
+    _os.environ.pop("SBL_PLUGINS_DIR", None)
+
+
+def test_agent_dailies():
+    """O-P / O-T: every shipped agent's daily, dry-run on the fictional sim ledgers
+    (tests/fixtures/<agent>-sim, make_sim.py) with no AI and no network - the dated note opened
+    first, pipeline.json with funnels + floor, the sbl-report, KPI / Lessons / Dashboard, the
+    standard top-level set, byte-stable renders, R6, a renamed + hidden stage, the ledger
+    migrations (idempotent, backed up), the Funding Plan's §0 markers, --refresh byte-stability."""
+    import json as _js, os as _os, shutil as _sh, subprocess as _sp, tempfile as _tf, hashlib as _hl
+    print("\n[agent dailies]")
+    plugins = REPO / "plugins"
+    AGENTS = {
+        "job-search": {"S": "skills/job-scout/scripts", "env": "JOB_SEARCH_HOME", "layer": "45-jobs", "label": "Job", "sim": "jobs-sim",
+                       "routine": "Daily job scout", "note": "Shortlist", "render": "render_brain.py", "funnels": ["postings"], "floor": 7,
+                       "profile": {"profile.md": "---\ntype: profile\nowner: Jane Doe\n---\n# Jane Doe\n", "search-criteria.md": "# criteria\n",
+                                   "scoring.md": "# scoring\n", "sources.md": "# sources\n",
+                                   "application-answers.md": "# answers\n\n```\nlevel: supervised\ndaily-target: 10\n```\n"},
+                       "section_cmd": None, "table": None},
+        "fundraising": {"S": "skills/raise-research/scripts", "env": "FUNDRAISE_HOME", "layer": "46-fundraising", "label": "Fundraising", "sim": "fundraising-sim",
+                        "routine": "Daily raise", "note": "Raise today", "render": "render_brain.py", "funnels": ["programs", "investors"], "floor": 8,
+                        "profile": {"round.md": "---\ntype: fundraising-profile\nmin_net_cash: 150000\ngeography_ok: [global, europe]\nrelocation: ok\n"
+                                                "exclusions: [crypto]\nthesis_keywords: [ai, developer, data]\noff_thesis: [consumer]\n---\n",
+                                    "answers.md": "---\ntype: fundraising-profile\nlevel: supervised\nmax_submits_per_run: 5\n---\n",
+                                    "company.md": "# Co\n- 25 sources.\n## Do not claim\n- users\n"},
+                        "table": ["ledger.py", "table", "ledger"], "section": "New today"},
+        "sales": {"S": "skills/sales-scout/scripts", "env": "SALES_HOME", "layer": "48-sales", "label": "Sales", "sim": "sales-sim",
+                  "routine": "Daily sales", "note": "Sell today", "render": "render_sales.py", "funnels": ["accounts"], "floor": 8,
+                  "profile": None, "table": ["ledger.py", "table", "shortlist"], "section": "New today"},
+        "travel-planner": {"S": "skills/trip-planner/scripts", "env": "TRAVEL_HOME", "layer": "47-travel", "label": "Travel", "sim": "travel-sim",
+                           "routine": "Today near me", "note": "Today near me", "render": "render_brain.py", "funnels": ["trips", "picks"], "floor": 6,
+                           "profile": {"traveler.md": "---\ntype: travel-profile\nowner: Jane Doe\nhome_city: Lisbon\nradius_km: 8\nmix: [coffee, meal, activity, event, wildcard]\n"
+                                                      "home_airports: [LIS]\ncitizenships: [PT]\n---\n# Traveller\n",
+                                       "booking-answers.md": "## 0. Autonomy\n\n```\nlevel: research\n```\n"},
+                           "table": ["today.py", "table"], "section": "Coffee"},
+    }
+    today = __import__("datetime").date.today().isoformat()
+    with _tf.TemporaryDirectory() as d:
+        d = Path(d)
+        # the sims, regenerated for TODAY (same seed, same shape as the checked-in copies)
+        simroot = d / "_sims"
+        simroot.mkdir()
+        _sp.run([sys.executable, str(FIXTURES / "agent-sim" / "make_sim.py")], capture_output=True, text=True,
+                env=dict(_os.environ, SBL_SIM_OUT=str(simroot), SBL_SIM_TODAY=today))
+        for agent, A in AGENTS.items():
+            root = plugins / agent
+            if not root.is_dir():
+                continue
+            S = root / A["S"]
+            B = d / agent / "brain"
+            (B / "00-me").mkdir(parents=True)
+            (B / "00-me" / "identity.md").write_text("---\ntype: identity\ntitle: Jane Doe\ncompany: \"[[Northwind Data]]\"\n---\n", encoding="utf-8")
+            (B / "_STRUCTURE.md").write_text("# built\n", encoding="utf-8")
+            (B / "96-agents").mkdir()
+            layer = B / A["layer"]
+            prof = layer / "profile"
+            prof.mkdir(parents=True)
+            if A["profile"]:
+                for name, txt in A["profile"].items():
+                    (prof / name).write_text(txt, encoding="utf-8")
+            else:   # sales: the shipped templates, with the time rules opened so the dry run is never "outside working hours"
+                ON = root / "skills/sales-onboarding/references"
+                for name in ("sending", "icp", "offer", "voice"):
+                    (prof / f"{name}.md").write_text((ON / f"{name}-template.md").read_text(encoding="utf-8"), encoding="utf-8")
+            state = B / ".plugins" / agent
+            sim = simroot / A["sim"] if (simroot / A["sim"]).is_dir() else FIXTURES / A["sim"]
+            state.mkdir(parents=True)
+            for f in sim.iterdir():
+                if f.name == "47-travel":
+                    _sh.copytree(f, layer, dirs_exist_ok=True)
+                elif f.is_dir():
+                    _sh.copytree(f, state / f.name, dirs_exist_ok=True)
+                else:
+                    _sh.copyfile(f, state / f.name)
+            env = {k: v for k, v in _os.environ.items() if not k.endswith("_HOME")}
+            env.update({A["env"]: str(state), "SBL_BRAIN": str(B), "CLAUDE_PROJECT_DIR": str(B), "SBL_PLUGINS_DIR": str(plugins)})
+
+            def run(*args, inp=None, timeout=120):
+                try:
+                    return _sp.run([sys.executable, str(S / args[0]), *args[1:]], cwd=str(B), env=env, capture_output=True, text=True, input=inp, timeout=timeout)
+                except _sp.TimeoutExpired:
+                    return _sp.CompletedProcess(args, 124, "", "TIMEOUT")
+
+            tag = f"dailies/{agent}"
+            # the ledger migrations (sales + travel), idempotent, with a backup
+            if agent == "sales":
+                r1 = run("ledger.py", "migrate"); r2 = run("ledger.py", "migrate")
+                check(f"{tag}: ledger migrate is idempotent (second run changes nothing)", r1.returncode == 0 and '"changed": 0' in r2.stdout, r1.stderr[-200:] + r2.stdout[-100:])
+            if agent == "travel-planner":
+                # one trip in the old id, to migrate
+                tp = layer / "trips" / "madrid-spring-2" / "itinerary.json"
+                raw = _js.loads(tp.read_text(encoding="utf-8")); raw["status"] = "draft"; tp.write_text(_js.dumps(raw), encoding="utf-8")
+                r1 = run("itinerary.py", "migrate"); r2 = run("itinerary.py", "migrate")
+                check(f"{tag}: trip status migration (draft→planned) is idempotent and keeps a backup",
+                      '"changed": 1' in r1.stdout and '"changed": 0' in r2.stdout and tp.with_name("itinerary.json.pre-migrate").is_file(), r1.stdout + r1.stderr[-200:])
+            # onboarding's seeds
+            r = run("stages.py", "init", "--contract", str(root / "studio.json"), "--profile", f"{A['layer']}/profile")
+            r2 = run("harness.py", "--brain", str(B), "seed", agent, "--json")
+            seeded = {x["name"] for x in _js.loads(r2.stdout or "[]")} if r2.returncode == 0 else set()
+            check(f"{tag}: stages.json seeded and the goals + routines seeded from the plugin's templates",
+                  r.returncode == 0 and (prof / "stages.json").is_file() and A["routine"] in seeded, r.stderr[-200:] + r2.stderr[-200:] + str(seeded))
+            r0 = run(A["render"], "--quiet")
+            check(f"{tag}: first render on the sim ledger succeeds", r0.returncode == 0, r0.stderr[-400:])
+            # the daily: start (the dated note FIRST) → the table into the note → status → close
+            r = run("daily.py", "start", "--agent", agent, "--routine", A["routine"], "--dry", "--json")
+            st = _js.loads(r.stdout or "{}") if r.returncode == 0 else {}
+            note = layer / "reports" / f"{A['note']} {today}.md"
+            txt = note.read_text(encoding="utf-8") if note.is_file() else ""
+            check(f"{tag}: daily.py start opens the dated note first (## Status before everything else; a report rendered under its name earlier is adopted, never lost)",
+                  r.returncode == 0 and note.is_file() and "schema: sbl-daily/1" in txt and txt.index("## Status") < txt.index("## Goal")
+                  and (agent != "job-search" or ("| 1 | Acme | CTO | 88 |" in txt and st.get("note_result") == "adopted")), r.stderr[-300:] + str(st.get("note_result")))
+            check(f"{tag}: the note names its routine and run; the run is in Activity", f'routine: "[[{A["routine"]}]]"' in txt and (B / st.get("run", "x")).is_file(), st.get("run"))
+            if A.get("table"):
+                tb = run(*A["table"])
+                r = run("daily.py", "section", "--agent", agent, A["section"], "--file", "-", inp=tb.stdout)
+                check(f"{tag}: the ledger's table lands in the note's '{A['section']}' section between markers (R2)",
+                      tb.returncode == 0 and r.returncode == 0 and "|" in tb.stdout and f"<!-- {A['section'].lower().replace(' ', '-')}:begin -->" in note.read_text(encoding="utf-8"), tb.stderr[-200:] + r.stderr[-200:])
+            if agent == "travel-planner":
+                r = run("today.py", "note")
+                nt = note.read_text(encoding="utf-8")
+                check(f"{tag}: today.py note fills one section per slot (Coffee · Food · …) with the feedback words",
+                      r.returncode == 0 and "<!-- coffee:begin -->" in nt and "## Food" in nt and "I went to #" in nt, r.stderr[-200:])
+            r = run("daily.py", "status", "--agent", agent, "worked the sim", "--phase", "acting", "--render-now")
+            act = (B / st.get("run", "x")).read_text(encoding="utf-8") if st.get("run") else ""
+            check(f"{tag}: daily.py status rewrites ## Status and marks the run step with its phase",
+                  r.returncode == 0 and "_worked the sim ·" in note.read_text(encoding="utf-8") and "[acting] worked the sim" in act, r.stderr[-200:])
+            rep = d / agent / "report.json"
+            rep.write_text(_js.dumps({"done": [{"text": "worked the sim", "evidence": A["layer"]}], "needs_you": ["one decision"], "news": True}), encoding="utf-8")
+            r = run("daily.py", "close", "--agent", agent, "--report", str(rep))
+            reports = [x for x in (B / "96-agents" / "Reports").glob("*.md") if "one decision" in x.read_text(encoding="utf-8")]
+            check(f"{tag}: daily.py close writes the sbl-report (news → Inbox) and prints the chat report + the fence",
+                  r.returncode == 0 and len(reports) == 1 and "```report" in r.stdout, r.stderr[-300:] + r.stdout[-200:])
+            ic = run("harness.py", "--brain", str(B), "inbox", "--agent", agent, "--json")
+            items = _js.loads(ic.stdout or "[]")
+            check(f"{tag}: the Inbox holds the run that needs you (and the goal-met report the sim's numbers trigger, nothing twice)",
+                  sum(1 for it in items if it["kind"] == "needs-you") == 1 and len(items) <= 2, ic.stdout[-300:])
+            # the pipeline: funnels + floor, every item in its funnel, valid
+            pipe = layer / "pipeline.json"
+            doc = _js.loads(pipe.read_text(encoding="utf-8")) if pipe.is_file() else {}
+            fids = [f["id"] for f in doc.get("funnels") or []]
+            rv = run("pipeline_doc.py", "check", str(pipe))
+            check(f"{tag}: pipeline.json has funnels {A['funnels']}, a {A['floor']}-machine floor, no top-level stages, every item in a funnel, and passes the check",
+                  fids == A["funnels"] and len(doc.get("floor") or []) == A["floor"] and not doc.get("stages") and doc.get("items")
+                  and all(it.get("funnel") in fids for it in doc["items"]) and rv.returncode == 0, f"{fids} {len(doc.get('floor') or [])} {rv.stdout[-200:]}")
+            check(f"{tag}: pipeline.json carries the throughput monitor (label · value · 12-day series)",
+                  isinstance(doc.get("throughput"), dict) and len(doc["throughput"].get("series") or []) == 12 and doc["throughput"].get("label"))
+            if agent == "fundraising":
+                per = {f["id"]: {s["id"] for s in f["stages"] if s.get("collapsed")} for f in doc["funnels"]}
+                check(f"{tag}: statuses a kind cannot normally reach are collapsed in that funnel (programs: contacted…meeting; investors: filed)",
+                      {"contacted", "replied", "meeting"} <= per["programs"] and "filed" in per["investors"], str(per))
+                probs = sum(1 for it in doc["items"] if it["funnel"] == "programs")
+                check(f"{tag}: every program / grant sits in the programs funnel and every fund in investors",
+                      probs > 50 and sum(1 for it in doc["items"] if it["funnel"] == "investors") > 100, str(probs))
+                plan = layer / "Funding Plan.md"
+                plan.write_text("---\ntype: fundraising-plan\ntitle: Funding Plan\n---\n# Funding Plan\n\n## §0 Ledger\n\n<!-- ledger:begin -->\nold\n<!-- ledger:end -->\n\nmy decisions\n", encoding="utf-8")
+                run(A["render"], "--quiet")
+                pt = plan.read_text(encoding="utf-8")
+                tb = run("ledger.py", "table", "ledger").stdout
+                check(f"{tag}: the Funding Plan's §0 is refreshed between markers from `ledger.py table ledger` and the rest is untouched",
+                      "old" not in pt and tb.strip().splitlines()[0] in pt and pt.endswith("my decisions\n") and tb.count("\n") > 20, pt[:300])
+            # standard layout, KPI, Lessons, Dashboard; second render byte-identical
+            names = {p.name for p in layer.iterdir()}
+            std = {f"{A['label']} Dashboard.md", f"{A['label']} KPI.md", f"{A['label']} Lessons.md", "pipeline.json", "profile", "reports"}
+            check(f"{tag}: the standard top-level set is present", std <= names, str(sorted(names)))
+            kpi = (layer / f"{A['label']} KPI.md").read_text(encoding="utf-8")
+            check(f"{tag}: the KPI note shows counts and a rate only at n ≥ 20", "n ≥ 20" in kpi or "20" in kpi, kpi[:200])
+            h1 = _hl.md5(pipe.read_bytes()).hexdigest()
+            r = run(A["render"], "--quiet")
+            check(f"{tag}: a second render is byte-identical", r.returncode == 0 and _hl.md5(pipe.read_bytes()).hexdigest() == h1, r.stderr[-200:])
+            keep_pipeline(agent, pipe)
+            # R6: an edited dashboard is kept, the fresh render lands beside it
+            dash = layer / f"{A['label']} Dashboard.md"
+            dash.write_text(dash.read_text(encoding="utf-8") + "\nmy own line\n", encoding="utf-8")
+            if agent == "fundraising":
+                run("ledger.py", "set-tier", "harbor-capital", "--tier", "2", "--fit", "77", "--why", "sim")
+            run(A["render"], "--quiet")
+            check(f"{tag}: R6 keeps the edited dashboard (the fresh render beside it as .new.md)",
+                  "my own line" in dash.read_text(encoding="utf-8"))
+            # a renamed + hidden stage still renders and counts
+            f0 = A["funnels"][0]
+            sids = [s["id"] for s in doc["funnels"][0]["stages"] if s["role"] == "open"]
+            hide = sids[1] if len(sids) > 1 else sids[0]
+            (prof / "stages.json").write_text(_js.dumps({"schema": "sbl-stages/1", "funnels": {f0: {sids[0]: {"label": "Renamed"}, hide: {"hidden": True}}}}), encoding="utf-8")
+            r = run(A["render"], "--quiet")
+            doc2 = _js.loads(pipe.read_text(encoding="utf-8"))
+            st2 = {s["id"]: s for s in doc2["funnels"][0]["stages"]}
+            n_before = sum(1 for it in doc["items"] if it["funnel"] == f0)
+            n_after = sum(1 for it in doc2["items"] if it["funnel"] == f0)
+            check(f"{tag}: a renamed + hidden stage profile still renders (label kept id, hidden collapsed and off the floor, items counted)",
+                  r.returncode == 0 and st2[sids[0]]["label"] == "Renamed" and st2[hide].get("collapsed") is True
+                  and not any(hide in g["stages"] for g in doc2["floor"] if g.get("funnel") == f0) and n_after == n_before
+                  and run("pipeline_doc.py", "check", str(pipe)).returncode == 0, f"{r.stderr[-200:]} {n_before}/{n_after}")
+            (prof / "stages.json").unlink()
+            # kpi + optimize over the sim: deterministic; proposals only with evidence; never a cap
+            evs = state / "events.jsonl"
+            k1 = run("kpi.py", "--pipeline", str(pipe), "--events", str(evs), "--json", "--today", today).stdout
+            k2 = run("kpi.py", "--pipeline", str(pipe), "--events", str(evs), "--json", "--today", today).stdout
+            check(f"{tag}: kpi.py is deterministic on the sim", k1 and k1 == k2)
+            sig = ",".join((_js.loads((root / "studio.json").read_text(encoding="utf-8")).get("optimize") or {}).get("signals") or ["kind"])
+            o1 = run("optimize.py", "propose", "--pipeline", str(pipe), "--events", str(evs), "--signals", sig, "--today", today, "--json").stdout
+            o2 = run("optimize.py", "propose", "--pipeline", str(pipe), "--events", str(evs), "--signals", sig, "--today", today, "--json").stdout
+            props = _js.loads(o1 or "[]")
+            check(f"{tag}: optimize.py is deterministic and every re-weight proposal has n ≥ 20", o1 == o2 and all(p.get("n", 0) >= 20 for p in props if p["kind"] == "reweight"), str(props)[:200])
+            # --refresh byte-stability: the engine's own refresh never touches the agent's layer
+            if agent in ("fundraising", "sales"):
+                ada = FIXTURES / "personal" / "ada" / "linkedin"
+                AB = d / agent / "ada"
+                rb = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"), str(ada), "-o", str(AB)], capture_output=True, text=True)
+                if rb.returncode == 0:
+                    _sh.copytree(layer, AB / A["layer"], dirs_exist_ok=True)
+                    _sh.copytree(state, AB / ".plugins" / agent, dirs_exist_ok=True)
+                    before = {p.relative_to(AB).as_posix(): _hl.md5(p.read_bytes()).hexdigest() for p in (AB / A["layer"]).rglob("*") if p.is_file()}
+                    rr = subprocess.run([sys.executable, str(SCRIPTS / "build_vault.py"), str(ada), "-o", str(AB), "--refresh"], capture_output=True, text=True)
+                    after = {p.relative_to(AB).as_posix(): _hl.md5(p.read_bytes()).hexdigest() for p in (AB / A["layer"]).rglob("*") if p.is_file()}
+                    check(f"{tag}: build_vault --refresh leaves the agent's layer byte-identical", rr.returncode == 0 and before == after, rr.stderr[-200:])
 
 
 def test_dev_tools():
@@ -4197,6 +4670,8 @@ def main():
     test_plugins()
     test_travel_plugin()
     test_harness()
+    test_agent_platform()
+    test_agent_dailies()
     test_dev_tools()
     test_docs_sources()
     test_docs_connector()

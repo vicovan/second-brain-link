@@ -1,15 +1,243 @@
 {
+  "schema": "sbl-agent/1",
   "id": "job-search",
   "label": "Jobs Agent",
   "blurb": "Sweeps open ATS boards against your criteria, tailors a CV per role, and fills the application.",
   "icon": "briefcase",
+  "color": "#3e6ae1",
   "grounding": "studio/grounding.md",
   "entrySkill": "job-pipeline",
+  "subjects": [
+    "personal"
+  ],
+  "providers": [
+    "claudecode"
+  ],
+  "network": {
+    "declared": true,
+    "what": "public job boards and company careers pages (never a login); Chrome for application forms"
+  },
   "layer": "45-jobs",
+  "layout": {
+    "dashboard": "Job Dashboard.md",
+    "kpi": "Job KPI.md",
+    "lessons": "Job Lessons.md",
+    "profile": "profile",
+    "reports": "reports",
+    "items": {
+      "postings": "applications"
+    },
+    "work": {
+      "applications": "applications"
+    },
+    "extras": []
+  },
   "homeNote": "45-jobs/reports/Shortlist {date}.md",
   "homeNoteFallback": "45-jobs/Job Dashboard.md",
+  "daily": {
+    "note": "Shortlist {date}",
+    "weekly": "Job review {date}",
+    "steps": [
+      "discover",
+      "screen",
+      "shortlist",
+      "cv",
+      "apply",
+      "outcomes"
+    ],
+    "sections": [
+      "Shortlist",
+      "Applications today",
+      "Needs you",
+      "Explored today"
+    ],
+    "settings": "45-jobs/profile/application-answers.md"
+  },
   "watchGlob": "45-jobs/**",
   "pipeline": "45-jobs/pipeline.json",
+  "render": {
+    "cmd": "render_brain.py --quiet"
+  },
+  "canvas": "lines",
+  "funnels": [
+    {
+      "id": "postings",
+      "label": "Postings",
+      "item": "posting",
+      "success": "interview",
+      "stages": [
+        {
+          "id": "shortlist",
+          "label": "Shortlist",
+          "role": "open"
+        },
+        {
+          "id": "prepared",
+          "label": "Prepared",
+          "role": "open"
+        },
+        {
+          "id": "applied",
+          "label": "Applied",
+          "role": "open",
+          "gate": "confirm"
+        },
+        {
+          "id": "handoff",
+          "label": "Hand-off",
+          "role": "open"
+        },
+        {
+          "id": "screen",
+          "label": "Screen",
+          "role": "open"
+        },
+        {
+          "id": "interview",
+          "label": "Interview",
+          "role": "open"
+        },
+        {
+          "id": "offer",
+          "label": "Offer",
+          "role": "positive",
+          "gate": "reason"
+        },
+        {
+          "id": "rejected",
+          "label": "Rejected",
+          "role": "negative",
+          "gate": "reason"
+        },
+        {
+          "id": "seen",
+          "label": "Seen",
+          "role": "parked"
+        },
+        {
+          "id": "out",
+          "label": "Out",
+          "role": "parked",
+          "gate": "reason"
+        },
+        {
+          "id": "prior",
+          "label": "Applied myself",
+          "role": "parked"
+        }
+      ]
+    }
+  ],
+  "floor": [
+    {
+      "id": "shortlist",
+      "label": "Shortlist",
+      "stages": [
+        "shortlist"
+      ]
+    },
+    {
+      "id": "prepared",
+      "label": "Prepared",
+      "stages": [
+        "prepared"
+      ]
+    },
+    {
+      "id": "applied",
+      "label": "Applied",
+      "stages": [
+        "applied"
+      ]
+    },
+    {
+      "id": "handoff",
+      "label": "Hand-off",
+      "stages": [
+        "handoff"
+      ]
+    },
+    {
+      "id": "screen",
+      "label": "Screen",
+      "stages": [
+        "screen"
+      ]
+    },
+    {
+      "id": "interview",
+      "label": "Interview",
+      "stages": [
+        "interview"
+      ]
+    },
+    {
+      "id": "offer",
+      "label": "Offer",
+      "stages": [
+        "offer"
+      ]
+    }
+  ],
+  "goals": [
+    {
+      "template": "Get hired",
+      "metric": "interviews",
+      "target": 3
+    }
+  ],
+  "outcomes": {
+    "interviews": {
+      "label": "interviews",
+      "cmd": "learn.py count interviews"
+    },
+    "screens": {
+      "label": "screens or better",
+      "cmd": "learn.py count screens"
+    },
+    "offers": {
+      "label": "offers",
+      "cmd": "learn.py count offers"
+    },
+    "applied": {
+      "label": "applications sent",
+      "cmd": "learn.py count applied"
+    }
+  },
+  "throughput": {
+    "label": "applications / day",
+    "cmd": "learn.py count applications --days 1"
+  },
+  "routines": [
+    {
+      "template": "Daily job scout",
+      "kind": "daily"
+    },
+    {
+      "template": "Weekly job review",
+      "kind": "weekly"
+    }
+  ],
+  "optimize": {
+    "sources": "profile/sources.md",
+    "scoring": "profile/scoring.md",
+    "signals": [
+      "portal",
+      "archetype",
+      "market",
+      "source"
+    ],
+    "explore": 0.2
+  },
+  "concurrency": {
+    "weight": "heavy",
+    "browser": true,
+    "parallel_items": 2
+  },
+  "inspector": {
+    "posting": "job"
+  },
+  "persona": "career-coach",
   "tools": [
     "Skill",
     "Agent",
@@ -20,54 +248,11 @@
     "profile": "45-jobs/profile/profile.md",
     "onboardSkill": "job-onboarding"
   },
-  "providers": [
-    "claudecode"
+  "preflight": [
+    "profile_present",
+    "chrome_connected"
   ],
-  "subjects": [
-    "personal"
-  ],
-  "color": "#3e6ae1",
-  "suggestions": [
-    {
-      "t": "Set me up",
-      "stage": "setup",
-      "short": "Build my job profile from this brain and my CV; ask me only what it cannot find.",
-      "q": "Set up or update my job-search profile. Pull whatever you can from this brain and my CV first, then ask me only what you genuinely cannot find: target roles, geography, compensation floor, hard exclusions and my settled application answers."
-    },
-    {
-      "t": "Run today's job search",
-      "stage": "do",
-      "short": "Sweep the open boards, score against my rubric, hand me today’s ranked shortlist.",
-      "q": "Launch a job search: sweep the open ATS boards against my criteria, score everything against my rubric, drop what I can't actually apply to, and give me today's ranked shortlist with comp and the apply route for each."
-    },
-    {
-      "t": "Tailor my CV for a job",
-      "stage": "do",
-      "short": "Paste a posting next; I build the ATS-first Markdown and PDF from my profile, every claim true.",
-      "q": "Tailor my CV for a specific job description and build the PDF. I'll paste the job description or the posting URL next — mirror the title, lead with the keywords that matter, and keep every claim true to my profile."
-    },
-    {
-      "t": "Apply to a shortlisted role",
-      "stage": "do",
-      "when": "has-work",
-      "short": "Fill the employer’s own form from my profile and verify every field; submit or stop at the gate, per my setting.",
-      "q": "Apply to a role from the shortlist: resolve it to the employer's own ATS form, open it in my browser, fill every field from my profile and answers, verify each one in the DOM, then finish the way my autonomy setting says — submit it, or show me a short review and wait."
-    },
-    {
-      "t": "How is the pipeline doing?",
-      "stage": "track",
-      "when": "has-work",
-      "short": "Interview rate by archetype, portal and score band — and what the outcomes say to change.",
-      "q": "Show me the KPI: interview rate by archetype, score band and portal, what the gates stopped and why, today's valid applications against my daily target, and what the outcomes so far say I should change."
-    },
-    {
-      "t": "Record a reply",
-      "stage": "track",
-      "when": "has-work",
-      "short": "Paste the email; I log it against the application and prep me if it is a screen or interview.",
-      "q": "I heard back on an application. I'll paste the email or tell you what happened — log it against the right application, and if it's a screen or interview, prep me from that role's fit file and my stories."
-    }
-  ],
+  "templates": "harness",
   "settings": {
     "title": "Jobs Agent settings",
     "blurb": "The agent reads these when it tailors a CV. They live in this brain, in 45-jobs/profile; nothing is uploaded anywhere.",
@@ -291,25 +476,83 @@
           "hint": "Drop a head-and-shoulders photo here or upload one. JPG, PNG or WebP; Studio shrinks it and removes location data."
         }
       ]
-    }
-  },
-  "templates": "harness",
-  "outcomes": {
-    "interviews": {
-      "label": "interviews",
-      "cmd": "learn.py count interviews"
     },
-    "screens": {
-      "label": "screens or better",
-      "cmd": "learn.py count screens"
-    },
-    "offers": {
-      "label": "offers",
-      "cmd": "learn.py count offers"
-    }
+    "daily": true
   },
-  "preflight": [
-    "profile_present",
-    "chrome_connected"
+  "suggestions": [
+    {
+      "t": "Set me up",
+      "stage": "setup",
+      "short": "Build my job profile from this brain and my CV; ask me only what it cannot find.",
+      "q": "Set up or update my job-search profile. Pull whatever you can from this brain and my CV first, then ask me only what you genuinely cannot find: target roles, geography, compensation floor, hard exclusions and my settled application answers."
+    },
+    {
+      "t": "Run today's job search",
+      "stage": "do",
+      "short": "Sweep the open boards, score against my rubric, hand me today’s ranked shortlist.",
+      "q": "Launch a job search: sweep the open ATS boards against my criteria, score everything against my rubric, drop what I can't actually apply to, and give me today's ranked shortlist with comp and the apply route for each."
+    },
+    {
+      "t": "Today's new roles",
+      "stage": "today",
+      "when": "onboarded",
+      "short": "Only what is new since my last run, scored against my rubric, added to today's Shortlist note.",
+      "q": "Show me today's new roles: run discover and screen for roles that are new since my last run, add the ones above my floor to today's Shortlist note, and tell me which knock-out removed the rest."
+    },
+    {
+      "t": "Tailor CVs for today's shortlist",
+      "stage": "today",
+      "when": "has-work",
+      "short": "A tailored CV for each role on today's shortlist, every claim from my profile.",
+      "q": "Tailor a CV for each role on today's shortlist that does not have one yet — ATS-first Markdown and PDF from my profile, every claim true — and list them in today's note."
+    },
+    {
+      "t": "Apply to today's shortlist",
+      "stage": "today",
+      "when": "has-work",
+      "short": "Each role's own form in my browser, verified field by field — submit or stop at my gate.",
+      "q": "Apply to today's shortlist, one role at a time: open the employer's own form in my browser, fill it from my profile, verify every field, then submit or stop at my gate per my level. Log each one."
+    },
+    {
+      "t": "Follow-ups due today",
+      "stage": "today",
+      "when": "has-work",
+      "short": "Applications that went quiet and replies waiting — a short draft for each. I send.",
+      "q": "What follow-ups are due today? List applications that went quiet past my follow-up window and replies I have not answered, and draft a short follow-up for each. Drafts only."
+    },
+    {
+      "t": "Tailor my CV for a job",
+      "stage": "do",
+      "short": "Paste a posting next; I build the ATS-first Markdown and PDF from my profile, every claim true.",
+      "q": "Tailor my CV for a specific job description and build the PDF. I'll paste the job description or the posting URL next — mirror the title, lead with the keywords that matter, and keep every claim true to my profile."
+    },
+    {
+      "t": "Apply to a shortlisted role",
+      "stage": "do",
+      "when": "has-work",
+      "short": "Fill the employer’s own form from my profile and verify every field; submit or stop at the gate, per my setting.",
+      "q": "Apply to a role from the shortlist: resolve it to the employer's own ATS form, open it in my browser, fill every field from my profile and answers, verify each one in the DOM, then finish the way my autonomy setting says — submit it, or show me a short review and wait."
+    },
+    {
+      "t": "How is the pipeline doing?",
+      "stage": "track",
+      "when": "has-work",
+      "short": "Interview rate by archetype, portal and score band — and what the outcomes say to change.",
+      "q": "Show me the KPI: interview rate by archetype, score band and portal, what the gates stopped and why, today's valid applications against my daily target, and what the outcomes so far say I should change."
+    },
+    {
+      "t": "Record a reply",
+      "stage": "track",
+      "when": "has-work",
+      "short": "Paste the email; I log it against the application and prep me if it is a screen or interview.",
+      "q": "I heard back on an application. I'll paste the email or tell you what happened — log it against the right application, and if it's a screen or interview, prep me from that role's fit file and my stories."
+    },
+    {
+      "t": "Weekly job review",
+      "stage": "track",
+      "when": "has-work",
+      "short": "What converted, what didn't, and the changes I'd make to sources and scoring — you decide.",
+      "q": "Run my weekly job review: interview rate by source, archetype and score band from real outcomes, then propose changes to my sources and scoring for me to approve. Caps and gates never loosen."
+    }
   ]
 }

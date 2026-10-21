@@ -12,6 +12,8 @@ description: Run a raise from your own profile — screen funds and programs aga
 **Nothing about any founder or company is in this skill.** Facts, the round and the filter chain
 live in `<surface>/46-fundraising/profile/`, which `references/raise-onboarding.md` writes with you.
 
+
+Every run starts with `python3 scripts/daily.py start --agent fundraising` (the dated daily note first) and ends with `scripts/daily.py close --report report.json` (the report, twice); Mondays run `scripts/kpi.py` → `scripts/optimize.py`.
 ## What differs from the Claude packaging — read this first
 
 Codex has no browser-automation tools, so **this packaging does not fill application forms.** It

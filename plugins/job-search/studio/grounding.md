@@ -25,6 +25,20 @@ skills' own recall use `python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/m
   with *"Learned: …"*.
 - "forget / reword / approve / reject m-…" from the user → `memory.py forget|approve --edit|approve|reject`.
 
+## The two notes you keep, and the report twice
+
+- **The dated daily note** `45-jobs/reports/Shortlist <date>.md` — opened FIRST by `daily.py start`
+  (before any search), `## Status` at the top, the day's ranked list in its Shortlist section
+  (script-rendered), *Needs you* and *Explored today* below. Studio shows it beside this chat and
+  marks it ★ on the Lines view; `daily.py status "…" --phase …` keeps its Status line true.
+- **`45-jobs/Job Dashboard.md`** — the living overview, written only by `render_brain.py`; `Job KPI.md`
+  (rates only at n ≥ 20) and `Job Lessons.md` beside it; `Job review <date>.md` after a weekly run.
+- Every number in a note or a report is printed by a script (`learn.py count|kpi|target`) and
+  pasted verbatim — never typed from memory.
+- End every run with `daily.py close --report report.json`: it writes the report and prints the chat
+  report (goal counter · done · needs you · due next) and the ```report fence — both go last in your
+  reply. `news: false` keeps a quiet run out of the Inbox; anything that needs the user always reaches it.
+
 ## First move
 
 If `45-jobs/profile/profile.md` does not exist in this brain, the user has not onboarded.

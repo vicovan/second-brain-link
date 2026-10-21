@@ -18,6 +18,9 @@ defence, not permission.
     learn.py add-lesson "text" [--tag pace]
     learn.py show [--trip <id>]
     learn.py kpi
+    learn.py went|loved|not-for-me|save --pick <id> [--note "…"]     the picks funnel (today.py)
+    learn.py count went|loved|saved|picks|planned|booked [--days N]   one number for a goal / the throughput
+    learn.py picks [--date D] [--json]                                the day's picks with their status
 """
 import argparse, contextlib, datetime, json, os, sys
 import pathlib as _pl
@@ -56,6 +59,62 @@ def _memory(kind, source, text, tags=(), evidence=None):
 
 OUTCOMES = ROOT / "outcomes.jsonl"
 LESSONS = ROOT / "lessons.md"
+
+
+# ------------------------------------------------------------------ the picks funnel (today.py's ledger)
+def _picks_ledger():
+    import today as T  # noqa: PLC0415
+    return T.ledger()
+
+
+def pick_move(pick_id, to, note="", by="user"):
+    """suggested → saved → went → loved / not_for_me; expired → saved (one writer, the shared lock)."""
+    L = _picks_ledger()
+    rows = L.load()
+    rec = next((r for r in rows if r.get("id") == pick_id), None)
+    if not rec:
+        raise SystemExit(f"no pick {pick_id}")
+    if rec.get("status") == "suggested" and to == "loved":
+        L.transition(rec, "went", by, note)
+    try:
+        L.transition(rec, to, by, note)          # appends the event under the lock
+    except ValueError as e:
+        raise SystemExit(str(e))
+    L.save(rows)                                 # the one writer, under the same lock (released between)
+    if to in ("went", "loved", "not_for_me"):
+        what = rec.get("name") or pick_id
+        _memory("lesson", "outcome", {"went": f"Went to {what} ({rec.get('kind')}, {rec.get('city')})",
+                                       "loved": f"Loved {what} ({rec.get('kind')}, {rec.get('city')}) — more like this.",
+                                       "not_for_me": f"{what} ({rec.get('kind')}, {rec.get('city')}) was not for me — avoid places like this."}[to]
+                + (f": \"{note.strip()[:200]}\"" if note else ""), ["taste", rec.get("slot") or ""], evidence=f"learn.py {to}|{pick_id}")
+    try:
+        import today as T  # noqa: PLC0415
+        T.snapshot(rec.get("date"))
+    except Exception:  # noqa: BLE001
+        pass
+    return rec
+
+
+def count(what, days=None):
+    """One number: picks (went / loved / saved / all) or trips (planned / booked) - outcomes, not activity."""
+    if what in ("planned", "booked"):
+        import itinerary as itin  # noqa: PLC0415
+        want = {"planned": ("planned", "shopped", "booked", "done"), "booked": ("booked", "done")}[what]
+        n = 0
+        for t in itin.list_trips():
+            try:
+                if itin.load(t).get("status") in want:
+                    n += 1
+            except (itin.ItineraryError, ValueError):
+                continue
+        return n
+    rows = _picks_ledger().load()
+    if days is not None:
+        cut = (datetime.date.today() - datetime.timedelta(days=max(0, int(days) - 1))).isoformat()
+        rows = [r for r in rows if str(r.get("updated") or r.get("date") or "")[:10] >= cut]
+    sts = {"went": ("went", "loved"), "loved": ("loved",), "saved": ("saved",), "picks": tuple(_picks_ledger().transitions),
+           "not_for_me": ("not_for_me",)}[what]
+    return sum(1 for r in rows if r.get("status") in sts)
 
 
 @contextlib.contextmanager
@@ -122,7 +181,25 @@ def main():
     s = sub.add_parser("add-lesson"); s.add_argument("text"); s.add_argument("--tag", default="")
     s = sub.add_parser("show"); s.add_argument("--trip")
     sub.add_parser("kpi")
+    for name in ("went", "loved", "not-for-me", "save"):
+        s = sub.add_parser(name); s.add_argument("--pick", required=True); s.add_argument("--note", default="")
+    s = sub.add_parser("count"); s.add_argument("what", choices=["went", "loved", "saved", "picks", "not_for_me", "planned", "booked"])
+    s.add_argument("--days", type=int)
+    s = sub.add_parser("picks"); s.add_argument("--date"); s.add_argument("--json", action="store_true")
     a = ap.parse_args()
+    if a.cmd in ("went", "loved", "not-for-me", "save"):
+        to = {"went": "went", "loved": "loved", "not-for-me": "not_for_me", "save": "saved"}[a.cmd]
+        rec = pick_move(a.pick, to, a.note)
+        print(json.dumps({"id": rec["id"], "name": rec.get("name"), "status": rec["status"]}, ensure_ascii=False))
+        return 0
+    if a.cmd == "count":
+        print(count(a.what, a.days))
+        return 0
+    if a.cmd == "picks":
+        import today as T  # noqa: PLC0415
+        rows = T.picks_for(a.date)
+        print(json.dumps(rows, ensure_ascii=False) if a.json else T.table(a.date), end="" if not a.json else "\n")
+        return 0
     if a.cmd == "log":
         print(json.dumps(upsert({"trip_id": a.trip, "kind": a.kind, "ref": a.ref,
                                  "note": a.note, "at": now()}), ensure_ascii=False))

@@ -19,8 +19,8 @@ account's evidence - a sequence holds the plan, never a mail-merge template.
 
 State is the ledger: `sequence_started`, `sent` (with `step`), `connected`, and the stop events.
 A contact's sequence stops on a reply, a bounce, an unsubscribe, a booked meeting, `stopped`,
-or when the account leaves the working stages (replied / meeting / opportunity / won / lost /
-parked).
+or when the account leaves the working stages (replied / meeting / trial / won / lost /
+nurture).
 
     sequence.py seed                     copy the shipped templates into the layer (never overwrites)
     sequence.py list [--json]
@@ -37,7 +37,7 @@ import sales_profile as prof  # noqa: E402
 from paths import render_dir, plugin_root  # noqa: E402
 
 SOCIAL = ("linkedin_invite", "linkedin_dm", "x_dm", "whatsapp")
-WORKING = ("target", "sequenced")
+WORKING = ("researched", "sequenced", "contacted")
 
 
 def seq_dir():
@@ -227,7 +227,7 @@ def main(argv=None):
             return 1
         ledger.log("sequence_started", account=x["key"], sequence=seq["name"], contacts=a.contacts)
         x["sequence"] = seq["name"]
-        if x.get("stage") in ("lead", "target"):
+        if x.get("stage") in ("lead", "researched"):
             ledger.set_stage(acc, x, "sequenced", "agent", f"sequence {seq['name']}")
         ledger.save_accounts(acc)
         print(f"{x['name']}: started {seq['name']}")

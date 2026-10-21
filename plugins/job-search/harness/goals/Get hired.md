@@ -13,6 +13,7 @@ by:
 status: active
 routines:
   - "[[Daily job scout]]"
+  - "[[Weekly job review]]"
 stop_when_overdue: false
 stop_after_runs: 0
 ---

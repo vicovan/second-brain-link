@@ -7,7 +7,7 @@ tags:
 id: routine-work-my-replies
 agent: sales
 skill: sales-reply
-goal: "[[Book sales meetings]]"
+goal: "[[Start trials]]"
 schedule: WEEKDAYS 11:00
 only_when:
   - "cmd: ledger.py count sent --days 30 | gt 0"

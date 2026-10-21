@@ -1,6 +1,6 @@
 ---
 name: raise-pipeline
-description: Run the founder's raise end to end — onboard if needed, research and verify targets, write the Funding Plan, apply to the week's programs and draft the week's investor emails, then track replies, follow-ups and deadlines — holding whatever gates the founder's autonomy setting calls for. Use for "run my raise", "build my funding plan", "what's due", "record a reply", the weekly fundraising run, or any fundraising request where the right skill is not obvious.
+description: Run the founder's raise end to end — onboard if needed, then the daily raise (new programs and investors found and screened, today's note opened first, applications filed and investor angles drafted within the autonomy level, follow-ups due, threads worth a comment) and the weekly update (KPIs, the optimizer, stale claims re-verified, the Funding Plan rebuilt) — holding whatever gates the founder's setting calls for. Use for "run my raise", "run today's raise", "build my funding plan", "what's due", "record a reply", the daily or weekly fundraising routine, or any fundraising request where the right skill is not obvious.
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch, Skill, Agent, TodoWrite, mcp__claude-in-chrome__*
 ---
 
@@ -16,6 +16,47 @@ Follow `memory-protocol.md` (in `skills/raise-apply/references/`). Tool:
 
 
 The orchestrator. It **owns no logic of its own** — it sequences the other five and holds the gates.
+The daily is the Jobs loop over two item kinds — **programs** (accelerators, fellowships, grants,
+pitch forms) and **investors** (funds, angels, strategics, syndicates) — in the founder's own words:
+*what programs to find new daily, apply on each in Chrome, and what angles to email.*
+
+## The shape of every run — the shared runner (`daily.py`)
+
+`S=${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts`. Eleven steps, every day; the scripts
+guarantee the shape, this file the words:
+
+```bash
+python3 $S/daily.py start --agent fundraising --routine "Daily raise"     # 0-3: preflight · memory recall · orient (stats, due, counters, goal pace) · OPEN THE DATED NOTE
+```
+
+It prints the goal lines with their pace (*investor meetings 3 of 5 · on pace* · *acceptances 0 of 1*),
+the `=== LAST REPORT ===` block (pick those up first), what memory says, and the note it opened:
+**`46-fundraising/reports/Raise today <date>.md`** — `## Status` first, then *New today · Due ·
+Angles today · Threads worth a comment · Needs you · Explored today*. That note is the home Studio
+shows beside this chat for the whole run.
+
+| Step | Programs | Investors | Mark it |
+|---|---|---|---|
+| 4 discover | new doors: the brain first (`_correlations` ties to alumni and partners, `10-people`), then the proven program sources in `profile/sources.md`, then today's explore slice — `python3 $S/daily.py explore --agent fundraising` names it (directories, cohort calendars, public lists the founder pasted) | new targets from thesis / portfolio signals, recent announcements, warm paths through the brain | `daily.py status "found N programs, M investors" --phase discovering` |
+| 5 screen + score | `raise-research`: the filter chain (`round.md`, cheapest first) → desk-screen 📋 → verify survivors on their own site ✅ within `max_research_agents` | the same chain, the tier, and **the angle**: which verified claim + recent signal makes this fund the right door this week (`ledger.py set-claim`, `set-tier`; the angle in the record's `angle`) | `--phase screening` |
+| 6 the note | `python3 $S/ledger.py table shortlist | python3 $S/daily.py section "New today" --agent fundraising --file -` (why it fits · deadline · access route · apply route); `ledger.py due --days 14` into *Due*; the angles into *Angles today* (angle + draft link) | same note | `--phase shortlisting` |
+| 7 act | `raise-apply` per `level:` in the founder's Chrome — find the real form, draft every answer within limits, lint against the facts file, fill, verify the DOM, **submit per level** (supervised: the approval card); never an account, never a credential | `raise-outreach`: one draft per angle (email / intro request / pitch-form note), linted, saved (+ Gmail draft when the tool exists). **Never sent.** `contacted` only when the founder says "I sent it" | `--phase acting` after each |
+| 7b secondary | follow-ups due (`raise-outreach` drafts), `raise-engage` threads (≤ `max_per_run`, drafts only) into *Threads worth a comment* | same | — |
+| 8 log | `ledger.py` events: `log-app`, `log-draft`, `next`, `log-outcome` — every outcome with the sentence that decided it | same | — |
+| 9 render | `render_brain.py --quiet` after every change (status calls render too, debounced) | | `--phase rendering` |
+| 10 reflect | the memory block above (≤ 3 inferred lessons) | | `--phase reflecting` |
+| 11 handoff | `report.json` → `python3 $S/daily.py close --agent fundraising --report report.json`; paste what it prints LAST in your reply: the chat report (goal counters · done · needs you · due next with dates), then the ```report fence | | — |
+
+Record what an explored source produced: `python3 $S/explore.py record --sources 46-fundraising/profile/sources.md --source "<name>" --found N [--converted N]`.
+
+## The modes
+
+| Asked | Mode |
+|---|---|
+| the daily routine, "run today's raise", "run my raise" | **daily** — the table above |
+| the weekly routine (*Weekly raise update*), "how is it going" | **week** — `python3 $S/daily.py start --agent fundraising --routine "Weekly raise update" --mode week`, then `python3 $S/kpi.py --pipeline 46-fundraising/pipeline.json --events <state root>/events.jsonl --signals origin,kind,tier,channel,angle --md --label Fundraising`, `python3 $S/optimize.py apply --pipeline 46-fundraising/pipeline.json --events <state root>/events.jsonl --profile 46-fundraising/profile --contract ${CLAUDE_PLUGIN_ROOT}/studio.json --level <level> --review-out "46-fundraising/reports/Raise update <date>.md" --label Fundraising` (sources, tiers, angles, channels — applied at `autonomous`, one card at `supervised`; never a cap or a gate), re-verify every stale Tier 1–2 claim (`raise-research`), rebuild **`Funding Plan.md`** (`raise-plan`, the previous one archived), and complete the update note: *since last week* (`ledger.py since <date>`) · *deadlines 30 d* (`ledger.py due --days 30`) · *what I changed and why*. Close with `daily.py close`. |
+| "Build my funding plan" | research (rescreen → fan-out → verify → tier) → `raise-plan` → offer this week's actions |
+| "Screen this list" / "Apply to <program>" / "Draft this week's emails" / "Threads to comment on" / "I sent it" / "I posted" / "What's due?" / "Record a reply" | the rows below, unchanged |
 
 ```
 supervised:  profile → research → plan → [FOUNDER PICKS] → apply: [APPROVE ANSWERS] → [SUBMIT]
@@ -63,7 +104,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts/ledger.py due --days
 | "I posted the comment on t-…" (the ✓ button) | the founder's own confirmation → `threads.py posted <id>`, re-render, one line back |
 | "What's due?" | `ledger.py due`; draft the due follow-ups (`raise-outreach`); flag deadlines ≤ 7 days |
 | "Record a reply" / pasted email | the outcome flow below |
-| weekly run (the nudge) | due → re-verify stale dated claims on Tier 1–2 → rebuild the plan → report |
+| weekly run (the nudge) | the **week** mode above |
 
 ## The gates — how many is the founder's setting, never your call
 
@@ -91,11 +132,13 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts/ledger.py due --days
    ("cold forms to <kind> never answered — prefer warm intros there").
 7. `render_brain.py --quiet`; if the ledger changed materially, rebuild the plan.
 
-## The report — always this order
+## The report — always this order, and twice
 
-1. The number that matters: replies, meetings, acceptances since the last run.
-2. What needs the founder: gates waiting, facts missing, decisions from §3 of the plan, drafts to send.
+1. The goal counters: meetings, acceptances (and replies) — from `ledger.py count`, never typed.
+2. What needs the founder: gates waiting, facts missing, decisions from §3 of the plan, drafts to send, "I sent it" confirmations.
 3. What was done: applications filed, drafts written, targets verified, what the filter removed.
 4. What is due next, with dates.
 
-Keep the dashboard and the plan true throughout — `render_brain.py --quiet` after every status change.
+Then the ```report fence `daily.py close` prints (done with evidence · not done · next · needs you ·
+news). Keep the dashboard, the note and the plan true throughout — `render_brain.py --quiet` after
+every status change (the plan's §0 ledger table is refreshed between its markers by the render).

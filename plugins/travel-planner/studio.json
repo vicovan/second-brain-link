@@ -1,20 +1,290 @@
 {
+  "schema": "sbl-agent/1",
   "id": "travel-planner",
   "label": "Travel Agent",
-  "blurb": "Plans a trip from the places already in your brain, draws it on the Map, and shops it on public sites — stopover nights included. Books nothing.",
+  "blurb": "Plans a trip from the places already in your brain, draws it on the Map, shops it on public sites — and every day finds what to try near where you are, from your own saved and loved places first. Books nothing; never reads the device's location.",
   "icon": "plane",
+  "color": "#8e44c9",
   "grounding": "studio/grounding.md",
   "entrySkill": "trip-pipeline",
+  "subjects": [
+    "personal"
+  ],
+  "providers": [
+    "claudecode"
+  ],
+  "network": {
+    "declared": true,
+    "what": "public travel and venue sites in the user's own browser (prices and opening hours stamped when seen); never the device's location; books nothing"
+  },
   "layer": "47-travel",
-  "homeNote": "47-travel/Travel Dashboard.md",
+  "layout": {
+    "dashboard": "Travel Dashboard.md",
+    "kpi": "Travel KPI.md",
+    "lessons": "Travel Lessons.md",
+    "profile": "profile",
+    "reports": "reports",
+    "items": {
+      "trips": "trips",
+      "picks": "picks"
+    },
+    "work": {
+      "trips": "trips",
+      "picks": "picks"
+    },
+    "extras": [
+      "Trip Ideas.md",
+      "Places I Love.md",
+      "Current Trip.geojson",
+      "All Trips.geojson",
+      "Suggestions.geojson",
+      "Today.geojson",
+      "suggestions",
+      "quotes"
+    ]
+  },
+  "homeNote": "47-travel/reports/Today near me {date}.md",
+  "homeNoteFallback": "47-travel/Travel Dashboard.md",
+  "daily": {
+    "note": "Today near me {date}",
+    "weekly": "Trip check {date}",
+    "steps": [
+      "here",
+      "discover",
+      "picks",
+      "events",
+      "trip"
+    ],
+    "sections": [
+      "Coffee",
+      "Food",
+      "Activity",
+      "Event",
+      "Social",
+      "Wildcard",
+      "This week's events",
+      "Trip day",
+      "Yesterday",
+      "Needs you",
+      "Explored today"
+    ],
+    "orient": [
+      "today.py here",
+      "itinerary.py count current",
+      "learn.py count went --days 7"
+    ],
+    "settings": "47-travel/profile/booking-answers.md"
+  },
   "watchGlob": "47-travel/**",
   "pipeline": "47-travel/pipeline.json",
-  "canvas": "map",
+  "render": {
+    "cmd": "render_brain.py --quiet"
+  },
+  "canvas": "lines",
   "canvasData": "47-travel/Current Trip.geojson",
   "canvasLayers": [
+    "47-travel/Today.geojson",
     "47-travel/Suggestions.geojson",
     "47-travel/All Trips.geojson"
   ],
+  "funnels": [
+    {
+      "id": "trips",
+      "label": "Trips",
+      "item": "trip",
+      "success": "booked",
+      "stages": [
+        {
+          "id": "idea",
+          "label": "Ideas",
+          "role": "open"
+        },
+        {
+          "id": "planned",
+          "label": "Planned",
+          "role": "open"
+        },
+        {
+          "id": "shopped",
+          "label": "Shopped",
+          "role": "open"
+        },
+        {
+          "id": "booked",
+          "label": "Booked",
+          "role": "positive",
+          "gate": "confirm"
+        },
+        {
+          "id": "done",
+          "label": "Done",
+          "role": "parked",
+          "gate": "confirm"
+        }
+      ]
+    },
+    {
+      "id": "picks",
+      "label": "Picks",
+      "item": "pick",
+      "success": "went",
+      "stages": [
+        {
+          "id": "suggested",
+          "label": "Suggested",
+          "role": "open"
+        },
+        {
+          "id": "saved",
+          "label": "Saved",
+          "role": "open"
+        },
+        {
+          "id": "went",
+          "label": "Went",
+          "role": "open"
+        },
+        {
+          "id": "loved",
+          "label": "Loved",
+          "role": "positive"
+        },
+        {
+          "id": "not_for_me",
+          "label": "Not for me",
+          "role": "negative"
+        },
+        {
+          "id": "expired",
+          "label": "Expired",
+          "role": "parked"
+        }
+      ]
+    }
+  ],
+  "floor": [
+    {
+      "id": "ideas",
+      "label": "Ideas",
+      "funnel": "trips",
+      "stages": [
+        "idea"
+      ]
+    },
+    {
+      "id": "planned",
+      "label": "Planned",
+      "funnel": "trips",
+      "stages": [
+        "planned"
+      ]
+    },
+    {
+      "id": "shopped",
+      "label": "Shopped",
+      "funnel": "trips",
+      "stages": [
+        "shopped"
+      ]
+    },
+    {
+      "id": "booked",
+      "label": "Booked",
+      "funnel": "trips",
+      "stages": [
+        "booked"
+      ]
+    },
+    {
+      "id": "today",
+      "label": "Today",
+      "funnel": "picks",
+      "stages": [
+        "suggested",
+        "saved"
+      ]
+    },
+    {
+      "id": "went",
+      "label": "Went",
+      "funnel": "picks",
+      "stages": [
+        "went"
+      ]
+    }
+  ],
+  "goals": [
+    {
+      "template": "Try my city",
+      "metric": "went",
+      "target": 8
+    },
+    {
+      "template": "Plan my next trip",
+      "metric": "planned",
+      "target": 1
+    }
+  ],
+  "outcomes": {
+    "went": {
+      "label": "places tried",
+      "cmd": "learn.py count went"
+    },
+    "loved": {
+      "label": "places loved",
+      "cmd": "learn.py count loved"
+    },
+    "planned": {
+      "label": "trips planned",
+      "cmd": "itinerary.py count planned"
+    },
+    "booked": {
+      "label": "trips booked",
+      "cmd": "itinerary.py count booked"
+    }
+  },
+  "throughput": {
+    "label": "places tried / week",
+    "cmd": "learn.py count went --days 7"
+  },
+  "routines": [
+    {
+      "template": "Today near me",
+      "kind": "daily"
+    },
+    {
+      "template": "This weekend",
+      "kind": "weekly"
+    },
+    {
+      "template": "Weekly trip check",
+      "kind": "weekly"
+    },
+    {
+      "template": "Trip ideas from my places",
+      "kind": "monthly"
+    }
+  ],
+  "optimize": {
+    "sources": "profile/sources.md",
+    "scoring": "profile/scoring.md",
+    "signals": [
+      "kind",
+      "slot",
+      "source"
+    ],
+    "explore": 0.2
+  },
+  "concurrency": {
+    "weight": "light",
+    "browser": true,
+    "parallel_items": 2
+  },
+  "inspector": {
+    "trip": "trip",
+    "pick": "place"
+  },
+  "persona": "travel-advisor",
   "tools": [
     "Skill",
     "Agent",
@@ -25,19 +295,60 @@
     "profile": "47-travel/profile/traveler.md",
     "onboardSkill": "travel-onboarding"
   },
-  "providers": [
-    "claudecode"
+  "preflight": [
+    "profile_present"
   ],
-  "subjects": [
-    "personal"
-  ],
-  "color": "#0f9d8a",
+  "templates": "harness",
+  "settings": {
+    "title": "Travel Agent settings",
+    "blurb": "The Travel Agent draws your trips on Studio's Map. The Map needs your own Google Maps key — it stays in this browser or app and goes only to Google to load map tiles, never your notes. Planning and every trip note work without it.",
+    "keys": [
+      {
+        "id": "mapsKey"
+      }
+    ],
+    "daily": true
+  },
   "suggestions": [
     {
       "t": "Set me up",
       "stage": "setup",
       "short": "Read my places first and propose my taste; ask only what the brain cannot know — airports, passports, companions, pace, budget.",
       "q": "Set up or update my travel profile. Read my places first — what I saved, rated and visited — propose my taste from them, and only ask me what the brain cannot tell you: home airports, citizenships, who I travel with, pace and budget."
+    },
+    {
+      "t": "What should I do today?",
+      "stage": "do",
+      "short": "Today's picks near where you are — your own saved and loved places first, then what's on this week.",
+      "q": "What should I do today? Build today's picks near where I am from my own saved and loved places first, then what's on this week, and show them on the map."
+    },
+    {
+      "t": "Coffee and food near me",
+      "stage": "today",
+      "when": "onboarded",
+      "short": "Cafés and places to eat near where I am today, my own saved and loved places first.",
+      "q": "Coffee and food near me today: where I am is my current trip stop, else my home city. Pick a café and a place to eat from my own saved and loved places first, then well-reviewed new ones, with why each fits me. Add them to today's note."
+    },
+    {
+      "t": "Something to do today",
+      "stage": "today",
+      "when": "onboarded",
+      "short": "One activity and one event on today or this week, near where I am.",
+      "q": "Something to do today near where I am: one activity and one event that is on today or this week, matched to what I liked before, with the time and a source for each. Add them to today's note."
+    },
+    {
+      "t": "Meet people today",
+      "stage": "today",
+      "when": "onboarded",
+      "short": "A social option today: a meetup, a class or a place where people like me go.",
+      "q": "Find me a social option today near where I am — a meetup, a class, a community event or a place where people with my interests go — and say why it fits. Add it to today's note."
+    },
+    {
+      "t": "Plan this weekend",
+      "stage": "today",
+      "when": "onboarded",
+      "short": "Two half-days near home from my places and what's on, as one short plan.",
+      "q": "Plan this weekend near where I am: two half-days built from my saved places and what's on, a walking route each, written as one short plan in my brain."
     },
     {
       "t": "Where should I go?",
@@ -77,29 +388,14 @@
       "when": "has-work",
       "short": "Cafés and restaurants near each day’s route that match the places I rated highly.",
       "q": "For the current trip, find cafés and restaurants that match my taste — the kinds of places I rated highly — near each day’s route. Keep my own saved places first and mark anything that is web only."
+    },
+    {
+      "t": "Weekly trip check",
+      "stage": "track",
+      "when": "has-work",
+      "short": "Which picks I went to and loved, and what I'd change in next week's mix — you decide.",
+      "q": "Run my weekly trip check: which picks I went to, loved or skipped, what is coming up on my trips, and what to change in next week's mix for me to approve."
     }
   ],
-  "settings": {
-    "title": "Travel Agent settings",
-    "blurb": "The Travel Agent draws your trips on Studio's Map. The Map needs your own Google Maps key — it stays in this browser or app and goes only to Google to load map tiles, never your notes. Planning and every trip note work without it.",
-    "keys": [
-      {
-        "id": "mapsKey"
-      }
-    ]
-  },
-  "templates": "harness",
-  "outcomes": {
-    "planned": {
-      "label": "trips planned",
-      "cmd": "itinerary.py count planned"
-    },
-    "booked": {
-      "label": "trips booked",
-      "cmd": "itinerary.py count booked"
-    }
-  },
-  "preflight": [
-    "profile_present"
-  ]
+  "mapAlternate": true
 }

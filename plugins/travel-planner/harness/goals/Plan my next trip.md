@@ -11,7 +11,9 @@ metric_label: trips planned
 target: 1
 by:
 status: active
-routines: []
+routines:
+  - "[[Trip ideas from my places]]"
+  - "[[Weekly trip check]]"
 stop_when_overdue: false
 stop_after_runs: 0
 ---

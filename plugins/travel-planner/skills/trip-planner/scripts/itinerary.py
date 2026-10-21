@@ -42,7 +42,9 @@ from paths import (trip_dir, trips_dir, state_root, surface_root, reference,  # 
 SCHEMA = "sbl-itinerary/1"
 MAP_SCHEMA = "sbl-map/1"
 ROLES = ("base", "stopover", "daytrip")
-STATUSES = ("draft", "shopped", "booked", "past")
+STATUSES = ("idea", "planned", "shopped", "booked", "done")
+# the ids trips used before the agent operating model: read mapped, `migrate` rewrites once
+LEGACY = {"draft": "planned", "past": "done"}
 STAY_STATUSES = ("candidate", "held", "booked")
 MODES = ("flight", "train", "car", "ferry", "bus")
 POI_KINDS = ("cafe", "restaurant", "bar", "museum", "tour", "viewpoint", "shop", "trail",
@@ -79,9 +81,33 @@ def path_of(trip_id, dest=None):
 def load(trip_id, dest=None):
     p = path_of(trip_id, dest)
     try:
-        return json.loads(p.read_text(encoding="utf-8"))
+        it = json.loads(p.read_text(encoding="utf-8"))
     except FileNotFoundError:
         raise ItineraryError(f"no trip {trip_id!r} at {p}")
+    if it.get("status") in LEGACY:            # an un-migrated file: the old id, mapped in memory
+        it["status"] = LEGACY[it["status"]]
+    return it
+
+
+def migrate(dest=None):
+    """Rewrite the old status ids in every trip's itinerary.json once (idempotent; a
+    `itinerary.json.pre-migrate` kept beside each changed file)."""
+    changed = []
+    for tid in list_trips(dest):
+        p = path_of(tid, dest)
+        try:
+            raw = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if raw.get("status") in LEGACY:
+            bak = p.with_name(p.name + ".pre-migrate")
+            if not bak.exists():
+                bak.write_bytes(p.read_bytes())
+            raw["status"] = LEGACY[raw["status"]]
+            raw["updated"] = now_iso()
+            _atomic_write(p, json.dumps(raw, ensure_ascii=False, indent=1) + "\n")
+            changed.append(tid)
+    return {"changed": len(changed), "trips": changed}
 
 
 def _atomic_write(p, text):
@@ -195,7 +221,7 @@ def new(trip_id, title, earliest=None, latest=None, nights=None, currency="EUR",
         budget=None, travelers=None, dest=None):
     if path_of(trip_id, dest).exists():
         raise ItineraryError(f"trip {trip_id!r} already exists")
-    it = {"schema": SCHEMA, "trip_id": trip_id, "title": title, "status": "draft",
+    it = {"schema": SCHEMA, "trip_id": trip_id, "title": title, "status": "planned",
           "created": now_iso(), "updated": now_iso(),
           "window": {"earliest": earliest or "", "latest": latest or "",
                      "nights": nights or 0, "flex_days": 0},
@@ -677,11 +703,13 @@ def main(argv=None):
     s.add_argument("--status", default="candidate"); s.add_argument("--source", default="")
     s.add_argument("--lat", type=float); s.add_argument("--lng", type=float)
     s = sub.add_parser("add-leg"); s.add_argument("trip"); s.add_argument("--json", required=True)
-    s = sub.add_parser("set-status"); s.add_argument("trip"); s.add_argument("status", choices=STATUSES)
+    s = sub.add_parser("set-status"); s.add_argument("trip"); s.add_argument("status", choices=STATUSES + tuple(LEGACY))
     for name in ("validate", "geojson", "activate", "show"):
         s = sub.add_parser(name); s.add_argument("trip")
     sub.add_parser("list")
-    s = sub.add_parser("count"); s.add_argument("what", choices=["planned", "booked", "taken"])
+    s = sub.add_parser("count"); s.add_argument("what", choices=["planned", "booked", "taken", "upcoming", "current"])
+    s.add_argument("--today", default="")
+    s = sub.add_parser("migrate")
     a = ap.parse_args(argv)
     try:
         if a.cmd == "new":
@@ -690,17 +718,33 @@ def main(argv=None):
             d = save(it, a.dest)
             print(d / "itinerary.json")
             return 0
+        if a.cmd == "migrate":
+            print(json.dumps(migrate(a.dest)))
+            return 0
         if a.cmd == "count":
-            # one number for a Harness goal: trips that reached a real stage, never drafts
-            want = {"planned": ("shopped", "booked", "past"), "booked": ("booked", "past"),
-                    "taken": ("past",)}[a.what]
+            # one number for a Harness goal: trips that reached a real stage (an itinerary on the
+            # map = planned), never ideas; `upcoming` / `current` read the stops' dates against --today
+            today = datetime.date.fromisoformat(a.today) if a.today else datetime.date.today()
+            want = {"planned": ("planned", "shopped", "booked", "done"), "booked": ("booked", "done"),
+                    "taken": ("done",), "upcoming": ("planned", "shopped", "booked"), "current": ("planned", "shopped", "booked")}[a.what]
             n = 0
             for t in list_trips(a.dest):
                 try:
-                    if load(t, a.dest).get("status") in want:
-                        n += 1
+                    it = load(t, a.dest)
                 except (ItineraryError, ValueError):
                     continue
+                if it.get("status") not in want:
+                    continue
+                if a.what in ("upcoming", "current"):
+                    starts = [_d(s.get("arrive")) for s in it.get("stops") or [] if _d(s.get("arrive"))]
+                    ends = [_d(s.get("depart")) for s in it.get("stops") or [] if _d(s.get("depart"))]
+                    if not starts:
+                        continue
+                    if a.what == "upcoming" and min(starts) < today:
+                        continue
+                    if a.what == "current" and not (min(starts) <= today <= (max(ends) if ends else min(starts))):
+                        continue
+                n += 1
             print(n)
             return 0
         if a.cmd == "list":
@@ -742,7 +786,7 @@ def main(argv=None):
                 else json.load(sys.stdin)
             add_leg(it, leg)
         elif a.cmd == "set-status":
-            it["status"] = a.status
+            it["status"] = LEGACY.get(a.status, a.status)
         # geojson (and every edit) - save re-projects map.geojson
         d = save(it, a.dest)
         if a.cmd in ("plan-days", "geojson"):

@@ -276,8 +276,9 @@ def main(argv=None):
         return 1
     ledger.log("sent", account=akey, contact=a.contact, channel=a.channel, batch=a.batch, step=a.step,
                message_id=a.message_id, evidence=a.evidence[:500], ts=now.replace(microsecond=0).isoformat())
-    if rec and rec.get("stage") in ("lead", "target"):
-        ledger.set_stage(acc, rec, "sequenced", "agent", "first step sent")
+    if rec and rec.get("stage") in ("lead", "researched", "sequenced"):
+        # the first real send is what makes an account `contacted` - the guard, never the model (R11)
+        ledger.set_stage(acc, rec, "contacted", "agent", "first step sent")
         ledger.save_accounts(acc)
     print(f"sent logged: {a.channel} → {a.contact} @ {rec.get('name') or a.account}")
     return 0

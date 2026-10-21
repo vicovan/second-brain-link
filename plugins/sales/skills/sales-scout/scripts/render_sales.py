@@ -6,14 +6,19 @@ render_sales.py - write the sales layer of the brain from the ledger. No network
 
 Writes, under <sales layer>/ (resolved per subject - never a hardcoded folder):
 
-    Pipeline.md              the home note: needs you · due today · booked · sent this week ·
-                             replies waiting · this week by origin · blocked, and why
-    pipeline.json            sbl-pipeline/1 - what Studio's Pipeline canvas draws (cards per
-                             stage, today's caps, the lead shortlist, the coverage table)
+    Sales Dashboard.md       the living overview (alias "Pipeline"): needs you · due today · booked ·
+                             sent this week · this week by origin · blocked, and why
+    Sales KPI.md             the accounts funnel: counts, conversions, rates at n >= 20 (kpi.py)
+    Sales Lessons.md         what the agent remembers (_memory/, inferred items flagged)
+    pipeline.json            sbl-pipeline/2 with the funnel + the floor (Studio's Runtime)
     accounts/<Name>.md       one note per worked account: why, the buying team with evidence,
                              each contact's sequence timeline, signals, the last events
-    leads/Leads <date>.md    the day's lead report: the one-line sweep summary, the coverage
-                             table, the shortlist, knock-outs and unreachable leads with reasons
+    reports/Sell today <date>.md   the dated daily note (alias "Leads <date>"): the sweep summary,
+                             the coverage table, the shortlist with strategy · angle · best channel.
+                             When daily.py opened it first, only its "New today" section is refreshed.
+    outreach/<date>/<key>/   every sent step (and every drafted one in a batch) as a note
+
+    render_sales.py --migrate-layout   Pipeline.md -> Sales Dashboard.md, leads/ -> reports/, old stage ids
 
 Everything is derived from accounts.jsonl + events.jsonl + the scout state, so a re-render
 with no new events is byte-identical. A note the user edited (its hash no longer matches the
@@ -27,9 +32,30 @@ import sales_profile as prof  # noqa: E402
 import scout  # noqa: E402
 import pipeline_doc as pdoc  # noqa: E402
 import sequence  # noqa: E402
+import kpi as KPIlib  # noqa: E402
+import stages as STG  # noqa: E402
+from ledger_base import Writer as _BaseWriter, replace_between  # noqa: E402
 from paths import render_dir, surface_root, is_brain, layer  # noqa: E402
 
-BOARD = ("target", "sequenced", "replied", "meeting", "opportunity", "won", "lost")
+BOARD = ("researched", "sequenced", "contacted", "replied", "meeting", "trial", "won", "lost")
+DASHBOARD = "Sales Dashboard.md"
+KPI = "Sales KPI.md"
+LESSONS = "Sales Lessons.md"
+DAILY_SCHEMA = "sbl-daily/1"
+TODAY = datetime.date.today().isoformat()
+
+
+def contract():
+    """The plugin's own studio.json (the sbl-agent/1 contract: funnels, floor, layout)."""
+    here = pathlib.Path(__file__).resolve()
+    for d in [here.parent] + list(here.parents):
+        sj = d / "studio.json"
+        if sj.is_file():
+            try:
+                return json.loads(sj.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                break
+    return {}
 SOCIAL = ("linkedin_invite", "linkedin_dm", "x_dm", "whatsapp")
 GLYPH = {"revival": "◆", "warm": "●", "dormant": "●", "intro": "◇", "cold": "○"}
 REACH_GLYPH = {"warm": "🟢 warm", "intro": "🟢 intro", "public": "🟢 public", "form": "🟡 form",
@@ -65,34 +91,24 @@ def fm(d):
     return "\n".join(out)
 
 
-class Writer:
+class Writer(_BaseWriter):
+    """The shared R6 writer (ledger_base.Writer). pipeline.json is machine data: always rewritten.
+    A NOTE is the seller's once they touch it - an edited or foreign note is never overwritten; the
+    fresh render lands beside it as <name>.new.md and the path is listed in `kept`."""
+
     def __init__(self, base):
-        self.base = pathlib.Path(base)
-        self.mf_path = ledger.root() / MANIFEST
-        try:
-            self.mf = json.loads(self.mf_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            self.mf = {}
-        self.kept, self.written = [], 0
+        super().__init__(base, ledger.root() / MANIFEST, quiet=True)
+        self.base = self.root
 
     def put(self, rel, text):
-        p = self.base / rel
-        if p.exists():
-            cur = p.read_text(encoding="utf-8", errors="replace")
-            if cur == text:
-                return
-            # pipeline.json is machine data for the board: always rewritten. A NOTE is the user's
-            # once they touch it - an edited or foreign note is never overwritten.
-            if rel.endswith(".md") and ((rel in self.mf and sha(cur) != self.mf[rel]) or rel not in self.mf):
-                self.kept.append(rel)
-                return
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(text, encoding="utf-8")
-        self.mf[rel] = sha(text)
-        self.written += 1
+        self.text(rel, text, machine=not str(rel).endswith(".md"))
+
+    @property
+    def written(self):
+        return self.wrote
 
     def close(self):
-        self.mf_path.write_text(json.dumps(self.mf, indent=2, sort_keys=True), encoding="utf-8")
+        self.finish()
 
 
 def brain_link(rel_note):
@@ -225,7 +241,7 @@ def account_note(a, evs, tl):
         L += ["## Ledger", "", "| When | Event | Who | Detail |", "|---|---|---|---|"]
         for e in shown[-15:]:
             det = e.get("rule") or e.get("subject") or e.get("reason") or e.get("to") or e.get("sequence") or ""
-            L.append(f"| {e['ts'][:16].replace('T', ' ')} | {e['kind']} | {esc(e.get('contact'))} | {esc(det)} |")
+            L.append(f"| {str(e.get('ts') or e.get('at') or '')[:16].replace('T', ' ')} | {e.get('kind') or 'stage'} | {esc(e.get('contact'))} | {esc(det)} |")
         L.append("")
     return "\n".join(L).rstrip() + "\n"
 
@@ -332,7 +348,15 @@ def render(dest=None):
                 L += ["", f"## {title} ({len(rows)})", ""]
                 L += [f"- {esc(x['name'])} — {esc(x.get('knocked_out') or x.get('why') or REACH_GLYPH.get(x.get('reach'), ''))}"
                       for x in rows[:40]]
-        w.put(f"leads/Leads {st['merged_at']}.md", "\n".join(L).rstrip() + "\n")
+        day = str(st["merged_at"])[:10]
+        daily = base / "reports" / f"Sell today {day}.md"
+        if daily.is_file() and merge_into_daily(daily, "\n".join(L)):
+            pass            # daily.py opened the note first: only its "New today" section was refreshed
+        else:
+            L[0] = fm({"type": "sales-daily", "title": f"Sell today {day}", "tags": ["sales-daily"], "date": day,
+                       "aliases": [f"Leads {st['merged_at']}"]})
+            L[2] = f"# Sell today {day}"
+            w.put(f"reports/Sell today {day}.md", "\n".join(L).rstrip() + "\n")
         # shortlisted leads get a note too, so the report's links resolve
         for x in sl.get("shortlist") or []:
             a = acc.get(x["key"])
@@ -352,8 +376,10 @@ def render(dest=None):
             seen_b.add(bk)
             blocked.append(e)
     booked = [c for c in cards if c["stage"] == "meeting"]
-    H = [fm({"type": "sales-pipeline", "title": "Pipeline", "tags": ["sales-pipeline"], "updated": stamp[:10],
-             "level": snd.get("level")}), "", "# Pipeline", "",
+    H = [fm({"type": "sales-dashboard", "title": "Sales Dashboard", "tags": ["sales-dashboard"], "updated": stamp[:10],
+             "level": snd.get("level"), "aliases": ["Pipeline"]}), "", "# Sales Dashboard", "",
+         *([f"Today: [[Sell today {today.isoformat()}]] · [[Sales KPI]] · [[Sales Lessons]]", ""]
+           if (base / "reports" / f"Sell today {today.isoformat()}.md").is_file() else ["[[Sales KPI]] · [[Sales Lessons]]", ""]),
          f"Autonomy **{snd.get('level')}** · social steps **{'on' if prof.on(snd.get('social_auto')) else 'off (you press Send)'}** · "
          f"today ✉ {today_box['sent']}/{today_box['cap']} · social {today_box['social_sent']}", "",
          *(["## Start here", "",
@@ -372,7 +398,7 @@ def render(dest=None):
     if booked:
         H += ["## Meetings", ""] + [f"- [[accounts/{safe(c['title'])}|{esc(c['title'])}]]" for c in booked] + [""]
     if leads:
-        H += [f"## Today's leads ({len(leads)})", "", f"[[leads/Leads {st.get('merged_at')}|Open the lead report]] — "
+        H += [f"## Today's leads ({len(leads)})", "", f"[[Sell today {str(st.get('merged_at'))[:10]}]] — "
               f"{summary}.", ""]
     H += ["## This week by origin", "", "| Origin | Sent | Replied | Meetings | Reply rate |", "|---|---|---|---|---|"]
     for o, r in sorted((k["dims"].get("origin") or {}).items()):
@@ -384,9 +410,149 @@ def render(dest=None):
         H += ["", f"## Blocked this week ({len(blocked)}) — why", ""]
         H += [f"- {e['ts'][:10]} {esc(acc.get(e.get('account'), {}).get('name') or e.get('account'))} · {esc(e.get('contact'))} — {esc(e.get('rule'))}"
               for e in blocked[-20:]]
-    w.put("Pipeline.md", "\n".join(H).rstrip() + "\n")
+    w.put(DASHBOARD, "\n".join(H).rstrip() + "\n")
+    write_outreach(w, acc, evs)
+    w.put(KPI, kpi_note(pj, evs))
+    w.put(LESSONS, lessons_note())
     w.close()
     return w
+
+
+def merge_into_daily(path, body):
+    """The dated note daily.py opened FIRST (schema sbl-daily/1) keeps its Status / Goal / the model's
+    words; the lead report goes into its `## New today` section between markers (R2)."""
+    try:
+        txt = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    head = txt.split("---", 2)[1] if txt.startswith("---") else ""
+    if f"schema: {DAILY_SCHEMA}" not in head:
+        return False
+    body = re.sub(r"\A\ufeff?\s*---\s*\n.*?\n---[ \t]*\n", "", body, count=1, flags=re.S)
+    body = re.sub(r"\A\s*#\s+.*\n", "", body, count=1).strip("\n")
+    if "## New today" in txt and "<!-- new-today:begin -->" not in txt:
+        pat = re.compile(r"(^## New today\n)(.*?)(?=^## |^Back to \[\[|\Z)", re.S | re.M)
+        new = pat.sub(lambda m: m.group(1) + "\n<!-- new-today:begin -->\n" + body + "\n<!-- new-today:end -->\n\n", txt, count=1)
+    else:
+        new = replace_between(txt, "new-today", body, heading="New today")
+    if new != txt:
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_text(new, encoding="utf-8")
+        os.replace(tmp, path)
+    return True
+
+
+def write_outreach(w, acc, evs):
+    """outreach/<date>/<account key>/ - one note per sent step (the evidence: channel, contact, subject,
+    message id) and per drafted step waiting in a batch. Bodies come from the batch notes."""
+    drafts = {}
+    bdir = ledger.root() / "batches"
+    if bdir.is_dir():
+        for bp in sorted(bdir.glob("*.json")):
+            try:
+                data = json.loads(bp.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            for it in data.get("items") or []:
+                if it.get("verdict") == "BLOCK":
+                    continue
+                drafts.setdefault((it.get("account"), it.get("contact"), it.get("channel"), it.get("step")), (bp.stem, it))
+    for e in evs:
+        if e.get("kind") != "sent" or e.get("dry_run"):
+            continue
+        key = e.get("account") or ""
+        a = acc.get(key, {})
+        day = str(e.get("ts") or "")[:10] or TODAY
+        step = e.get("step")
+        title = f"Step {step or '?'} · {e.get('channel')} · {safe(e.get('contact') or '')}"
+        meta = {"type": "sales-outreach", "title": f"{safe(a.get('name') or key)} · {title}", "tags": ["sales-outreach"],
+                "account": a.get("name") or key, "contact": e.get("contact") or "", "channel": e.get("channel") or "",
+                "step": step, "sent": str(e.get("ts") or "")[:16], "batch": e.get("batch") or ""}
+        body = [fm(meta), "", f"# {safe(a.get('name') or key)} — {title}", "",
+                f"**Sent** {str(e.get('ts') or '')[:16].replace('T', ' ')} from the seller's own {e.get('channel')}"
+                + (f" · batch {e.get('batch')}" if e.get("batch") else "") + (f" · subject *{esc(e.get('subject'))}*" if e.get("subject") else ""), ""]
+        if e.get("message_id"):
+            body.append(f"Message id: `{e['message_id']}`")
+        if e.get("evidence"):
+            body += ["", "Evidence: " + esc(e["evidence"])]
+        d = drafts.get((key, e.get("contact"), e.get("channel"), step))
+        if d and d[1].get("body"):
+            body += ["", "```text", str(d[1]["body"]).rstrip(), "```"]
+        body += ["", f"Back to [[{safe(a.get('name') or key)}]] · [[Sales Dashboard]]"]
+        w.put(f"outreach/{day}/{key}/{safe(title)}.md", "\n".join(body).rstrip() + "\n")
+        drafts.pop((key, e.get("contact"), e.get("channel"), step), None)
+    for (key, contact, channel, step), (bid, it) in sorted(drafts.items(), key=lambda x: str(x)):
+        a = acc.get(key or "", {})
+        title = f"Draft step {step or '?'} · {channel} · {safe(contact or '')}"
+        meta = {"type": "sales-outreach", "title": f"{safe(a.get('name') or key)} · {title}", "tags": ["sales-outreach", "draft"],
+                "account": a.get("name") or key, "contact": contact or "", "channel": channel or "", "step": step, "batch": bid}
+        body = [fm(meta), "", f"# {safe(a.get('name') or key)} — {title}", "", f"**Draft** — waiting in [[Batch {bid}]]; never sent until approved.", ""]
+        if it.get("subject"):
+            body.append(f"**Subject:** {esc(it['subject'])}")
+        if it.get("body"):
+            body += ["", "```text", str(it["body"]).rstrip(), "```"]
+        body += ["", f"Back to [[{safe(a.get('name') or key)}]] · [[Sales Dashboard]]"]
+        w.put(f"outreach/{TODAY}/{key}/{safe(title)}.md", "\n".join(body).rstrip() + "\n")
+
+
+def kpi_events(evs):
+    """The ledger's stage moves as kpi.py reads them: {key, from, to, at}."""
+    return [{"key": e.get("account"), "from": e.get("from"), "to": e.get("to"), "at": str(e.get("ts") or "")[:10]}
+            for e in evs if e.get("kind") == "stage"]
+
+
+def kpi_note(doc, evs):
+    k = KPIlib.compute(doc, kpi_events(evs), today=TODAY, signals=["origin", "segment", "channel", "step", "signal"])
+    old = ledger.kpi()
+    t = old["totals"]
+    extra = ["## Touches", "", f"sent **{t['sent']}** · replies **{t['replies']}** · meetings **{t['meetings']}** · trials **{t.get('trials', t.get('opportunities', 0))}** · won **{t['won']}**", ""]
+    for dim, vals in old["dims"].items():
+        extra += [f"### By {dim} (sends)", "", f"| {dim} | sent | replied | meetings | reply rate |", "|---|---|---|---|---|"]
+        for v, r in sorted(vals.items(), key=lambda x: -x[1]["sent"]):
+            rate = f"{r['reply_rate']:.0%}" if r["reply_rate"] is not None else "counts only (n < 20)"
+            extra.append(f"| {v} | {r['sent']} | {r['replied']} | {r['meetings']} | {rate} |")
+        extra.append("")
+    return KPIlib.markdown(k, "Sales", title="Sales KPI", extra="\n".join(extra), tags=["sales"])
+
+
+def lessons_note():
+    body = ""
+    try:
+        import memory as M  # noqa: PLC0415
+        root = ledger.root()
+        brain = str(root.parent.parent) if root.parent.name == ".plugins" else None
+        items = M.recall("sales", None, 4000, stamp=False, brain=brain)
+        body = "\n".join("- " + M.recall_line(it) for it in items)
+    except Exception:  # noqa: BLE001
+        body = ""
+    return (fm({"type": "synthesis", "title": "Sales Lessons", "tags": ["sales", "lessons"], "updated": TODAY}) + "\n\n# Sales Lessons\n\n"
+            "> What outcomes taught this agent (`_memory/`, scope `sales`). Inferred items are flagged; edit or remove them in Studio's Memory manager.\n\n"
+            + (body or "_Nothing learned yet._") + "\n\nBack to [[Sales Dashboard]]\n")
+
+
+def migrate_layout(dest=None, dry_run=False):
+    """The standard layout THROUGH the manifest (a note the seller edited stays where it is and is
+    listed): Pipeline.md -> Sales Dashboard.md (alias Pipeline), leads/Leads <date>.md ->
+    reports/Sell today <date>.md (alias Leads <date>); then the ledger's old stage ids."""
+    base = pathlib.Path(dest) if dest else render_dir()
+    moves = []
+    if (base / "Pipeline.md").is_file():
+        moves.append(("Pipeline.md", DASHBOARD, "Pipeline"))
+    for p_ in sorted((base / "leads").glob("Leads *.md")) if (base / "leads").is_dir() else []:
+        day = p_.stem[len("Leads "):][:10]
+        moves.append((f"leads/{p_.name}", f"reports/Sell today {day}.md", p_.stem))
+    w = Writer(base)
+    rep_ = w.migrate_layout(moves, dry_run=dry_run)
+    for a_, b_ in rep_["moved"]:
+        print(f"{'would move' if dry_run else 'move'}  {a_} -> {b_}")
+    for left in rep_["left"]:
+        print(f"LEFT (edited by you): {left}")
+    for a_, b_, why in rep_["skipped"]:
+        print(f"SKIPPED {a_} -> {b_} ({why})")
+    mig = {"changed": 0} if dry_run else ledger.migrate()
+    print(f"{len(rep_['moved'])} moved, {len(rep_['left'])} left, {len(rep_['skipped'])} skipped; "
+          f"{mig['changed']} account(s) re-staged. Nothing was deleted.")
+    return 0
 
 
 
@@ -399,20 +565,23 @@ def pipeline_v2(acc, by_acc, cards, sl, st, cov, stamp, setup, starter, summary,
     S, A = pdoc.stage, pdoc.action
     doc = pdoc.new("sales", "Sales", "#d9480f")
     doc["generated"] = stamp
-    doc["stages"] = [
-        S("lead", "Lead", next=["target", "parked"]),
-        S("target", "Target", next=["sequenced", "parked", "lost"],
-          move_prompt="Research {title} for me — the buying team and a way in for each person — and make it a target."),
-        S("sequenced", "Sequenced", next=["replied", "meeting", "parked", "lost"],
-          move_prompt="Start the sequence that fits {title} and bring the first touch to me."),
-        S("replied", "Replied", next=["meeting", "opportunity", "parked", "lost"]),
-        S("meeting", "Meeting", next=["opportunity", "won", "lost"]),
-        S("opportunity", "Opportunity", next=["won", "lost"]),
-        S("won", "Won", "positive", gate="reason", move_prompt="Mark {title} as won."),
-        S("lost", "Lost", "negative", next=["target"], gate="reason", move_prompt="Mark {title} as lost."),
-        S("parked", "Parked", "parked", next=["target"], move_prompt="Park {title} for now."),
-        S("out", "Knocked out", "parked"),
-    ]
+    NEXT = {"lead": ["researched", "nurture"], "researched": ["sequenced", "nurture", "lost"],
+            "sequenced": ["contacted", "replied", "nurture", "lost"], "contacted": ["replied", "meeting", "nurture", "lost"],
+            "replied": ["meeting", "trial", "nurture", "lost"], "meeting": ["trial", "won", "lost"], "trial": ["won", "lost"],
+            "lost": ["researched"], "nurture": ["researched"]}
+    PROMPT = {"researched": "Research {title} for me — the buying team, a way in for each person, the strategy and the reach-out mix.",
+              "sequenced": "Start the sequence that fits {title} and bring the first touch to me.",
+              "won": "Mark {title} as won.", "lost": "Mark {title} as lost.", "nurture": "Park {title} as not now.",
+              "trial": "Record that {title} started a trial."}
+    c = contract()
+    funnels = []
+    for f in c.get("funnels") or []:
+        stages = [S(x["id"], x.get("label") or x["id"].title(), x.get("role", "open"), next=NEXT.get(x["id"], []),
+                    gate=x.get("gate", "none"), move_prompt=PROMPT.get(x["id"], "Move {title} to {stage_label}."))
+                  for x in f["stages"]]
+        funnels.append(pdoc.funnel(f["id"], f["label"], f["item"], f["success"], stages, f.get("success2")))
+    doc["funnels"] = funnels
+    doc["floor"] = [pdoc.floor_group(g["id"], g["label"], g["stages"], g.get("funnel")) for g in (c.get("floor") or [])]
     shortlisted = {x.get("key") for x in (sl.get("shortlist") or [])}
     card_by = {c["id"]: c for c in cards}
     items = []
@@ -426,13 +595,21 @@ def pipeline_v2(acc, by_acc, cards, sl, st, cov, stamp, setup, starter, summary,
             flags.append("shortlist")
         if a.get("new"):
             flags.append("new")
-        worked = stage not in ("lead", "out", "parked", "lost") or a["key"] in shortlisted
+        worked = stage not in ("lead", "out", "nurture", "lost") or a["key"] in shortlisted
         noted = stage != "lead" or a["key"] in shortlisted
+        mine = by_acc.get(a["key"], [])
+        sent = [e for e in mine if e.get("kind") == "sent" and not e.get("dry_run")]
+        sig = sorted(a.get("signals") or [], key=lambda x: str(x.get("seen") or ""), reverse=True)
         attrs = {"origin": a.get("origin") or "cold", "reach": a.get("reach") or "",
                  "market": (a.get("markets") or [""])[0], "segment": a.get("segment") or "",
-                 "warmth": int(round(100 * float(a.get("warmth") or 0)))}
+                 "warmth": int(round(100 * float(a.get("warmth") or 0))),
+                 "channel": (sent[0].get("channel") if sent else (a.get("channels") or [""])[0]) or "",
+                 "step": str(max((int(e.get("step") or 0) for e in sent), default=0) or ""),
+                 "signal": (sig[0].get("kind") if sig else "") or "", "strategy": a.get("strategy") or "",
+                 "angle": a.get("angle") or "", "offer": a.get("offer") or "", "day": str(a.get("first_seen") or "")[:10]}
+        attrs = {k: v for k, v in attrs.items() if v not in ("", None)}
         sub = " · ".join(x for x in (", ".join(a.get("markets") or []), a.get("segment") or "") if x)
-        it = pdoc.item(a["key"], a["name"], stage, sub=sub, score=a.get("score"), flags=flags or None,
+        it = pdoc.item(a["key"], a["name"], stage, funnel="accounts", sub=sub, score=a.get("score"), flags=flags or None,
                        needs=c.get("needs") or None, why=a.get("knocked_out") or a.get("why") or None,
                        note=(pre + f"accounts/{safe(a['name'])}.md") if noted else None,
                        attrs=attrs, next=c.get("next"), stage_since=a.get("stage_since") or a.get("first_seen"),
@@ -444,9 +621,13 @@ def pipeline_v2(acc, by_acc, cards, sl, st, cov, stamp, setup, starter, summary,
     sent = sum(1 for es in by_acc.values() for e in es if e.get("kind") == "sent" and not e.get("dry_run"))
     replies = sum(1 for es in by_acc.values() for e in es if e.get("kind") == "replied")
     meetings = sum(1 for es in by_acc.values() for e in es if e.get("kind") == "meeting_booked")
-    doc["headline"] = {"label": "meetings booked", "value": meetings, "n": sent, "period": "all time"}
+    trials = sum(1 for a in acc.values() if a.get("stage") in ("trial", "won"))
+    doc["headline"] = {"label": "trials", "value": trials, "n": sent, "period": "all time"}
+    doc["throughput"] = pdoc.throughput((c.get("throughput") or {}).get("label") or "touches / day",
+                                        [e.get("ts") for es in by_acc.values() for e in es if e.get("kind") == "sent" and not e.get("dry_run")], today.isoformat())
     doc["stats"] = [{"label": "replies / sends", "num": replies, "den": sent, "min_n": 20},
-                    {"label": "meetings / sends", "num": meetings, "den": sent, "min_n": 20}]
+                    {"label": "meetings / sends", "num": meetings, "den": sent, "min_n": 20},
+                    {"label": "trials / meetings", "num": trials, "den": meetings, "min_n": 20}]
     notices = []
     if setup:
         notices.append({"level": "warn", "text": "Profile not set up — " + ("a preview from your brain only" if starter else "set it up to sweep the web"),
@@ -462,11 +643,13 @@ def pipeline_v2(acc, by_acc, cards, sl, st, cov, stamp, setup, starter, summary,
     doc["lenses"] = [pdoc.lens("score", "Score", "score", domain=[0, 100]),
                      pdoc.lens("warmth", "Warmth", "attrs.warmth", domain=[0, 100]),
                      pdoc.lens("age", "Age in stage", "stage_since", scale="days", buckets=[3, 7, 14, 30]),
-                     pdoc.lens("needs", "Needs you", "flags", scale="flag", value="needs-you")]
+                     pdoc.lens("needs", "Needs you", "flags", scale="flag", value="needs-you"),
+                     pdoc.lens("today", "New today", "attrs.day", scale="flag", value=today.isoformat())]
     doc["facets"] = [pdoc.facet("origin", "Origin", "attrs.origin", {k: {"label": k, "glyph": g} for k, g in ORIGIN_GLYPH.items()}),
                      pdoc.facet("reach", "Way in", "attrs.reach"),
                      pdoc.facet("market", "Market", "attrs.market"),
-                     pdoc.facet("segment", "Segment", "attrs.segment")]
+                     pdoc.facet("segment", "Segment", "attrs.segment"),
+                     pdoc.facet("channel", "Channel", "attrs.channel"), pdoc.facet("strategy", "Strategy", "attrs.strategy")]
     doc["panel"] = {
         "top": ["{attrs.origin}", "{stage_label}", "score {score}", "{attrs.market}"],
         "sections": [{"type": "text", "label": "Why now", "from": "why"},
@@ -475,14 +658,15 @@ def pipeline_v2(acc, by_acc, cards, sl, st, cov, stamp, setup, starter, summary,
                      {"type": "evidence", "label": "Signals", "from": "detail.signals"},
                      {"type": "links", "label": "Deal history", "from": "detail.deals"}],
         "actions": [
-            A("Research & add", "Research {title} for me: the buying team, a way in for each person with its evidence, and why now — then make it a target.", "primary", stages=["lead"]),
+            A("Research & add", "Research {title} for me: the buying team, a way in for each person with its evidence, why now, the strategy (try · use · buy · partner) and the reach-out mix — then make it researched.", "primary", stages=["lead"]),
             A("Research these {n}", "Add these leads to my pipeline and research them — the buying team, a way in for each person, and why now: {titles}.", "primary", stages=["lead"], bulk=True),
-            A("Find a way in", "Find me a way in at {title} — a contact form, a public profile or someone I know.", stages=["lead", "target"]),
-            A("Start sequence", "Start the sequence that fits {title} and bring the first touch to me.", "primary", stages=["target"]),
-            A("Answer the reply", "Work the reply from {title}.", "primary", stages=["replied", "sequenced", "meeting"], flag="needs-you"),
-            A("Pause", "Pause the sequence for {title} and tell me why it is a good moment to.", stages=["sequenced"]),
-            A("Brief me", "Brief me for my call with {title}.", "primary", stages=["meeting", "opportunity"]),
-            A("Brief me", "Brief me on {title}: where it stands, who we are talking to, and what is next.", stages=["target", "sequenced", "replied"]),
+            A("Find a way in", "Find me a way in at {title} — a contact form, a public profile or someone I know.", stages=["lead", "researched"]),
+            A("Start sequence", "Start the sequence that fits {title} and bring the first touch to me.", "primary", stages=["researched"]),
+            A("Answer the reply", "Work the reply from {title}.", "primary", stages=["replied", "sequenced", "contacted", "meeting"], flag="needs-you"),
+            A("Pause", "Pause the sequence for {title} and tell me why it is a good moment to.", stages=["sequenced", "contacted"]),
+            A("Brief me", "Brief me for my call with {title}.", "primary", stages=["meeting", "trial"]),
+            A("Brief me", "Brief me on {title}: where it stands, who we are talking to, and what is next.", stages=["researched", "sequenced", "contacted", "replied"]),
+            A("Started a trial", "Record that {title} started a trial.", "primary", stages=["meeting"]),
             A("Reconsider", "Look at {title} again — why it was knocked out, and whether that still holds.", stages=["out"]),
         ],
     }
@@ -495,6 +679,7 @@ def pipeline_v2(acc, by_acc, cards, sl, st, cov, stamp, setup, starter, summary,
     doc["coverage"] = cov
     doc["setup"] = setup
     doc["starter"] = starter
+    STG.apply(doc, pathlib.Path(render_dir()) / "profile")       # the seller's labels / hidden stages
     probs = pdoc.check(doc)
     if probs:
         raise SystemExit("pipeline.json would be invalid: " + "; ".join(probs[:5]))
@@ -503,7 +688,12 @@ def pipeline_v2(acc, by_acc, cards, sl, st, cov, stamp, setup, starter, summary,
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--dest")
+    ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--migrate-layout", action="store_true", help="the standard layout + the ledger's stage ids (nothing deleted)")
+    ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args(argv)
+    if a.migrate_layout:
+        return migrate_layout(a.dest, a.dry_run)
     w = render(a.dest)
     print(f"rendered {w.written} files into {w.base}" + (f"; kept {len(w.kept)} you edited: {', '.join(w.kept[:5])}" if w.kept else ""))
     return 0

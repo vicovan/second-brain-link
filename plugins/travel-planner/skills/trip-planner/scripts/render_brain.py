@@ -42,12 +42,18 @@ import itinerary as itin  # noqa: E402
 import suggest as sug  # noqa: E402
 import quotes as qts  # noqa: E402
 import pipeline_doc as pdoc  # noqa: E402
+import kpi as KPIlib  # noqa: E402
+import stages as STG  # noqa: E402
+import today as TD  # noqa: E402
+from ledger_base import Writer as _BaseWriter  # noqa: E402
 from paths import (render_dir, state_root, machinery_dir, surface_root, is_brain,  # noqa: E402
                    profile_dir, places_dir)
 
 MANIFEST = "_TRAVEL_GENERATED.json"
 BUILD_REPORT = "_TRAVEL_BUILD_REPORT.md"
 DASHBOARD = "Travel Dashboard.md"
+KPI = "Travel KPI.md"
+LESSONS = "Travel Lessons.md"
 IDEAS = "Trip Ideas.md"
 LOVE = "Places I Love.md"
 CURRENT_GEOJSON = "Current Trip.geojson"
@@ -91,29 +97,31 @@ def sha(text):
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-class Writer:
-    """Writes only what changed, and remembers what it wrote."""
+class Writer(_BaseWriter):
+    """The shared R6 writer (ledger_base.Writer): a note the user edited is kept and the fresh
+    render lands beside it as <name>.new.md; machine files (.json, .geojson) are always
+    rewritten; the manifest (`_TRAVEL_GENERATED.json`, in the hidden ledger) remembers the rest."""
 
-    def __init__(self, root, quiet=False):
-        self.root, self.quiet, self.man, self.wrote, self.same = pathlib.Path(root), quiet, {}, 0, 0
+    def __init__(self, root, manifest_path, quiet=False):
+        super().__init__(root, manifest_path, quiet)
 
-    def text(self, rel, body):
-        p = self.root / rel
-        self.man[str(rel)] = sha(body)
-        try:
-            if p.is_file() and p.read_text(encoding="utf-8") == body:
-                self.same += 1
-                return False
-        except OSError:
-            pass
-        p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_name(p.name + ".tmp")
-        tmp.write_text(body, encoding="utf-8")
-        os.replace(tmp, p)
-        self.wrote += 1
-        if not self.quiet:
-            print(f"  + {rel}", file=sys.stderr)
-        return True
+    def text(self, rel, body, machine=None):
+        rel = str(rel)
+        if machine is None:
+            machine = not rel.endswith(".md")
+        return super().text(rel, body, machine=machine)
+
+
+def contract():
+    here = pathlib.Path(__file__).resolve()
+    for d in [here.parent] + list(here.parents):
+        sj = d / "studio.json"
+        if sj.is_file():
+            try:
+                return json.loads(sj.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                break
+    return {}
 
 
 def money(v, cur, quoted_at):
@@ -490,6 +498,9 @@ def render_dashboard(w, trips, current_id, surface, sets=(), current_set=None, q
         cur = next((t for t in trips if t["trip_id"] == current_id), None)
         if cur:
             L += [f"**Current trip:** [[{trip_titles(cur)['trip']}]] — Studio's Map opens on it.", ""]
+    tn = f"Today near me {TODAY}"
+    if (render_dir() / "reports" / f"{tn}.md").is_file():
+        L += [f"**Today:** [[{tn}]] — today's picks (also on the Map: `Today.geojson`).", ""]
     L += ["## Trips", ""]
     if not trips:
         L.append("_None yet. Ask the Travel Agent for trip ideas, or to plan somewhere._")
@@ -511,7 +522,8 @@ def render_dashboard(w, trips, current_id, surface, sets=(), current_set=None, q
         for q in sorted(quote_sets, key=lambda x: x.get("updated", ""), reverse=True):
             L.append(f"- [[{quote_title(q, surface)}]] — {len(q.get('options') or [])} {q['kind']} option(s)")
     L += ["", "## Also here", "", f"- [[Trip Ideas]] — where your brain says to go",
-          f"- [[Places I Love]] — your taste, from your own ratings", ""]
+          f"- [[Places I Love]] — your taste, from your own ratings",
+          f"- [[Travel KPI]] · [[Travel Lessons]]", ""]
     pdir = profile_dir()
     missing = [f for f in PROFILE_FILES if not (pdir / f).is_file()]
     L += ["## Profile", ""]
@@ -530,11 +542,11 @@ def render_dashboard(w, trips, current_id, surface, sets=(), current_set=None, q
 
 
 # ---------------------------------------------------------------- pipeline.json (Studio's Pipeline canvas)
-TR_STAGES = (("idea", "Ideas", "open", ["draft"], "none", "Plan a trip to {title}."),
-             ("draft", "Draft", "open", ["shopped", "past"], "none", "Move {title} to {stage_label}."),
-             ("shopped", "Shopped", "open", ["booked", "draft"], "none", "Move {title} to {stage_label}."),
-             ("booked", "Booked", "positive", ["past"], "confirm", "Record that I booked {title} — ask me what I booked first."),
-             ("past", "Past", "parked", [], "confirm", "{title} is over — mark it past."))
+TR_NEXT = {"idea": ["planned"], "planned": ["shopped", "booked", "done"], "shopped": ["booked", "planned", "done"], "booked": ["done"],
+           "suggested": ["saved", "went", "not_for_me"], "saved": ["went", "not_for_me"], "went": ["loved", "not_for_me"], "expired": ["saved"]}
+TR_PROMPT = {"idea": "Plan a trip to {title}.", "booked": "Record that I booked {title} — ask me what I booked first.",
+             "done": "{title} is over — mark it done.", "saved": "Save {title} for later.", "went": "I went to {title}.",
+             "loved": "I loved {title}.", "not_for_me": "{title} was not for me."}
 
 
 def _slug(x):
@@ -546,8 +558,17 @@ def write_pipeline(w, out, trips, quote_sets):
     S, A = pdoc.stage, pdoc.action
     out = pathlib.Path(out)
     pre = out.name + "/" if is_brain(out.parent) else ""
-    doc = pdoc.new("travel-planner", "Travel", "#0f9d8a")
-    doc["stages"] = [S(sid, lab, role, next=nx, gate=g, move_prompt=mp) for sid, lab, role, nx, g, mp in TR_STAGES]
+    doc = pdoc.new("travel-planner", "Travel", "#8e44c9")
+    c = contract()
+    funnels = []
+    for f in c.get("funnels") or []:
+        ids = {x["id"] for x in f["stages"]}
+        stages = [S(x["id"], x.get("label") or x["id"].title(), x.get("role", "open"), next=[n for n in TR_NEXT.get(x["id"], []) if n in ids],
+                    gate=x.get("gate", "none"), move_prompt=TR_PROMPT.get(x["id"], "Move {title} to {stage_label}."), collapsed=bool(x.get("collapsed")))
+                  for x in f["stages"]]
+        funnels.append(pdoc.funnel(f["id"], f["label"], f["item"], f["success"], stages, f.get("success2")))
+    doc["funnels"] = funnels
+    doc["floor"] = [pdoc.floor_group(g["id"], g["label"], g["stages"], g.get("funnel")) for g in (c.get("floor") or [])]
     try:
         ideas = json.loads((state_root() / "ideas.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -561,7 +582,7 @@ def write_pipeline(w, out, trips, quote_sets):
         seen.add(iid)
         n_saved, n_loved = len(x.get("saved_not_visited") or []), len(x.get("loved") or [])
         tags = list(x.get("categories") or [])
-        items.append(pdoc.item(iid, x.get("city"), "idea", sub=x.get("country") or None,
+        items.append(pdoc.item(iid, x.get("city"), "idea", funnel="trips", sub=x.get("country") or None,
                                score=min(100, 10 * n_saved + 15 * n_loved + 10 * len(x.get("people") or [])) or None,
                                why=x.get("why") or None, note=pre + IDEAS,
                                attrs={"country": x.get("country") or "", "saved": n_saved, "loved": n_loved},
@@ -574,7 +595,7 @@ def write_pipeline(w, out, trips, quote_sets):
             by_trip.setdefault(q["trip"], []).append(q)
     for it in sorted(trips, key=lambda t: t["trip_id"]):
         tid = it["trip_id"]
-        st = it["status"] if it["status"] in ("draft", "shopped", "booked", "past") else "draft"
+        st = it["status"] if it["status"] in ("planned", "shopped", "booked", "done") else "planned"
         start = min((s["arrive"] for s in it["stops"] if s.get("arrive")), default="")
         end = max((s["depart"] for s in it["stops"] if s.get("depart")), default="")
         nights = int(it["window"].get("nights") or 0)
@@ -587,14 +608,14 @@ def write_pipeline(w, out, trips, quote_sets):
         days_out = (datetime.date.fromisoformat(start) - datetime.date.fromisoformat(TODAY)).days if start else None
         cur = it.get("currency", "")
         T = trip_titles(it)
-        row = pdoc.item(tid, it["title"], st,
+        row = pdoc.item(tid, it["title"], st, funnel="trips",
                         sub=" · ".join(x for x in (f"{start} → {end}" if start else "", f"{nights} nights" if nights else "",
                                                    ", ".join(countries)) if x) or None,
                         flags=flags or None, needs=needs or None, note=pre + f"trips/{tid}/{T['trip']}.md",
                         updated=it.get("updated") or None, stage_since=str(it.get("updated") or "")[:10] or None,
                         attrs={k: v for k, v in {"country": countries[0] if countries else "", "nights": nights,
                                                  "stops": len(it["stops"]), "days_out": days_out}.items() if v not in (None, "")})
-        if st != "past":
+        if st != "done":
             stops = [{"label": f"{s['place']}" + (" (stopover)" if s["role"] == "stopover" else ""),
                       "status": "done" if (s.get("stay") or {}).get("status") == "booked" else "upcoming",
                       "date": s.get("arrive") or "",
@@ -626,15 +647,40 @@ def write_pipeline(w, out, trips, quote_sets):
             row["detail"] = {"facts": {k: v for k, v in facts.items() if v not in (None, "", 0)},
                              "stops": stops, "quotes": quotes, "links": links}
         items.append(row)
+    # the picks funnel: today's and the last weeks' picks (today.py), one item each
+    picks = TD.ledger().load() if (state_root() / TD.PICKS).is_file() else []
+    for r in sorted(picks, key=lambda x: (x.get("date") or "", x.get("id") or "")):
+        st = r.get("status") if r.get("status") in TD.STATUSES else "suggested"
+        note = (pre + str(r["brain_note"])) if r.get("from_brain") and str(r.get("brain_note") or "").endswith(".md") else None
+        row = pdoc.item(r["id"], r.get("name") or r["id"], st, funnel="picks", sub=" · ".join(x for x in (TD.SLOT_LABEL.get(r.get("slot"), ""), r.get("city") or "") if x) or None,
+                        why=r.get("why") or None, note=note, url=r.get("url") or None,
+                        stage_since=str(r.get("updated") or r.get("date") or "")[:10] or None, updated=r.get("updated") or None,
+                        attrs={k: v for k, v in {"kind": r.get("kind") or "", "slot": r.get("slot") or "", "city": r.get("city") or "",
+                                                 "source": r.get("source") or "", "day": r.get("date") or "",
+                                                 "neighbourhood": TD._area(r, (r.get("lat"), r.get("lng"))) if False else ""}.items() if v})
+        if st in ("suggested", "saved", "went"):
+            facts = {"Why": r.get("why") or "", "Open today": (f"seen {r['seen_at'][:10]}" if r.get("seen_at") else ""),
+                     "Distance": f"{r['distance_km']} km" if r.get("distance_km") is not None else ""}
+            row["detail"] = {"facts": {k: v for k, v in facts.items() if v},
+                             "quotes": ([{"label": r["name"], "price": r["price"], "currency": "", "quoted_at": r.get("quoted_at") or "", "url": r.get("url") or ""}]
+                                        if r.get("price") not in (None, "") and r.get("quoted_at") else []),
+                             "links": ([{"label": "The place in your brain", "note": note}] if note else [])}
+        items.append(row)
     doc["items"] = items
     n = lambda *xs: sum(1 for t in trips if t["status"] in xs)  # noqa: E731
-    doc["headline"] = {"label": "booked", "value": n("booked", "past"), "n": len(trips), "period": "all trips"}
-    doc["stats"] = [{"label": "trips booked / planned", "num": n("booked", "past"), "den": n("shopped", "booked", "past"), "min_n": 5}]
+    went = sum(1 for r in picks if r.get("status") in ("went", "loved"))
+    doc["headline"] = {"label": "places tried", "value": went, "n": len(picks), "period": "all picks"}
+    doc["throughput"] = pdoc.throughput((c.get("throughput") or {}).get("label") or "places tried / week",
+                                        [h.get("at") for r in picks for h in (r.get("history") or []) if h.get("to") == "went"], TODAY)
+    doc["stats"] = [{"label": "went / picks", "num": went, "den": len(picks), "min_n": 20},
+                    {"label": "trips booked / planned", "num": n("booked", "done"), "den": n("planned", "shopped", "booked", "done"), "min_n": 5}]
     doc["lenses"] = [pdoc.lens("score", "Idea strength", "score", domain=[0, 100]),
                      pdoc.lens("soon", "Days to departure", "attrs.days_out", domain=[0, 90]),
                      pdoc.lens("nights", "Nights", "attrs.nights", domain=[0, 21]),
-                     pdoc.lens("needs", "Needs you", "flags", scale="flag", value="needs-you")]
-    doc["facets"] = [pdoc.facet("country", "Country", "attrs.country")]
+                     pdoc.lens("needs", "Needs you", "flags", scale="flag", value="needs-you"),
+                     pdoc.lens("today", "New today", "attrs.day", scale="flag", value=TODAY)]
+    doc["facets"] = [pdoc.facet("country", "Country", "attrs.country"), pdoc.facet("kind", "Kind", "attrs.kind"),
+                     pdoc.facet("slot", "Slot", "attrs.slot"), pdoc.facet("source", "Source", "attrs.source")]
     doc["panel"] = {
         "top": ["{stage_label}", "{attrs.country}", "{attrs.nights} nights"],
         "sections": [{"type": "text", "label": "Why go", "from": "why"},
@@ -645,20 +691,64 @@ def write_pipeline(w, out, trips, quote_sets):
                      {"type": "links", "label": "Notes", "from": "detail.links"}],
         "actions": [
             A("Plan this trip", "Plan a trip to {title} from my own saved places first, and put it on the map.", "primary", stages=["idea"]),
-            A("Find flights", "Find real flight prices for {title} from my home airport. Book nothing.", "primary", stages=["draft", "shopped"]),
-            A("Find stays", "Find stays for each stop of {title} with real prices. Book nothing.", stages=["draft", "shopped"]),
-            A("Record that I booked", "I booked {title} — ask me what I booked and record it.", "primary", stages=["shopped"]),
-            A("Show on map", "Show {title} on the map.", "map", stages=["draft", "shopped", "booked", "past"]),
+            A("Find flights", "Find real flight prices for {title} from my home airport. Book nothing.", "primary", stages=["planned", "shopped"]),
+            A("Find stays", "Find stays for each stop of {title} with real prices. Book nothing.", stages=["planned", "shopped"]),
+            A("Record that I booked", "I booked {title} — ask me what I booked and record it.", "primary", stages=["shopped", "planned"]),
+            A("Show on map", "Show {title} on the map.", "map", stages=["planned", "shopped", "booked", "done"]),
+            A("Save it", "Save {title} for another day.", stages=["suggested", "expired"]),
+            A("I went", "I went to {title}.", "primary", stages=["suggested", "saved"]),
+            A("Loved it", "I loved {title}.", "primary", stages=["went"]),
+            A("Not for me", "{title} was not for me.", stages=["suggested", "saved", "went"]),
             A("Plan these {n}", "Sketch a trip for each of these {n} ideas and tell me which fits my usual months best: {titles}.", "primary", stages=["idea"], bulk=True),
         ],
     }
     doc["actions"] = [A("Where should I go?", "Where should I go next? Use only my brain and give me three ideas, each with its notes.", "primary")]
-    doc["generated"] = max([str(t.get("updated") or "") for t in trips] + [str((ideas.get("meta") or {}).get("generated") or "")])
+    doc["generated"] = max([str(t.get("updated") or "") for t in trips] + [str((ideas.get("meta") or {}).get("generated") or "")]
+                           + [str(r.get("updated") or "") for r in picks])
+    STG.apply(doc, out / "profile")           # the user's labels / hidden stages (profile/stages.json)
     probs = pdoc.check(doc)
     if probs:
         print("  ! pipeline.json not written: " + "; ".join(probs[:3]), file=sys.stderr)
-        return
-    w.text("pipeline.json", pdoc.dumps(doc))
+        return None
+    w.text("pipeline.json", pdoc.dumps(doc), machine=True)
+    return doc
+
+
+def kpi_note(doc):
+    """`Travel KPI.md` from the shared kpi.py: the trips funnel from outcomes.jsonl, the picks funnel
+    from the picks' own history (R2)."""
+    evs = []
+    try:
+        import learn  # noqa: PLC0415
+        for r in learn.rows():
+            if r.get("kind") in ("planned", "shopped", "booked", "travelled"):
+                evs.append({"key": r.get("trip_id"), "to": {"travelled": "done"}.get(r["kind"], r["kind"]), "at": str(r.get("at") or "")[:10]})
+    except Exception:  # noqa: BLE001
+        pass
+    for r in (TD.ledger().load() if (state_root() / TD.PICKS).is_file() else []):
+        for h in r.get("history") or []:
+            evs.append({"key": r["id"], "from": h.get("from"), "to": h.get("to"), "at": str(h.get("at") or "")[:10]})
+    k = KPIlib.compute(doc, evs, today=TODAY, signals=["kind", "slot", "source"])
+    return KPIlib.markdown(k, "Travel", title="Travel KPI", tags=["travel"])
+
+
+def lessons_note():
+    body = []
+    lessons = state_root() / "lessons.md"
+    if lessons.is_file():
+        body += ["## Lessons recorded", "", lessons.read_text(encoding="utf-8").strip(), ""]
+    try:
+        import memory as M  # noqa: PLC0415
+        root = state_root()
+        brain = str(root.parent.parent) if root.parent.name == ".plugins" else None
+        items = M.recall("travel-planner", None, 4000, stamp=False, brain=brain)
+        if items:
+            body += ["## What the agent remembers (inferred items are flagged)", ""] + ["- " + M.recall_line(it) for it in items] + [""]
+    except Exception:  # noqa: BLE001
+        pass
+    return (frontmatter([("type", "synthesis"), ("title", "Travel Lessons"), ("updated", TODAY)], ["travel", "lessons"])
+            + "# Travel Lessons\n\n> What trips and picks taught this agent (`_memory/`, scope `travel-planner`). Edit or remove any inferred item in Studio's Memory manager.\n\n"
+            + ("\n".join(body) if body else "_Nothing learned yet._\n") + "\nBack to [[Travel Dashboard]]\n")
 
 
 # ---------------------------------------------------------------- main
@@ -666,7 +756,8 @@ def render(dest=None, quiet=False):
     out = render_dir(dest)
     surface = surface_root() if not dest else out.parent
     links = Links(surface)
-    w = Writer(out, quiet)
+    mdir = machinery_dir(state_root(), out)
+    w = Writer(out, mdir / MANIFEST, quiet)
     trips = []
     for tid in itin.list_trips(dest):
         try:
@@ -694,7 +785,10 @@ def render(dest=None, quiet=False):
     render_ideas(w, links)
     render_love(w, links, surface)
     render_dashboard(w, trips, current_id, surface, sets, current_set, quote_sets)
-    write_pipeline(w, out, trips, quote_sets)
+    doc = write_pipeline(w, out, trips, quote_sets)
+    if doc:
+        w.text(KPI, kpi_note(doc))
+    w.text(LESSONS, lessons_note())
     # the stable path Studio's Map opens: the active trip's map, or an empty collection
     geo_text = json.dumps({"type": "FeatureCollection", "properties": {"schema": itin.MAP_SCHEMA,
                                                                        "trip_id": ""}, "features": []}) + "\n"
@@ -706,19 +800,13 @@ def render(dest=None, quiet=False):
     # the Map's other two layers - the same bytes suggest.py / itinerary.py write mid-run
     w.text(itin.ALL_TRIPS_GEOJSON, json.dumps(itin.all_trips_geojson(dest), ensure_ascii=False) + "\n")
     w.text(sug.GEOJSON, sug.geojson_text(dest))
+    # the Today layer: today's picks as numbered pins (today.py writes it too; an empty day = an empty collection)
+    today_rows = TD.picks_for(TODAY) if (state_root() / TD.PICKS).is_file() else []
+    w.text(TD.TODAY_GEOJSON, json.dumps(TD.to_geojson(today_rows, TODAY), ensure_ascii=False) + "\n")
     # machinery: own manifest + report, in the hidden ledger
-    mdir = machinery_dir(state_root(), out)
-    prev = {}
-    try:
-        prev = json.loads((mdir / MANIFEST).read_text(encoding="utf-8")).get("files", {})
-    except (OSError, ValueError):
-        pass
-    stale = sorted(set(prev) - set(w.man))
-    (mdir / MANIFEST).write_text(json.dumps({"schema": 1, "generated": TODAY, "layer": str(out),
-                                             "files": w.man}, indent=1, ensure_ascii=False) + "\n",
-                                 encoding="utf-8")
+    stale = w.finish({"layer": str(out)})
     rep = [f"# Travel layer build — {TODAY}", "", f"- layer: `{out}`", f"- written: {w.wrote}",
-           f"- unchanged: {w.same}", f"- trips: {len(trips)}"]
+           f"- unchanged: {w.same}", f"- kept (edited by you; fresh copy beside as .new.md): {len(w.kept)}", f"- trips: {len(trips)}"]
     if stale:
         rep += ["", "## No longer produced (left in place — delete by hand if unwanted)", ""] + \
                [f"- `{s}`" for s in stale]
@@ -730,7 +818,11 @@ def main():
     ap = argparse.ArgumentParser(description="render the travel layer")
     ap.add_argument("--dest")
     ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--migrate-layout", action="store_true", help="the trips' old status ids (draft→planned, past→done); the layout is already standard")
     a = ap.parse_args()
+    if a.migrate_layout:
+        print(json.dumps(itin.migrate(a.dest)))
+        return 0
     out, w = render(a.dest, a.quiet)
     if not a.quiet:
         print(f"{out}: {w.wrote} written, {w.same} unchanged")

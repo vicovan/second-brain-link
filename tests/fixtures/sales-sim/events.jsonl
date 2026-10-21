@@ -1,0 +1,356 @@
+{"kind": "stage", "account": "meridiancyberdyne", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-08-21T08:30:00"}
+{"kind": "stage", "account": "atlasacme", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-08-22T08:30:00"}
+{"kind": "stage", "account": "zenithacme", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-08-22T08:30:00"}
+{"kind": "stage", "account": "lanternumbrella", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-08-22T08:30:00"}
+{"kind": "stage", "account": "emberpiedpiper", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-08-23T08:30:00"}
+{"kind": "stage", "account": "orchardglobex", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-08-23T08:30:00"}
+{"kind": "stage", "account": "quarryaperture", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-08-23T08:30:00"}
+{"kind": "stage", "account": "willowmonarch", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-08-25T08:30:00"}
+{"kind": "stage", "account": "orchardglobex", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-08-25T08:30:00"}
+{"kind": "stage", "account": "granitesoylent", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-08-25T08:30:00"}
+{"kind": "stage", "account": "zenithacme", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-08-25T08:30:00"}
+{"kind": "stage", "account": "orchardglobex", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-08-26T08:30:00"}
+{"kind": "stage", "account": "quarryaperture", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-08-26T08:30:00"}
+{"kind": "stage", "account": "kestrelvandelay", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-08-26T08:30:00"}
+{"kind": "stage", "account": "atlasacme", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-08-26T08:30:00"}
+{"kind": "stage", "account": "granitesoylent", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-08-27T08:30:00"}
+{"kind": "stage", "account": "fathomwonka", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-08-27T08:30:00"}
+{"kind": "stage", "account": "lanternumbrella", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-08-27T08:30:00"}
+{"kind": "stage", "account": "quarryaperture", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-08-28T08:30:00"}
+{"kind": "stage", "account": "atlasacme", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-08-29T08:30:00"}
+{"kind": "stage", "account": "fathomwonka", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-08-29T08:30:00"}
+{"kind": "stage", "account": "lanternumbrella", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-08-29T08:30:00"}
+{"kind": "stage", "account": "emberwayne", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-08-30T08:30:00"}
+{"kind": "stage", "account": "granitesoylent", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-08-30T08:30:00"}
+{"kind": "stage", "account": "verdantinitech", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-08-30T08:30:00"}
+{"kind": "stage", "account": "juniperwonka", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-08-30T08:30:00"}
+{"kind": "stage", "account": "quarryvandelay", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-08-31T08:30:00"}
+{"kind": "stage", "account": "willowstark", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-08-31T08:30:00"}
+{"kind": "stage", "account": "orchardglobex", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-08-31T08:30:00"}
+{"kind": "stage", "account": "kestrelvandelay", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-08-31T08:30:00"}
+{"kind": "stage", "account": "juniperwonka", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-08-31T08:30:00"}
+{"kind": "stage", "account": "fathompiedpiper", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-08-31T08:30:00"}
+{"kind": "stage", "account": "emberwayne", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-01T08:30:00"}
+{"kind": "stage", "account": "granitesoylent", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-09-01T08:30:00"}
+{"kind": "stage", "account": "fathomwonka", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-01T08:30:00"}
+{"kind": "stage", "account": "atlasoscorp", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-01T08:30:00"}
+{"kind": "stage", "account": "orchardglobex", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-02T08:30:00"}
+{"kind": "stage", "account": "verdantaperture", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-02T08:30:00"}
+{"kind": "stage", "account": "granitesoylent", "from": "replied", "to": "meeting", "by": "agent", "ts": "2026-09-02T08:30:00"}
+{"kind": "stage", "account": "kestrelvandelay", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-02T08:30:00"}
+{"kind": "stage", "account": "marlinsoylent", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-02T08:30:00"}
+{"kind": "stage", "account": "orchardglobex", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-03T08:30:00"}
+{"kind": "stage", "account": "atlasacme", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-09-03T08:30:00"}
+{"kind": "stage", "account": "fathomwonka", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-09-03T08:30:00"}
+{"kind": "stage", "account": "summitcyberdyne", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-04T08:30:00"}
+{"kind": "stage", "account": "embersoylent", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-04T08:30:00"}
+{"kind": "stage", "account": "atlasacme", "from": "replied", "to": "meeting", "by": "agent", "ts": "2026-09-04T08:30:00"}
+{"kind": "stage", "account": "tundradunder", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-04T08:30:00"}
+{"kind": "stage", "account": "verdantinitech", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-04T08:30:00"}
+{"kind": "stage", "account": "juniperdunder", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-04T08:30:00"}
+{"kind": "stage", "account": "harborwonka", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-05T08:30:00"}
+{"kind": "stage", "account": "emberwayne", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-05T08:30:00"}
+{"kind": "stage", "account": "juniperdunder", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-05T08:30:00"}
+{"kind": "stage", "account": "fathompiedpiper", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-05T08:30:00"}
+{"kind": "stage", "account": "verdantaperture", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-06T08:30:00"}
+{"kind": "stage", "account": "basaltinitech", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-06T08:30:00"}
+{"kind": "stage", "account": "fathomwonka", "from": "replied", "to": "meeting", "by": "agent", "ts": "2026-09-06T08:30:00"}
+{"kind": "stage", "account": "verdantinitech", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-06T08:30:00"}
+{"kind": "stage", "account": "juniperdunder", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-06T08:30:00"}
+{"kind": "stage", "account": "summitcyberdyne", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-07T08:30:00"}
+{"kind": "stage", "account": "fathompiedpiper", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-07T08:30:00"}
+{"kind": "stage", "account": "meridianmonarch", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-07T08:30:00"}
+{"kind": "stage", "account": "harborwonka", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-08T08:30:00"}
+{"kind": "stage", "account": "atlasacme", "from": "meeting", "to": "trial", "by": "agent", "ts": "2026-09-08T08:30:00"}
+{"kind": "stage", "account": "basaltmonarch", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-08T08:30:00"}
+{"kind": "stage", "account": "meridianmonarch", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-08T08:30:00"}
+{"kind": "stage", "account": "verdantaperture", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-09T08:30:00"}
+{"kind": "stage", "account": "embersoylent", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-09T08:30:00"}
+{"kind": "stage", "account": "orchardoscorp", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-09T08:30:00"}
+{"kind": "stage", "account": "tundradunder", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-09T08:30:00"}
+{"kind": "stage", "account": "orchardsoylent", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-09T08:30:00"}
+{"kind": "stage", "account": "harborwonka", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-10T08:30:00"}
+{"kind": "stage", "account": "kestreltidewater", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-10T08:30:00"}
+{"kind": "stage", "account": "fathomwonka", "from": "meeting", "to": "trial", "by": "agent", "ts": "2026-09-10T08:30:00"}
+{"kind": "stage", "account": "verdantstark", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-10T08:30:00"}
+{"kind": "stage", "account": "summitcyberdyne", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-11T08:30:00"}
+{"kind": "stage", "account": "kestreltidewater", "from": "researched", "to": "lost", "by": "user", "ts": "2026-09-11T08:30:00"}
+{"kind": "stage", "account": "marlinvandelay", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-11T08:30:00"}
+{"kind": "stage", "account": "basaltumbrella", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-11T08:30:00"}
+{"kind": "stage", "account": "granitestark", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-11T08:30:00"}
+{"kind": "stage", "account": "tundradunder", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-11T08:30:00"}
+{"kind": "stage", "account": "fathompiedpiper", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-09-11T08:30:00"}
+{"kind": "stage", "account": "basaltmonarch", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-11T08:30:00"}
+{"kind": "stage", "account": "orchardoscorp", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-12T08:30:00"}
+{"kind": "stage", "account": "harborgringotts", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-12T08:30:00"}
+{"kind": "stage", "account": "embersoylent", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-13T08:30:00"}
+{"kind": "stage", "account": "basaltumbrella", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-13T08:30:00"}
+{"kind": "stage", "account": "granitestark", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-13T08:30:00"}
+{"kind": "stage", "account": "willowvandelay", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-13T08:30:00"}
+{"kind": "stage", "account": "basaltmonarch", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-13T08:30:00"}
+{"kind": "stage", "account": "meridianmonarch", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-13T08:30:00"}
+{"kind": "stage", "account": "verdantaperture", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-09-14T08:30:00"}
+{"kind": "stage", "account": "lanternwonka", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-14T08:30:00"}
+{"kind": "stage", "account": "basaltumbrella", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-14T08:30:00"}
+{"kind": "stage", "account": "orchardsoylent", "from": "researched", "to": "nurture", "by": "agent", "ts": "2026-09-14T08:30:00"}
+{"kind": "stage", "account": "meridianmonarch", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-09-14T08:30:00"}
+{"kind": "stage", "account": "willowvandelay", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-15T08:30:00"}
+{"kind": "stage", "account": "tundradunder", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-09-15T08:30:00"}
+{"kind": "stage", "account": "fathompiedpiper", "from": "replied", "to": "meeting", "by": "agent", "ts": "2026-09-15T08:30:00"}
+{"kind": "stage", "account": "zenithpiedpiper", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-16T08:30:00"}
+{"kind": "stage", "account": "marlinvandelay", "from": "researched", "to": "lost", "by": "user", "ts": "2026-09-16T08:30:00"}
+{"kind": "stage", "account": "lanternwonka", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-16T08:30:00"}
+{"kind": "stage", "account": "orchardoscorp", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-16T08:30:00"}
+{"kind": "stage", "account": "basaltwayne", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-16T08:30:00"}
+{"kind": "stage", "account": "tundradunder", "from": "replied", "to": "meeting", "by": "agent", "ts": "2026-09-16T08:30:00"}
+{"kind": "stage", "account": "basaltumbrella", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-09-17T08:30:00"}
+{"kind": "stage", "account": "fathomcyberdyne", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-17T08:30:00"}
+{"kind": "stage", "account": "harborgringotts", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-17T08:30:00"}
+{"kind": "stage", "account": "lanternwonka", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-18T08:30:00"}
+{"kind": "stage", "account": "tundradunder", "from": "meeting", "to": "trial", "by": "agent", "ts": "2026-09-18T08:30:00"}
+{"kind": "stage", "account": "lanternwonka", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-09-19T08:30:00"}
+{"kind": "stage", "account": "fathomstark", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-19T08:30:00"}
+{"kind": "stage", "account": "willowvandelay", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-19T08:30:00"}
+{"kind": "stage", "account": "tundratidewater", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-19T08:30:00"}
+{"kind": "stage", "account": "zenithpiedpiper", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-21T08:30:00"}
+{"kind": "stage", "account": "zenithvandelay", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-21T08:30:00"}
+{"kind": "stage", "account": "verdantdunder", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-21T08:30:00"}
+{"kind": "stage", "account": "fathomcyberdyne", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-22T08:30:00"}
+{"kind": "stage", "account": "willowvandelay", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-09-22T08:30:00"}
+{"kind": "stage", "account": "kestrelsoylent", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-23T08:30:00"}
+{"kind": "stage", "account": "harborwayne", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-23T08:30:00"}
+{"kind": "stage", "account": "willowoscorp", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-23T08:30:00"}
+{"kind": "stage", "account": "lanternstark", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-23T08:30:00"}
+{"kind": "stage", "account": "willowhooli", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-23T08:30:00"}
+{"kind": "stage", "account": "tundratidewater", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-23T08:30:00"}
+{"kind": "stage", "account": "verdantdunder", "from": "researched", "to": "lost", "by": "user", "ts": "2026-09-23T08:30:00"}
+{"kind": "stage", "account": "harborwayne", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-24T08:30:00"}
+{"kind": "stage", "account": "lanternwonka", "from": "replied", "to": "meeting", "by": "agent", "ts": "2026-09-24T08:30:00"}
+{"kind": "stage", "account": "fathomstark", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-24T08:30:00"}
+{"kind": "stage", "account": "lanternstark", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-25T08:30:00"}
+{"kind": "stage", "account": "harborvandelay", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-25T08:30:00"}
+{"kind": "stage", "account": "verdantaperture", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-25T08:30:00"}
+{"kind": "stage", "account": "willowvandelay", "from": "replied", "to": "meeting", "by": "agent", "ts": "2026-09-25T08:30:00"}
+{"kind": "sent", "account": "granitenorthwind", "contact": "Zoe Grant", "channel": "form", "ts": "2026-09-25T10:00:00", "step": 1, "batch": "b8", "message_id": "<sim-granitenorthwind-1@example>"}
+{"kind": "sent", "account": "emberwayne", "contact": "Tom Baker", "channel": "linkedin_dm", "ts": "2026-09-25T10:00:00", "step": 2, "batch": "b7", "message_id": "<sim-emberwayne-2@example>"}
+{"kind": "sent", "account": "zenithoscorp", "contact": "Jane Doe", "channel": "email", "ts": "2026-09-25T10:00:00", "step": 1, "batch": "b8", "message_id": "<sim-zenithoscorp-1@example>"}
+{"kind": "sent", "account": "willowoscorp", "contact": "Lee Park", "channel": "email", "ts": "2026-09-25T10:00:00", "step": 2, "batch": "b3", "message_id": "<sim-willowoscorp-2@example>"}
+{"kind": "stage", "account": "zenithpiedpiper", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-26T08:30:00"}
+{"kind": "sent", "account": "lanternaperture", "contact": "Noa Levi", "channel": "linkedin_dm", "ts": "2026-09-26T10:00:00", "step": 1, "batch": "b9", "message_id": "<sim-lanternaperture-1@example>"}
+{"kind": "stage", "account": "lanternaperture", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-27T08:30:00"}
+{"kind": "stage", "account": "willowhooli", "from": "researched", "to": "out", "by": "agent", "ts": "2026-09-27T08:30:00"}
+{"kind": "stage", "account": "verdantaperture", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-27T08:30:00"}
+{"kind": "stage", "account": "willowvandelay", "from": "meeting", "to": "trial", "by": "agent", "ts": "2026-09-27T08:30:00"}
+{"kind": "sent", "account": "summitcyberdyne", "contact": "Tom Baker", "channel": "linkedin_dm", "ts": "2026-09-27T10:00:00", "step": 1, "batch": "b3", "message_id": "<sim-summitcyberdyne-1@example>"}
+{"kind": "sent", "account": "harborglobex", "contact": "Tom Baker", "channel": "email", "ts": "2026-09-27T10:00:00", "step": 2, "batch": "b7", "message_id": "<sim-harborglobex-2@example>"}
+{"kind": "sent", "account": "harborwayne", "contact": "Mo Haddad", "channel": "linkedin_dm", "ts": "2026-09-27T10:00:00", "step": 2, "batch": "b1", "message_id": "<sim-harborwayne-2@example>"}
+{"kind": "sent", "account": "atlasaperture", "contact": "Ravi Mehta", "channel": "form", "ts": "2026-09-27T10:00:00", "step": 1, "batch": "b1", "message_id": "<sim-atlasaperture-1@example>"}
+{"kind": "sent", "account": "quarrynorthwind", "contact": "Tom Baker", "channel": "email", "ts": "2026-09-27T10:00:00", "step": 2, "batch": "b2", "message_id": "<sim-quarrynorthwind-2@example>"}
+{"kind": "sent", "account": "zenithsoylent", "contact": "Mo Haddad", "channel": "linkedin_dm", "ts": "2026-09-27T10:00:00", "step": 2, "batch": "b8", "message_id": "<sim-zenithsoylent-2@example>"}
+{"kind": "stage", "account": "kestrelsoylent", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-28T08:30:00"}
+{"kind": "stage", "account": "harborwayne", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-28T08:30:00"}
+{"kind": "stage", "account": "zenithpiedpiper", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-09-28T08:30:00"}
+{"kind": "stage", "account": "lanternwonka", "from": "meeting", "to": "trial", "by": "agent", "ts": "2026-09-28T08:30:00"}
+{"kind": "stage", "account": "willowoscorp", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-28T08:30:00"}
+{"kind": "stage", "account": "tundratidewater", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-28T08:30:00"}
+{"kind": "sent", "account": "quarryaperture", "contact": "Noa Levi", "channel": "email", "ts": "2026-09-28T10:00:00", "step": 2, "batch": "b8", "message_id": "<sim-quarryaperture-2@example>"}
+{"kind": "stage", "account": "basalthooli", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-29T08:30:00"}
+{"kind": "stage", "account": "emberumbrella", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-29T08:30:00"}
+{"kind": "stage", "account": "lanternwonka", "from": "trial", "to": "won", "by": "user", "ts": "2026-09-29T08:30:00"}
+{"kind": "stage", "account": "summittidewater", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-29T08:30:00"}
+{"kind": "stage", "account": "harborvandelay", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-29T08:30:00"}
+{"kind": "stage", "account": "verdantaperture", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-29T08:30:00"}
+{"kind": "sent", "account": "verdantaperture", "contact": "Yuki Sato", "channel": "email", "ts": "2026-09-29T10:00:00", "step": 1, "batch": "b7", "message_id": "<sim-verdantaperture-1@example>"}
+{"kind": "sent", "account": "harborglobex", "contact": "Tom Baker", "channel": "linkedin_dm", "ts": "2026-09-29T10:00:00", "step": 1, "batch": "b3", "message_id": "<sim-harborglobex-1@example>"}
+{"kind": "sent", "account": "summittidewater", "contact": "Dana Reyes", "channel": "form", "ts": "2026-09-29T10:00:00", "step": 1, "batch": "b6", "message_id": "<sim-summittidewater-1@example>"}
+{"kind": "stage", "account": "lanternaperture", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-09-30T08:30:00"}
+{"kind": "stage", "account": "summitmassivedynamic", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-09-30T08:30:00"}
+{"kind": "stage", "account": "willowoscorp", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-30T08:30:00"}
+{"kind": "stage", "account": "harborvandelay", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-09-30T08:30:00"}
+{"kind": "sent", "account": "kestreltidewater", "contact": "Zoe Grant", "channel": "email", "ts": "2026-09-30T10:00:00", "step": 2, "batch": "b4", "message_id": "<sim-kestreltidewater-2@example>"}
+{"kind": "stage", "account": "emberumbrella", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-01T08:30:00"}
+{"kind": "stage", "account": "zenithsoylent", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-01T08:30:00"}
+{"kind": "stage", "account": "verdantaperture", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-10-01T08:30:00"}
+{"kind": "stage", "account": "fathomnorthwind", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-01T08:30:00"}
+{"kind": "sent", "account": "summitcyberdyne", "contact": "Tom Baker", "channel": "email", "ts": "2026-10-01T10:00:00", "step": 2, "batch": "b6", "message_id": "<sim-summitcyberdyne-2@example>"}
+{"kind": "sent", "account": "emberumbrella", "contact": "Mo Haddad", "channel": "form", "ts": "2026-10-01T10:00:00", "step": 2, "batch": "b6", "message_id": "<sim-emberumbrella-2@example>"}
+{"kind": "stage", "account": "summitmonarch", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-02T08:30:00"}
+{"kind": "stage", "account": "summitpiedpiper", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-02T08:30:00"}
+{"kind": "stage", "account": "summittidewater", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-02T08:30:00"}
+{"kind": "stage", "account": "atlasaperture", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-02T08:30:00"}
+{"kind": "stage", "account": "atlaswonka", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-02T08:30:00"}
+{"kind": "stage", "account": "basalthooli", "from": "researched", "to": "nurture", "by": "agent", "ts": "2026-10-03T08:30:00"}
+{"kind": "stage", "account": "kestrelsoylent", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-03T08:30:00"}
+{"kind": "sent", "account": "kestreltidewater", "contact": "Zoe Grant", "channel": "form", "ts": "2026-10-03T10:00:00", "step": 1, "batch": "b4", "message_id": "<sim-kestreltidewater-1@example>"}
+{"kind": "sent", "account": "emberwayne", "contact": "Tom Baker", "channel": "linkedin_dm", "ts": "2026-10-03T10:00:00", "step": 1, "batch": "b6", "message_id": "<sim-emberwayne-1@example>"}
+{"kind": "sent", "account": "embersoylent", "contact": "Sam Chen", "channel": "linkedin_dm", "ts": "2026-10-03T10:00:00", "step": 2, "batch": "b4", "message_id": "<sim-embersoylent-2@example>"}
+{"kind": "sent", "account": "summittidewater", "contact": "Dana Reyes", "channel": "email", "ts": "2026-10-03T10:00:00", "step": 2, "batch": "b6", "message_id": "<sim-summittidewater-2@example>"}
+{"kind": "stage", "account": "harborglobex", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-04T08:30:00"}
+{"kind": "stage", "account": "basaltcyberdyne", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-04T08:30:00"}
+{"kind": "stage", "account": "emberumbrella", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-04T08:30:00"}
+{"kind": "stage", "account": "willowoscorp", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-10-04T08:30:00"}
+{"kind": "stage", "account": "zenithsoylent", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-04T08:30:00"}
+{"kind": "stage", "account": "harborvandelay", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-10-04T08:30:00"}
+{"kind": "sent", "account": "marlinvandelay", "contact": "Tom Baker", "channel": "linkedin_dm", "ts": "2026-10-04T10:00:00", "step": 1, "batch": "b3", "message_id": "<sim-marlinvandelay-1@example>"}
+{"kind": "stage", "account": "lanternaperture", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-05T08:30:00"}
+{"kind": "stage", "account": "verdanthooli", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-05T08:30:00"}
+{"kind": "stage", "account": "summitpiedpiper", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-05T08:30:00"}
+{"kind": "stage", "account": "summittidewater", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-05T08:30:00"}
+{"kind": "stage", "account": "fathomnorthwind", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-05T08:30:00"}
+{"kind": "stage", "account": "zenithmonarch", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-05T08:30:00"}
+{"kind": "sent", "account": "kestrelglobex", "contact": "Zoe Grant", "channel": "email", "ts": "2026-10-05T10:00:00", "step": 2, "batch": "b8", "message_id": "<sim-kestrelglobex-2@example>"}
+{"kind": "sent", "account": "quarrymassivedynamic", "contact": "Ana Costa", "channel": "email", "ts": "2026-10-05T10:00:00", "step": 1, "batch": "b7", "message_id": "<sim-quarrymassivedynamic-1@example>"}
+{"kind": "sent", "account": "quarryaperture", "contact": "Noa Levi", "channel": "email", "ts": "2026-10-05T10:00:00", "step": 1, "batch": "b5", "message_id": "<sim-quarryaperture-1@example>"}
+{"kind": "stage", "account": "harborglobex", "from": "researched", "to": "lost", "by": "user", "ts": "2026-10-06T08:30:00"}
+{"kind": "stage", "account": "verdanthooli", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-06T08:30:00"}
+{"kind": "stage", "account": "zenithsoylent", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-06T08:30:00"}
+{"kind": "stage", "account": "atlaswonka", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-06T08:30:00"}
+{"kind": "stage", "account": "emberstark", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-06T08:30:00"}
+{"kind": "sent", "account": "zenithoscorp", "contact": "Jane Doe", "channel": "email", "ts": "2026-10-06T10:00:00", "step": 2, "batch": "b5", "message_id": "<sim-zenithoscorp-2@example>"}
+{"kind": "sent", "account": "lanternwonka", "contact": "Tom Baker", "channel": "email", "ts": "2026-10-06T10:00:00", "step": 2, "batch": "b3", "message_id": "<sim-lanternwonka-2@example>"}
+{"kind": "sent", "account": "summitpiedpiper", "contact": "Eva Lind", "channel": "email", "ts": "2026-10-06T10:00:00", "step": 1, "batch": "b5", "message_id": "<sim-summitpiedpiper-1@example>"}
+{"kind": "sent", "account": "granitesoylent", "contact": "Yuki Sato", "channel": "email", "ts": "2026-10-06T10:00:00", "step": 2, "batch": "b8", "message_id": "<sim-granitesoylent-2@example>"}
+{"kind": "stage", "account": "summitmonarch", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-07T08:30:00"}
+{"kind": "stage", "account": "lanternaperture", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-10-07T08:30:00"}
+{"kind": "sent", "account": "kestrelsoylent", "contact": "Kim Novak", "channel": "email", "ts": "2026-10-07T10:00:00", "step": 1, "batch": "b5", "message_id": "<sim-kestrelsoylent-1@example>"}
+{"kind": "sent", "account": "verdantvandelay", "contact": "Alex Rivera", "channel": "form", "ts": "2026-10-07T10:00:00", "step": 1, "batch": "b4", "message_id": "<sim-verdantvandelay-1@example>"}
+{"kind": "sent", "account": "kestrelvandelay", "contact": "Kim Novak", "channel": "linkedin_dm", "ts": "2026-10-07T10:00:00", "step": 2, "batch": "b4", "message_id": "<sim-kestrelvandelay-2@example>"}
+{"kind": "stage", "account": "kestrelsoylent", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-10-08T08:30:00"}
+{"kind": "stage", "account": "junipersoylent", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-08T08:30:00"}
+{"kind": "stage", "account": "harborvandelay", "from": "replied", "to": "meeting", "by": "agent", "ts": "2026-10-08T08:30:00"}
+{"kind": "stage", "account": "summitglobex", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-08T08:30:00"}
+{"kind": "stage", "account": "summitaperture", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-08T08:30:00"}
+{"kind": "sent", "account": "embersoylent", "contact": "Sam Chen", "channel": "linkedin_dm", "ts": "2026-10-08T10:00:00", "step": 1, "batch": "b7", "message_id": "<sim-embersoylent-1@example>"}
+{"kind": "sent", "account": "basaltumbrella", "contact": "Priya Nair", "channel": "linkedin_dm", "ts": "2026-10-08T10:00:00", "step": 1, "batch": "b6", "message_id": "<sim-basaltumbrella-1@example>"}
+{"kind": "stage", "account": "basaltcyberdyne", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-09T08:30:00"}
+{"kind": "stage", "account": "summitpiedpiper", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-09T08:30:00"}
+{"kind": "stage", "account": "verdantvandelay", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-09T08:30:00"}
+{"kind": "stage", "account": "zenithsoylent", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-10-09T08:30:00"}
+{"kind": "stage", "account": "summitglobex", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-09T08:30:00"}
+{"kind": "stage", "account": "meridiandunder", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-09T08:30:00"}
+{"kind": "stage", "account": "zenithmonarch", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-09T08:30:00"}
+{"kind": "sent", "account": "lanternaperture", "contact": "Noa Levi", "channel": "form", "ts": "2026-10-09T10:00:00", "step": 2, "batch": "b8", "message_id": "<sim-lanternaperture-2@example>"}
+{"kind": "sent", "account": "verdantaperture", "contact": "Yuki Sato", "channel": "linkedin_dm", "ts": "2026-10-09T10:00:00", "step": 2, "batch": "b6", "message_id": "<sim-verdantaperture-2@example>"}
+{"kind": "stage", "account": "summitpiedpiper", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-10-10T08:30:00"}
+{"kind": "stage", "account": "verdantvandelay", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-10T08:30:00"}
+{"kind": "stage", "account": "emberstark", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-10T08:30:00"}
+{"kind": "sent", "account": "zenithpiedpiper", "contact": "Mo Haddad", "channel": "linkedin_dm", "ts": "2026-10-10T10:00:00", "step": 1, "batch": "b8", "message_id": "<sim-zenithpiedpiper-1@example>"}
+{"kind": "sent", "account": "marlinvandelay", "contact": "Tom Baker", "channel": "email", "ts": "2026-10-10T10:00:00", "step": 2, "batch": "b8", "message_id": "<sim-marlinvandelay-2@example>"}
+{"kind": "sent", "account": "lanternwonka", "contact": "Tom Baker", "channel": "linkedin_dm", "ts": "2026-10-10T10:00:00", "step": 1, "batch": "b9", "message_id": "<sim-lanternwonka-1@example>"}
+{"kind": "sent", "account": "kestrelglobex", "contact": "Zoe Grant", "channel": "email", "ts": "2026-10-10T10:00:00", "step": 1, "batch": "b9", "message_id": "<sim-kestrelglobex-1@example>"}
+{"kind": "replied", "account": "zenithoscorp", "contact": "Jane Doe", "channel": "email", "ts": "2026-10-10T15:00:00", "reply_class": "question"}
+{"kind": "replied", "account": "quarrymassivedynamic", "contact": "Ana Costa", "channel": "email", "ts": "2026-10-10T15:00:00", "reply_class": "meeting-ask"}
+{"kind": "replied", "account": "willowoscorp", "contact": "Lee Park", "channel": "email", "ts": "2026-10-10T15:00:00", "reply_class": "question"}
+{"kind": "stage", "account": "orchardcyberdyne", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-11T08:30:00"}
+{"kind": "stage", "account": "summitpiedpiper", "from": "replied", "to": "meeting", "by": "agent", "ts": "2026-10-11T08:30:00"}
+{"kind": "stage", "account": "verdantvandelay", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-11T08:30:00"}
+{"kind": "stage", "account": "quarrynorthwind", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-11T08:30:00"}
+{"kind": "stage", "account": "zenithsoylent", "from": "replied", "to": "meeting", "by": "agent", "ts": "2026-10-11T08:30:00"}
+{"kind": "stage", "account": "harborvandelay", "from": "meeting", "to": "trial", "by": "agent", "ts": "2026-10-11T08:30:00"}
+{"kind": "stage", "account": "atlaswonka", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-11T08:30:00"}
+{"kind": "stage", "account": "summitaperture", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-11T08:30:00"}
+{"kind": "stage", "account": "zenithmonarch", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-11T08:30:00"}
+{"kind": "replied", "account": "zenithpiedpiper", "contact": "Mo Haddad", "channel": "email", "ts": "2026-10-11T15:00:00", "reply_class": "meeting-ask"}
+{"kind": "stage", "account": "lanternaperture", "from": "replied", "to": "meeting", "by": "agent", "ts": "2026-10-12T08:30:00"}
+{"kind": "stage", "account": "summitcyberdyne", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-12T08:30:00"}
+{"kind": "stage", "account": "marlinhooli", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-12T08:30:00"}
+{"kind": "stage", "account": "emberstark", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-12T08:30:00"}
+{"kind": "sent", "account": "basaltumbrella", "contact": "Priya Nair", "channel": "email", "ts": "2026-10-12T10:00:00", "step": 2, "batch": "b5", "message_id": "<sim-basaltumbrella-2@example>"}
+{"kind": "sent", "account": "granitesoylent", "contact": "Yuki Sato", "channel": "email", "ts": "2026-10-12T10:00:00", "step": 1, "batch": "b3", "message_id": "<sim-granitesoylent-1@example>"}
+{"kind": "meeting_booked", "account": "fathompiedpiper", "contact": "Noa Levi", "ts": "2026-10-12T16:00:00"}
+{"kind": "stage", "account": "verdantvandelay", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-10-13T08:30:00"}
+{"kind": "stage", "account": "summitglobex", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-13T08:30:00"}
+{"kind": "stage", "account": "atlaswonka", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-10-13T08:30:00"}
+{"kind": "sent", "account": "harborwayne", "contact": "Mo Haddad", "channel": "email", "ts": "2026-10-13T10:00:00", "step": 1, "batch": "b9", "message_id": "<sim-harborwayne-1@example>"}
+{"kind": "sent", "account": "quarrymassivedynamic", "contact": "Ana Costa", "channel": "linkedin_dm", "ts": "2026-10-13T10:00:00", "step": 2, "batch": "b8", "message_id": "<sim-quarrymassivedynamic-2@example>"}
+{"kind": "sent", "account": "verdantvandelay", "contact": "Alex Rivera", "channel": "form", "ts": "2026-10-13T10:00:00", "step": 2, "batch": "b2", "message_id": "<sim-verdantvandelay-2@example>"}
+{"kind": "replied", "account": "lanternaperture", "contact": "Noa Levi", "channel": "email", "ts": "2026-10-13T15:00:00", "reply_class": "question"}
+{"kind": "meeting_booked", "account": "harborvandelay", "contact": "Eva Lind", "ts": "2026-10-13T16:00:00"}
+{"kind": "stage", "account": "summitpiedpiper", "from": "meeting", "to": "trial", "by": "agent", "ts": "2026-10-14T08:30:00"}
+{"kind": "stage", "account": "quarrynorthwind", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-14T08:30:00"}
+{"kind": "stage", "account": "marlinhooli", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-14T08:30:00"}
+{"kind": "replied", "account": "granitesoylent", "contact": "Yuki Sato", "channel": "email", "ts": "2026-10-14T15:00:00", "reply_class": "meeting-ask"}
+{"kind": "meeting_booked", "account": "atlasaperture", "contact": "Ravi Mehta", "ts": "2026-10-14T16:00:00"}
+{"kind": "stage", "account": "orchardwonka", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-15T08:30:00"}
+{"kind": "stage", "account": "quarrymassivedynamic", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-15T08:30:00"}
+{"kind": "stage", "account": "harborvandelay", "from": "trial", "to": "won", "by": "user", "ts": "2026-10-15T08:30:00"}
+{"kind": "stage", "account": "beaconoscorp", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-15T08:30:00"}
+{"kind": "sent", "account": "zenithpiedpiper", "contact": "Mo Haddad", "channel": "email", "ts": "2026-10-15T10:00:00", "step": 2, "batch": "b8", "message_id": "<sim-zenithpiedpiper-2@example>"}
+{"kind": "sent", "account": "emberumbrella", "contact": "Mo Haddad", "channel": "email", "ts": "2026-10-15T10:00:00", "step": 1, "batch": "b2", "message_id": "<sim-emberumbrella-1@example>"}
+{"kind": "sent", "account": "summitpiedpiper", "contact": "Eva Lind", "channel": "email", "ts": "2026-10-15T10:00:00", "step": 2, "batch": "b9", "message_id": "<sim-summitpiedpiper-2@example>"}
+{"kind": "sent", "account": "quarrynorthwind", "contact": "Tom Baker", "channel": "form", "ts": "2026-10-15T10:00:00", "step": 1, "batch": "b5", "message_id": "<sim-quarrynorthwind-1@example>"}
+{"kind": "sent", "account": "kestrelvandelay", "contact": "Kim Novak", "channel": "email", "ts": "2026-10-15T10:00:00", "step": 1, "batch": "b6", "message_id": "<sim-kestrelvandelay-1@example>"}
+{"kind": "replied", "account": "granitenorthwind", "contact": "Zoe Grant", "channel": "email", "ts": "2026-10-15T15:00:00", "reply_class": "meeting-ask"}
+{"kind": "replied", "account": "kestrelsoylent", "contact": "Kim Novak", "channel": "email", "ts": "2026-10-15T15:00:00", "reply_class": "interested"}
+{"kind": "replied", "account": "verdantvandelay", "contact": "Alex Rivera", "channel": "email", "ts": "2026-10-15T15:00:00", "reply_class": "meeting-ask"}
+{"kind": "meeting_booked", "account": "granitesoylent", "contact": "Yuki Sato", "ts": "2026-10-15T16:00:00"}
+{"kind": "stage", "account": "zenithoscorp", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-16T08:30:00"}
+{"kind": "stage", "account": "orchardcyberdyne", "from": "researched", "to": "nurture", "by": "agent", "ts": "2026-10-16T08:30:00"}
+{"kind": "stage", "account": "quarrymassivedynamic", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-16T08:30:00"}
+{"kind": "stage", "account": "saffronwayne", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-16T08:30:00"}
+{"kind": "stage", "account": "verdantnorthwind", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-16T08:30:00"}
+{"kind": "sent", "account": "kestrelsoylent", "contact": "Kim Novak", "channel": "linkedin_dm", "ts": "2026-10-16T10:00:00", "step": 2, "batch": "b3", "message_id": "<sim-kestrelsoylent-2@example>"}
+{"kind": "sent", "account": "orchardglobex", "contact": "Priya Nair", "channel": "form", "ts": "2026-10-16T10:00:00", "step": 2, "batch": "b7", "message_id": "<sim-orchardglobex-2@example>"}
+{"kind": "replied", "account": "lanternwonka", "contact": "Tom Baker", "channel": "email", "ts": "2026-10-16T15:00:00", "reply_class": "question"}
+{"kind": "meeting_booked", "account": "granitenorthwind", "contact": "Zoe Grant", "ts": "2026-10-16T16:00:00"}
+{"kind": "meeting_booked", "account": "zenithsoylent", "contact": "Mo Haddad", "ts": "2026-10-16T16:00:00"}
+{"kind": "meeting_booked", "account": "fathomwonka", "contact": "Yuki Sato", "ts": "2026-10-16T16:00:00"}
+{"kind": "stage", "account": "granitenorthwind", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-17T08:30:00"}
+{"kind": "stage", "account": "lanternaperture", "from": "meeting", "to": "trial", "by": "agent", "ts": "2026-10-17T08:30:00"}
+{"kind": "stage", "account": "zenithoscorp", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-17T08:30:00"}
+{"kind": "stage", "account": "kestrelglobex", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-17T08:30:00"}
+{"kind": "stage", "account": "verdantvandelay", "from": "replied", "to": "meeting", "by": "agent", "ts": "2026-10-17T08:30:00"}
+{"kind": "stage", "account": "quarrynorthwind", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-17T08:30:00"}
+{"kind": "stage", "account": "harbormonarch", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-17T08:30:00"}
+{"kind": "stage", "account": "zenithstark", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-17T08:30:00"}
+{"kind": "stage", "account": "beaconoscorp", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-17T08:30:00"}
+{"kind": "sent", "account": "zenithsoylent", "contact": "Mo Haddad", "channel": "linkedin_dm", "ts": "2026-10-17T10:00:00", "step": 1, "batch": "b4", "message_id": "<sim-zenithsoylent-1@example>"}
+{"kind": "replied", "account": "verdantaperture", "contact": "Yuki Sato", "channel": "email", "ts": "2026-10-17T15:00:00", "reply_class": "not-now"}
+{"kind": "meeting_booked", "account": "quarrymassivedynamic", "contact": "Ana Costa", "ts": "2026-10-17T16:00:00"}
+{"kind": "meeting_booked", "account": "summitpiedpiper", "contact": "Eva Lind", "ts": "2026-10-17T16:00:00"}
+{"kind": "meeting_booked", "account": "quarrynorthwind", "contact": "Tom Baker", "ts": "2026-10-17T16:00:00"}
+{"kind": "meeting_booked", "account": "atlasacme", "contact": "Tom Baker", "ts": "2026-10-17T16:00:00"}
+{"kind": "meeting_booked", "account": "willowvandelay", "contact": "Mo Haddad", "ts": "2026-10-17T16:00:00"}
+{"kind": "meeting_booked", "account": "zenithstark", "contact": "Yuki Sato", "ts": "2026-10-17T16:00:00"}
+{"kind": "stage", "account": "granitenorthwind", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-18T08:30:00"}
+{"kind": "stage", "account": "atlasaperture", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-18T08:30:00"}
+{"kind": "stage", "account": "juniperumbrella", "from": "lead", "to": "researched", "by": "agent", "ts": "2026-10-18T08:30:00"}
+{"kind": "sent", "account": "harborwonka", "contact": "Tom Baker", "channel": "email", "ts": "2026-10-18T10:00:00", "step": 2, "batch": "b7", "message_id": "<sim-harborwonka-2@example>"}
+{"kind": "sent", "account": "orchardglobex", "contact": "Priya Nair", "channel": "form", "ts": "2026-10-18T10:00:00", "step": 1, "batch": "b2", "message_id": "<sim-orchardglobex-1@example>"}
+{"kind": "replied", "account": "basaltumbrella", "contact": "Priya Nair", "channel": "email", "ts": "2026-10-18T15:00:00", "reply_class": "question"}
+{"kind": "replied", "account": "orchardglobex", "contact": "Priya Nair", "channel": "email", "ts": "2026-10-18T15:00:00", "reply_class": "not-now"}
+{"kind": "stage", "account": "quarrymassivedynamic", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-19T08:30:00"}
+{"kind": "stage", "account": "summitpiedpiper", "from": "trial", "to": "won", "by": "user", "ts": "2026-10-19T08:30:00"}
+{"kind": "sent", "account": "harborwonka", "contact": "Tom Baker", "channel": "form", "ts": "2026-10-19T10:00:00", "step": 1, "batch": "b8", "message_id": "<sim-harborwonka-1@example>"}
+{"kind": "sent", "account": "willowoscorp", "contact": "Lee Park", "channel": "form", "ts": "2026-10-19T10:00:00", "step": 1, "batch": "b4", "message_id": "<sim-willowoscorp-1@example>"}
+{"kind": "sent", "account": "atlasaperture", "contact": "Ravi Mehta", "channel": "form", "ts": "2026-10-19T10:00:00", "step": 2, "batch": "b2", "message_id": "<sim-atlasaperture-2@example>"}
+{"kind": "meeting_booked", "account": "lanternwonka", "contact": "Tom Baker", "ts": "2026-10-19T16:00:00"}
+{"kind": "meeting_booked", "account": "verdantvandelay", "contact": "Alex Rivera", "ts": "2026-10-19T16:00:00"}
+{"kind": "meeting_booked", "account": "tundradunder", "contact": "Zoe Grant", "ts": "2026-10-19T16:00:00"}
+{"kind": "stage", "account": "granitenorthwind", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "granitenorthwind", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "granitenorthwind", "from": "replied", "to": "meeting", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "orchardwonka", "from": "researched", "to": "nurture", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "zenithoscorp", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "zenithoscorp", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "kestrelglobex", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "kestrelglobex", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "quarrymassivedynamic", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "quarrymassivedynamic", "from": "replied", "to": "meeting", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "atlasaperture", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "atlasaperture", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "atlasaperture", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "atlasaperture", "from": "replied", "to": "meeting", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "juniperumbrella", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "quarrynorthwind", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "quarrynorthwind", "from": "replied", "to": "meeting", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "harbormonarch", "from": "researched", "to": "out", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "zenithstark", "from": "researched", "to": "sequenced", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "zenithstark", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "zenithstark", "from": "contacted", "to": "replied", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "zenithstark", "from": "replied", "to": "meeting", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "zenithstark", "from": "meeting", "to": "trial", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "stage", "account": "beaconoscorp", "from": "sequenced", "to": "contacted", "by": "agent", "ts": "2026-10-20T08:30:00"}
+{"kind": "sent", "account": "granitenorthwind", "contact": "Zoe Grant", "channel": "email", "ts": "2026-10-20T10:00:00", "step": 2, "batch": "b7", "message_id": "<sim-granitenorthwind-2@example>"}
+{"kind": "replied", "account": "summitpiedpiper", "contact": "Eva Lind", "channel": "email", "ts": "2026-10-20T15:00:00", "reply_class": "question"}
+{"kind": "meeting_booked", "account": "lanternaperture", "contact": "Noa Levi", "ts": "2026-10-20T16:00:00"}

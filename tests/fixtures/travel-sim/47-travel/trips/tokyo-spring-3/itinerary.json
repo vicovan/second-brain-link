@@ -1,0 +1,100 @@
+{
+ "schema": "sbl-itinerary/1",
+ "trip_id": "tokyo-spring-3",
+ "title": "Tokyo in spring",
+ "status": "shopped",
+ "created": "2026-08-31T09:00:00",
+ "updated": "2026-10-18T09:00:00",
+ "window": {
+  "earliest": "2026-10-20",
+  "latest": "2026-10-23",
+  "nights": 3,
+  "flex_days": 0
+ },
+ "currency": "EUR",
+ "budget": {},
+ "travelers": [
+  {
+   "id": "me",
+   "label": "me"
+  }
+ ],
+ "stops": [
+  {
+   "id": "s1",
+   "place": "Tokyo",
+   "country": "JP",
+   "lat": 35.6762,
+   "lng": 139.6503,
+   "role": "base",
+   "arrive": "2026-10-20",
+   "depart": "2026-10-23",
+   "nights": 3,
+   "why": "saved, never visited",
+   "days": [
+    {
+     "date": "2026-10-20",
+     "route": "",
+     "items": [
+      "p1",
+      "p2"
+     ]
+    },
+    {
+     "date": "2026-10-21",
+     "route": "",
+     "items": [
+      "p3"
+     ]
+    }
+   ],
+   "stay": {}
+  }
+ ],
+ "legs": [],
+ "pois": [
+  {
+   "id": "p1",
+   "stop": "s1",
+   "name": "Marlin Cafe",
+   "kind": "cafe",
+   "lat": 35.664302378320585,
+   "lng": 139.66038534955888,
+   "why": "the kind of place you love",
+   "from_brain": false,
+   "brain_note": "",
+   "rating": null,
+   "price_band": "",
+   "booking": null
+  },
+  {
+   "id": "p2",
+   "stop": "s1",
+   "name": "Atlas Cafe",
+   "kind": "museum",
+   "lat": 35.67654485094321,
+   "lng": 139.65047685007602,
+   "why": "the kind of place you love",
+   "from_brain": false,
+   "brain_note": "",
+   "rating": null,
+   "price_band": "",
+   "booking": null
+  },
+  {
+   "id": "p3",
+   "stop": "s1",
+   "name": "Lantern Museum",
+   "kind": "cafe",
+   "lat": 35.668933457823044,
+   "lng": 139.6524248434207,
+   "why": "the kind of place you love",
+   "from_brain": false,
+   "brain_note": "",
+   "rating": null,
+   "price_band": "",
+   "booking": null
+  }
+ ],
+ "routes": []
+}

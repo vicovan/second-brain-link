@@ -20,7 +20,7 @@ them**. Every other skill reads them.
 
 | File | Holds | Missing means |
 |---|---|---|
-| `traveler.md` | home airports, citizenships (`visa_ok`), companions, cabin/seat, red-eyes, loyalty programme names, mobility and dietary needs | nothing can be shopped — ask first |
+| `traveler.md` | **`home_city`, `radius_km`, `mix`** (the daily's where, how far, which slots), home airports, citizenships (`visa_ok`), companions, cabin/seat, red-eyes, loyalty programme names, mobility and dietary needs | nothing can be shopped, and *Today near me* has no "here" — ask first |
 | `travel-criteria.md` | trip length, seasons, climate, pace, flight limits, layover and **stopover-night** tolerance, avoid-list, budget bands | the scout proposes the whole world |
 | `taste.md` | cuisines, coffee, hotel style, neighbourhood, activity types — **proposed from the brain, confirmed by the user** | suggestions fall back to generic |
 | `booking-answers.md` | **§0 Autonomy**, name as on passport, opt-in DOB and passport expiry, loyalty numbers | every run re-asks |
@@ -64,7 +64,10 @@ Then say what you found in a few lines — *"You saved 9 places in Lisbon and vi
 rated three third-wave coffee bars ★5 and a buffet breakfast ★2."* — and ask only what the
 brain cannot know:
 
-1. Home airports (and any others they would fly from).
+1. **Home city** (the daily's "here" when no trip is on — never the device), how far they will
+   go on an ordinary day (`radius_km`, default 6), and the daily mix (`mix`: coffee · meal ·
+   activity · event · wildcard, + social when they want company). Home airports (and any others
+   they would fly from).
 2. Citizenships, and any countries they have confirmed they may enter (`visa_ok`). Never
    decide a visa is unnecessary.
 3. Who usually travels with them.
@@ -87,6 +90,14 @@ Use `AskUserQuestion` for choices with few options; ask free text in prose.
 - **Never store** a passport or national ID number, a card number, or a password, even if
   offered. Date of birth and passport expiry go in §2 of `booking-answers.md` **only** if the
   user explicitly opts in.
-- Run `render_brain.py --quiet` afterwards so the dashboard's profile line updates.
+- Then seed the daily and show the line:
+  ```bash
+  python3 $S/stages.py init --contract ${CLAUDE_PLUGIN_ROOT}/studio.json --profile 47-travel/profile
+  python3 $S/explore.py add --sources 47-travel/profile/sources.md --source "<the city's event listing>" --kind events --proven
+  python3 $S/explore.py add --sources 47-travel/profile/sources.md --source "<a neighbourhood or a kind to explore>"
+  python3 $S/harness.py seed travel-planner     # Goals: Try my city · Plan my next trip; Routines: Today near me · This weekend · Weekly trip check · Trip ideas (off)
+  python3 $S/render_brain.py --quiet
+  ```
+  and say: *"Your daily is ready — switch it on in Routines or the Daily tab."*
 
 **Acceptance:** a second run with nothing changed writes nothing.

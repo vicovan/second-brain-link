@@ -19,12 +19,14 @@ layer and the account's evidence. There is no mail-merge and no `{{first_name}}`
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/sales-scout/scripts/sequence.py list
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/sales-scout/scripts/ledger.py list --stage target
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/sales-scout/scripts/ledger.py list --stage researched
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/sales-scout/scripts/sequence.py start <KEY> --sequence "<Name>" --contacts "<A,B>"
 ```
 
-- Match the sequence to the account's `origin` (`applies_to`). A cold account where the brain
-  also holds a tie gets the warm one.
+- Match the sequence to the account's `origin` (`applies_to`) **and its reach-out mix**: the
+  account's `channels` (set by `sales-research`, in order) decide which steps run and in what
+  order — an account whose mix starts with *intro* gets the intro step first; a mix without social
+  skips the social steps. A cold account where the brain also holds a tie gets the warm one.
 - Run to the people research chose — usually one buyer and, later, one champion; never the
   whole team at once.
 - A `requires: social` step on a seller with `social_auto: off` becomes an **assisted** step (the

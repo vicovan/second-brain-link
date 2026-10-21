@@ -58,9 +58,23 @@ tags: [fundraising, plan]
    silent, it says ⚠ rather than guessing.
 2. **The filter** — the founder's chain, verbatim from `round.md`, and what it removed this run
    (counts per filter from `ledger.py rescreen`).
-3. **§0 Ledger** — every record with an application or a contact: filed/sent date, outcome, next
-   window. **Conflicts are questions, not guesses**: when two sources disagree (a program shows a
-   window open for a batch the founder believes rejected them), list the evidence and the question.
+3. **§0 Ledger** — **script-rendered, never typed** (R2). Write the heading, then the markers with
+   the table `ledger.py table ledger` prints between them; `render_brain.py` refreshes it on every
+   render and never touches the rest of the plan:
+
+   ```
+   ## §0 Ledger
+
+   <!-- ledger:begin -->
+   | Target | Kind | Tier | Status | Filed / sent | Outcome | Next |
+   ...
+   <!-- ledger:end -->
+   ```
+
+   Below the markers, in your own words: **conflicts are questions, not guesses** — when two sources
+   disagree (a program shows a window open for a batch the founder believes rejected them), list the
+   evidence and the question. Rows an older plan had that the ledger lacks are offered for import
+   (`import_doc.py`) under *Needs you*, never silently added.
 4. **§1 Timeline** — dated rows from today: date · days left · action · net cash · stamp. Rolling
    doors in their own block. **Branches** where a pending decision changes the plan ("If <program>
    accepts → …; if not by <date> → …"). A deadline with `year_confirmed: false` is shown ⚠.
@@ -79,8 +93,8 @@ tags: [fundraising, plan]
 10. **This week, in order** — at most seven numbered actions, the cheapest-highest-odds first, each
     naming the skill that does it ("Draft the Tier 2 emails — raise-outreach").
 
-Link targets as `[[<Name> (target)]]` (their note titles) — never an aliased link inside a table
-cell. Never link a note that does not exist.
+Link targets as `[[<Name> (target)]]` (their note titles — under `programs/` or `investors/` by kind)
+— never an aliased link inside a table cell. Never link a note that does not exist.
 
 ## After writing
 

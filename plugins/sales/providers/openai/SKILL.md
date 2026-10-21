@@ -13,6 +13,8 @@ description: Run outbound from your own profile and Second Brain — generate le
 sending settings live in `<surface>/48-sales/profile/`, which `references/sales-onboarding.md`
 writes with you.
 
+
+Every run starts with `python3 scripts/daily.py start --agent sales` (the dated daily note first) and ends with `scripts/daily.py close --report report.json` (the report, twice); Mondays run `scripts/kpi.py` → `scripts/optimize.py`.
 ## What differs from the Claude packaging — read this first
 
 Codex has no browser-automation tools, so **this packaging does not perform social steps or fill

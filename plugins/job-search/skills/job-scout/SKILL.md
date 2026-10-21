@@ -486,7 +486,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/render_brain.py --quiet  
 ```
 **Record only after the report is written** — a crashed run should be repeatable.
 
-`render_brain.py` mirrors the report into `<brain>/45-jobs/reports/Shortlist <date>.md` — plus
+`render_brain.py` mirrors the report into `<brain>/45-jobs/reports/Shortlist <date>.md` (into the `## Shortlist` section of the dated daily note when `daily.py start` opened it first) — plus
 the dashboard, the lessons and one folder per application under
 `45-jobs/applications/<date>/<job_key>/` — so the user opens the same dashboard from Obsidian
 or Second Brain Studio. Run it again after **every** status change, not just once at the end:

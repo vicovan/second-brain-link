@@ -1,17 +1,272 @@
 {
+  "schema": "sbl-agent/1",
   "id": "sales",
   "label": "Sales Agent",
   "blurb": "Finds leads — your brain's warm ties and lost deals first, then companies with a reason to buy now — researches the buying team, runs your sequences from your own mailbox and browser within your caps, works the replies and books the meetings. No bought data.",
   "icon": "target",
+  "color": "#d9480f",
   "grounding": "studio/grounding.md",
   "entrySkill": "sales-pipeline",
+  "subjects": [
+    "personal",
+    "company"
+  ],
+  "providers": [
+    "claudecode"
+  ],
+  "network": {
+    "declared": true,
+    "what": "public company sites, job boards, news and directories for signals (never a login, no bought data); the seller's own mailbox (SMTP/IMAP) and browser for sends, every one through the send guard"
+  },
   "layer": "48-sales",
-  "homeNote": "48-sales/Pipeline.md",
+  "layout": {
+    "dashboard": "Sales Dashboard.md",
+    "kpi": "Sales KPI.md",
+    "lessons": "Sales Lessons.md",
+    "profile": "profile",
+    "reports": "reports",
+    "items": {
+      "accounts": "accounts"
+    },
+    "work": {
+      "outreach": "outreach"
+    },
+    "extras": [
+      "sequences",
+      "batches"
+    ]
+  },
+  "homeNote": "48-sales/reports/Sell today {date}.md",
+  "homeNoteFallback": "48-sales/Sales Dashboard.md",
   "home": {
     "cmd": "scout.py starter"
   },
+  "daily": {
+    "note": "Sell today {date}",
+    "weekly": "Sales review {date}",
+    "steps": [
+      "replies",
+      "due",
+      "leads",
+      "strategy",
+      "sequences",
+      "send"
+    ],
+    "sections": [
+      "New today",
+      "Due steps",
+      "Replies to work",
+      "Approvals waiting",
+      "Explored today",
+      "Needs you"
+    ],
+    "orient": [
+      "sales_profile.py check",
+      "scout.py stats",
+      "sequence.py due --count"
+    ],
+    "settings": "48-sales/profile/sending.md"
+  },
   "watchGlob": "48-sales/**",
   "pipeline": "48-sales/pipeline.json",
+  "render": {
+    "cmd": "render_sales.py --quiet"
+  },
+  "canvas": "lines",
+  "funnels": [
+    {
+      "id": "accounts",
+      "label": "Accounts",
+      "item": "account",
+      "success": "trial",
+      "stages": [
+        {
+          "id": "lead",
+          "label": "Lead",
+          "role": "open"
+        },
+        {
+          "id": "researched",
+          "label": "Researched",
+          "role": "open"
+        },
+        {
+          "id": "sequenced",
+          "label": "Sequenced",
+          "role": "open"
+        },
+        {
+          "id": "contacted",
+          "label": "Contacted",
+          "role": "open"
+        },
+        {
+          "id": "replied",
+          "label": "Replied",
+          "role": "open"
+        },
+        {
+          "id": "meeting",
+          "label": "Meeting",
+          "role": "open"
+        },
+        {
+          "id": "trial",
+          "label": "Trial",
+          "role": "open"
+        },
+        {
+          "id": "won",
+          "label": "Won",
+          "role": "positive",
+          "gate": "reason"
+        },
+        {
+          "id": "lost",
+          "label": "Lost",
+          "role": "negative",
+          "gate": "reason"
+        },
+        {
+          "id": "nurture",
+          "label": "Not now",
+          "role": "parked"
+        },
+        {
+          "id": "out",
+          "label": "Knocked out",
+          "role": "parked"
+        }
+      ]
+    }
+  ],
+  "floor": [
+    {
+      "id": "lead",
+      "label": "Lead",
+      "stages": [
+        "lead"
+      ]
+    },
+    {
+      "id": "researched",
+      "label": "Researched",
+      "stages": [
+        "researched"
+      ]
+    },
+    {
+      "id": "sequenced",
+      "label": "Sequenced",
+      "stages": [
+        "sequenced"
+      ]
+    },
+    {
+      "id": "contacted",
+      "label": "Contacted",
+      "stages": [
+        "contacted"
+      ]
+    },
+    {
+      "id": "replied",
+      "label": "Replied",
+      "stages": [
+        "replied"
+      ]
+    },
+    {
+      "id": "meeting",
+      "label": "Meeting",
+      "stages": [
+        "meeting"
+      ]
+    },
+    {
+      "id": "trial",
+      "label": "Trial",
+      "stages": [
+        "trial"
+      ]
+    },
+    {
+      "id": "won",
+      "label": "Won",
+      "stages": [
+        "won"
+      ]
+    }
+  ],
+  "goals": [
+    {
+      "template": "Start trials",
+      "metric": "trials",
+      "target": 5
+    }
+  ],
+  "outcomes": {
+    "trials": {
+      "label": "trials started",
+      "cmd": "ledger.py count trials"
+    },
+    "meetings": {
+      "label": "meetings booked",
+      "cmd": "ledger.py count meetings"
+    },
+    "replies": {
+      "label": "replies",
+      "cmd": "ledger.py count replies"
+    },
+    "won": {
+      "label": "won",
+      "cmd": "ledger.py count won"
+    },
+    "contacted": {
+      "label": "accounts contacted",
+      "cmd": "ledger.py count contacted"
+    }
+  },
+  "throughput": {
+    "label": "touches / day",
+    "cmd": "ledger.py count touches --days 1"
+  },
+  "routines": [
+    {
+      "template": "Daily sales",
+      "kind": "daily"
+    },
+    {
+      "template": "Work my replies",
+      "kind": "daily"
+    },
+    {
+      "template": "Weekly sales review",
+      "kind": "weekly"
+    }
+  ],
+  "optimize": {
+    "sources": "profile/sources.md",
+    "scoring": "profile/scoring.md",
+    "signals": [
+      "origin",
+      "segment",
+      "channel",
+      "step",
+      "signal",
+      "strategy"
+    ],
+    "explore": 0.2
+  },
+  "concurrency": {
+    "weight": "heavy",
+    "browser": true,
+    "parallel_items": 2
+  },
+  "inspector": {
+    "account": "account"
+  },
+  "persona": "sales-advisor",
   "tools": [
     "Skill",
     "Agent",
@@ -22,85 +277,11 @@
     "profile": "48-sales/profile/offer.md",
     "onboardSkill": "sales-onboarding"
   },
-  "providers": [
-    "claudecode"
+  "preflight": [
+    "profile_present",
+    "chrome_connected"
   ],
-  "subjects": [
-    "personal",
-    "company"
-  ],
-  "color": "#d9480f",
-  "suggestions": [
-    {
-      "t": "Set me up",
-      "stage": "setup",
-      "short": "Pull my offer, customers and voice from this brain and my deck; ask only the decisions.",
-      "q": "Set up or update my sales profile. Read this brain first — my company, the deals I won and lost, how I write — and my deck and facts file, then ask me only the decisions: what I sell and to whom, my markets, the daily target and floor, how autonomous you should be, whether you may send social steps yourself, and my mailbox."
-    },
-    {
-      "t": "Who would take my call?",
-      "stage": "do",
-      "when": "onboarded",
-      "short": "The warm leads already in my brain — ties, lost deals, intro paths. No web, no cost.",
-      "q": "Who would take my call? Rank the leads my brain already holds — warm and dormant decision-makers, lost deals worth reopening, intro paths — with why each one, and nothing from the web."
-    },
-    {
-      "t": "Find me leads",
-      "stage": "do",
-      "when": "onboarded",
-      "short": "Today's sweep across my markets: coverage table, shortlist above my floor, knock-outs shown.",
-      "q": "Find me leads: run today's sweep — my brain first, then every market's sources (hiring signals, funding and news, directories, events, registries, public threads) and the companies' own sites. Show the coverage table, the shortlist above my floor with why now and the way in, and what was knocked out and why."
-    },
-    {
-      "t": "Who's hiring for what I sell?",
-      "stage": "do",
-      "when": "onboarded",
-      "short": "Companies posting my buyer and need roles, from public job search and their own boards.",
-      "q": "Who's hiring for what I sell? Run the hiring-signal pass only — LinkedIn's public job search and the companies' own careers boards — for my buyer and need roles in my markets, and add the matches as leads."
-    },
-    {
-      "t": "Build this week's pipeline",
-      "stage": "do",
-      "when": "has-work",
-      "short": "Research the approved leads — buying team, a way in, why now (fan-out told first).",
-      "q": "Build this week's pipeline: research the top leads from the latest lead report — the buying team, a reachable channel for each person with its evidence, the why now — tell me the fan-out before you spend it, then make them targets."
-    },
-    {
-      "t": "Start sequences",
-      "stage": "do",
-      "when": "has-work",
-      "short": "A cadence per target; the first touches come back as one approval batch.",
-      "q": "Start sequences for my targets that do not have one — the cadence that fits each account's origin, to the people research chose — and bring the first touches back to me as one approval batch."
-    },
-    {
-      "t": "Send what's due",
-      "stage": "do",
-      "when": "has-work",
-      "short": "Today's steps, each through the guard: email from my mailbox, social in my browser, forms.",
-      "q": "Send what's due today. Write each message from my voice and the account's evidence, lint it against my facts, run it through the send guard, batch anything gated into one approval card, and send the rest within my caps."
-    },
-    {
-      "t": "Work my replies",
-      "stage": "track",
-      "when": "has-work",
-      "short": "Read, classify, answer the routine ones, propose times, book — pricing and objections come to me.",
-      "q": "Work my replies: read new replies from the people I've written to, classify each one, stop their sequences, answer the routine ones and propose meeting times, book what's agreed, suppress any unsubscribe, and bring me pricing, legal and objections with a drafted answer."
-    },
-    {
-      "t": "Brief me for my next call",
-      "stage": "track",
-      "when": "has-work",
-      "short": "History, who's on the call, why now, what they'll ask, the one outcome to aim for.",
-      "q": "Brief me for my next call: the deal history from my brain, who is on the call and what they said, why now, what they'll ask with honest answers from my profile, and the one outcome to aim for."
-    },
-    {
-      "t": "How is it going?",
-      "stage": "track",
-      "when": "has-work",
-      "short": "Replies, meetings and what's working by origin, segment and step — rates only from 20 sends.",
-      "q": "How is it going? Show replies, meetings and opportunities by origin, segment, channel and step (rates only where there are at least 20 sends), what is working, and at most three changes you'd make."
-    }
-  ],
+  "templates": "harness",
   "settings": {
     "title": "Sales Agent settings",
     "blurb": "What the agent may do on your behalf, and the materials it may quote. It all lives in your brain, in the sales profile — nothing is uploaded anywhere. Your mailbox password is never stored here (macOS Keychain or SBL_MAIL_PASSWORD).",
@@ -252,25 +433,119 @@
           ]
         }
       ]
-    }
-  },
-  "templates": "harness",
-  "outcomes": {
-    "replies": {
-      "label": "replies",
-      "cmd": "ledger.py count replies"
     },
-    "meetings": {
-      "label": "meetings booked",
-      "cmd": "ledger.py count meetings"
-    },
-    "opportunities": {
-      "label": "opportunities",
-      "cmd": "ledger.py count opportunities"
-    }
+    "daily": true
   },
-  "preflight": [
-    "profile_present",
-    "chrome_connected"
+  "suggestions": [
+    {
+      "t": "Set me up",
+      "stage": "setup",
+      "short": "Pull my offer, customers and voice from this brain and my deck; ask only the decisions.",
+      "q": "Set up or update my sales profile. Read this brain first — my company, the deals I won and lost, how I write — and my deck and facts file, then ask me only the decisions: what I sell and to whom, my markets, the daily target and floor, how autonomous you should be, whether you may send social steps yourself, and my mailbox."
+    },
+    {
+      "t": "Run today's sales",
+      "stage": "do",
+      "short": "Replies first, then the due steps, then today's leads with a strategy and a reach-out mix per account.",
+      "q": "Run today's sales: work the replies, send what is due within my caps, find today's leads with a strategy and a reach-out mix per account, start the sequences that fit, and give me the dated note."
+    },
+    {
+      "t": "New companies today",
+      "stage": "today",
+      "when": "onboarded",
+      "short": "Companies with a reason to buy now that are new since my last run, scored, coverage shown.",
+      "q": "Find new companies today: run today's sweep across my markets — my brain first, then the public signals — and add the accounts above my floor to today's Sell today note, with the coverage table and what was knocked out."
+    },
+    {
+      "t": "A strategy for each account",
+      "stage": "today",
+      "when": "has-work",
+      "short": "For today's accounts: get them to try, use, buy or partner — and why.",
+      "q": "For each account in today's Sell today note, pick the strategy — try, use, buy or partner — say why from the evidence, and name the offer from my offer note that fits."
+    },
+    {
+      "t": "How to reach each account",
+      "stage": "today",
+      "when": "has-work",
+      "short": "The channel mix and the angle per account: email, social, an intro, their form.",
+      "q": "For each account in today's note, choose how to reach it — email, social, a warm intro from my brain or their contact form — and the angle for the first touch. Draft the first touches as one approval batch."
+    },
+    {
+      "t": "Replies and steps due today",
+      "stage": "today",
+      "when": "has-work",
+      "short": "Answer the routine replies, then send today's due steps through the guard.",
+      "q": "Work today's replies first — answer the routine ones, bring pricing and objections to me — then send the steps due today, each through the guard and within my caps."
+    },
+    {
+      "t": "Who would take my call?",
+      "stage": "do",
+      "when": "onboarded",
+      "short": "The warm leads already in my brain — ties, lost deals, intro paths. No web, no cost.",
+      "q": "Who would take my call? Rank the leads my brain already holds — warm and dormant decision-makers, lost deals worth reopening, intro paths — with why each one, and nothing from the web."
+    },
+    {
+      "t": "Find me leads",
+      "stage": "do",
+      "when": "onboarded",
+      "short": "Today's sweep across my markets: coverage table, shortlist above my floor, knock-outs shown.",
+      "q": "Find me leads: run today's sweep — my brain first, then every market's sources (hiring signals, funding and news, directories, events, registries, public threads) and the companies' own sites. Show the coverage table, the shortlist above my floor with why now and the way in, and what was knocked out and why."
+    },
+    {
+      "t": "Who's hiring for what I sell?",
+      "stage": "do",
+      "when": "onboarded",
+      "short": "Companies posting my buyer and need roles, from public job search and their own boards.",
+      "q": "Who's hiring for what I sell? Run the hiring-signal pass only — LinkedIn's public job search and the companies' own careers boards — for my buyer and need roles in my markets, and add the matches as leads."
+    },
+    {
+      "t": "Build this week's pipeline",
+      "stage": "do",
+      "when": "has-work",
+      "short": "Research the approved leads — buying team, a way in, why now (fan-out told first).",
+      "q": "Build this week's pipeline: research the top leads from the latest lead report — the buying team, a reachable channel for each person with its evidence, the why now — tell me the fan-out before you spend it, then make them targets."
+    },
+    {
+      "t": "Start sequences",
+      "stage": "do",
+      "when": "has-work",
+      "short": "A cadence per target; the first touches come back as one approval batch.",
+      "q": "Start sequences for my targets that do not have one — the cadence that fits each account's origin, to the people research chose — and bring the first touches back to me as one approval batch."
+    },
+    {
+      "t": "Send what's due",
+      "stage": "do",
+      "when": "has-work",
+      "short": "Today's steps, each through the guard: email from my mailbox, social in my browser, forms.",
+      "q": "Send what's due today. Write each message from my voice and the account's evidence, lint it against my facts, run it through the send guard, batch anything gated into one approval card, and send the rest within my caps."
+    },
+    {
+      "t": "Work my replies",
+      "stage": "track",
+      "when": "has-work",
+      "short": "Read, classify, answer the routine ones, propose times, book — pricing and objections come to me.",
+      "q": "Work my replies: read new replies from the people I've written to, classify each one, stop their sequences, answer the routine ones and propose meeting times, book what's agreed, suppress any unsubscribe, and bring me pricing, legal and objections with a drafted answer."
+    },
+    {
+      "t": "Brief me for my next call",
+      "stage": "track",
+      "when": "has-work",
+      "short": "History, who's on the call, why now, what they'll ask, the one outcome to aim for.",
+      "q": "Brief me for my next call: the deal history from my brain, who is on the call and what they said, why now, what they'll ask with honest answers from my profile, and the one outcome to aim for."
+    },
+    {
+      "t": "How is it going?",
+      "stage": "track",
+      "when": "has-work",
+      "short": "Replies, meetings and what's working by origin, segment and step — rates only from 20 sends.",
+      "q": "How is it going? Show replies, meetings and opportunities by origin, segment, channel and step (rates only where there are at least 20 sends), what is working, and at most three changes you'd make."
+    },
+    {
+      "t": "Weekly sales review",
+      "stage": "track",
+      "when": "has-work",
+      "short": "Replies, meetings and trials by source and strategy, and the changes I'd make — you decide.",
+      "q": "Run my weekly sales review: replies, meetings and trials by source, strategy and channel (rates only from 20 sends), then propose changes to my sources, scoring and reach-out mix for me to approve. Caps and gates never loosen."
+    }
   ]
 }

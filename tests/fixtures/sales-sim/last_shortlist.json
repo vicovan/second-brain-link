@@ -1,0 +1,127 @@
+{
+ "floor": 60,
+ "target": 10,
+ "merged_at": "2026-10-20",
+ "shortlist": [
+  {
+   "key": "meridiangringotts",
+   "name": "Meridian Gringotts",
+   "score": 88,
+   "markets": [
+    "Madrid"
+   ],
+   "reach": "intro",
+   "origin": "revival",
+   "new": true,
+   "why": "hiring for the role we help"
+  },
+  {
+   "key": "granitehooli",
+   "name": "Granite Hooli",
+   "score": 68,
+   "markets": [
+    "Tokyo"
+   ],
+   "reach": "handoff",
+   "origin": "cold",
+   "new": true,
+   "why": "hiring for the role we help"
+  },
+  {
+   "key": "basaltaperture",
+   "name": "Basalt Aperture",
+   "score": 79,
+   "markets": [
+    "Madrid"
+   ],
+   "reach": "intro",
+   "origin": "dormant",
+   "new": true,
+   "why": "hiring for the role we help"
+  },
+  {
+   "key": "tundraacme",
+   "name": "Tundra Acme",
+   "score": 78,
+   "markets": [
+    "Tokyo"
+   ],
+   "reach": "intro",
+   "origin": "cold",
+   "new": true,
+   "why": "hiring for the role we help"
+  },
+  {
+   "key": "emberwonka",
+   "name": "Ember Wonka",
+   "score": 71,
+   "markets": [
+    "Lisbon"
+   ],
+   "reach": "warm",
+   "origin": "revival",
+   "new": true,
+   "why": "hiring for the role we help"
+  },
+  {
+   "key": "verdanttidewater",
+   "name": "Verdant Tidewater",
+   "score": 84,
+   "markets": [
+    "Tokyo"
+   ],
+   "reach": "handoff",
+   "origin": "cold",
+   "new": true,
+   "why": "hiring for the role we help"
+  },
+  {
+   "key": "basaltvandelay",
+   "name": "Basalt Vandelay",
+   "score": 94,
+   "markets": [
+    "Berlin"
+   ],
+   "reach": "handoff",
+   "origin": "intro",
+   "new": true,
+   "why": "hiring for the role we help"
+  },
+  {
+   "key": "atlasdunder",
+   "name": "Atlas Dunder",
+   "score": 63,
+   "markets": [
+    "Tokyo"
+   ],
+   "reach": "form",
+   "origin": "intro",
+   "new": true,
+   "why": "hiring for the role we help"
+  },
+  {
+   "key": "fathommassivedynamic",
+   "name": "Fathom Massive Dynamic",
+   "score": 80,
+   "markets": [
+    "Lisbon"
+   ],
+   "reach": "intro",
+   "origin": "revival",
+   "new": true,
+   "why": "hiring for the role we help"
+  },
+  {
+   "key": "fathomglobex",
+   "name": "Fathom Globex",
+   "score": 92,
+   "markets": [
+    "Lisbon"
+   ],
+   "reach": "handoff",
+   "origin": "revival",
+   "new": true,
+   "why": "hiring for the role we help"
+  }
+ ]
+}

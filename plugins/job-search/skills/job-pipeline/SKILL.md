@@ -18,6 +18,42 @@ Follow `memory-protocol.md` (in `skills/job-apply/references/`). Tool:
 The daily loop, start to finish. This skill **owns no logic of its own** — it sequences the other
 four and holds whatever gates the user's autonomy setting calls for.
 
+## The shape of every run — the shared runner (`daily.py`)
+
+`S=${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts`. The eleven steps of the agent operating model,
+in this order, every day; the scripts guarantee the shape, this file the words:
+
+```bash
+python3 $S/daily.py start --agent job-search --routine "Daily job scout"    # 0-3: preflight · memory recall · orient (counters, pace) · OPEN THE DATED NOTE
+```
+
+It prints the goal line with its pace (*interviews 1 of 3 · on pace* / *behind: widen within caps*),
+the `=== LAST REPORT ===` block (pick those items up first — never redo a Done), what memory says,
+and the dated note it opened: **`45-jobs/reports/Shortlist <date>.md`**, with `## Status` first.
+That note is the home Studio shows beside this chat for the whole run; the scout's report lands in
+its `## Shortlist` section when `render_brain.py` runs, the rest of it is yours and daily.py's.
+
+| Step | What | Mark it |
+|---|---|---|
+| 4 discover | the scout (step 2 below): brain first, the proven sources, then today's explore slice — `python3 $S/daily.py explore --agent job-search` names the candidate sources/queries to try (20 % of the budget, rotating by date) | `daily.py status "swept N boards: M new" --phase discovering` |
+| 5 screen + score | knock-outs, the rubric, the ledger gate | `--phase screening` |
+| 6 shortlist | the scout writes the report; `render_brain.py --quiet` puts it into the note's Shortlist section | `--phase shortlisting` |
+| 7 act | CVs, fills, submits — behind Gate 1 / 2 / 3 at `supervised` | `--phase acting` after each application |
+| 8 log | `learn.py log-outcome` / `set-result`, every outcome with evidence | — |
+| 9 render | `render_brain.py --quiet` after every ledger write (status calls render too, debounced) | `--phase rendering` |
+| 10 reflect | the memory block above (≤ 3 inferred lessons) | `--phase reflecting` |
+| 11 handoff | `report.json` → `python3 $S/daily.py close --agent job-search --report report.json`; paste what it prints LAST in your reply: the chat report, then the ```report fence | — |
+
+When a source you explored found a role, record it: `python3 $S/explore.py record --sources 45-jobs/profile/sources.md --source "<name>" --found N [--converted N]` — a candidate that converts is promoted, one that never finds anything is dropped after five tries.
+
+## The modes
+
+| Asked | Mode |
+|---|---|
+| the daily routine, "run my job pipeline", "find and apply to jobs" | **daily** — everything below |
+| the weekly routine (*Weekly job review*), "how is it going", "what's working" | **week** — `python3 $S/daily.py start --agent job-search --routine "Weekly job review" --mode week`, then `python3 $S/learn.py kpi --json` and `python3 $S/optimize.py apply --pipeline 45-jobs/pipeline.json --signals portal,archetype,market,source --profile 45-jobs/profile --contract ${CLAUDE_PLUGIN_ROOT}/studio.json --level <level> --review-out "45-jobs/reports/Job review <date>.md" --label Job`. At `supervised` the proposals come back as one card (the review note lists them as *proposed*); at `autonomous` the scoring weights and the sources move and the note says what changed and why. The optimizer never touches `max-submits-per-run`, `daily-target` or any gate. Close with `daily.py close`. |
+| "set me up" / no profile | `job-onboarding`, then continue |
+
 ```
 supervised:  lessons -> scout -> [USER PICKS] -> tailor CV -> [USER APPROVES] -> fill -> [USER SUBMITS] -> log
 autonomous:  lessons -> scout -> pick by score -> tailor CV -> fill -> verify in DOM -> submit -> log
@@ -82,8 +118,9 @@ of them by hand. This matters more at `autonomous`, not less: verification is th
 
 **Keep the report true the whole way through.** `<state root>/reports/<date>.md` is what they watch while
 the run is happening — linked titles, a `CV` column, a `Status` emoji and a `Status detail`
-sentence, all updated the moment anything changes. They have had to ask for this twice; do not make it
-a third time.
+sentence, all updated the moment anything changes — mirrored into the dated note's Shortlist
+section by every `render_brain.py --quiet`, and the note's `## Status` line by every `daily.py status`.
+They have had to ask for this twice; do not make it a third time.
 
 **Check the browser at the START, before building anything** (`browser-setup.md`). Ten built
 applications waiting on a disconnected extension is the most avoidable delay in the whole run.
@@ -360,10 +397,17 @@ Before reporting back, confirm `<state root>/reports/<date>.md` reflects reality
 ⛔ skipped · ❌ disqualified), and a row in the "Application log" table for each. The user reads this
 file as their pipeline; stale status is a bug.
 
-### 8. Report — lead with the KPI
+### 8. Report — lead with the KPI, and close the run
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/learn.py kpi
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/daily.py close --agent job-search --report report.json
 ```
+`report.json` holds `done` (each with its evidence — the note or folder that proves it), `not_done`,
+`next`, `needs_you` (the hand-offs, the gates still waiting, a reply to record), `news`. `daily.py
+close` writes the sbl-report (the Inbox item when it is news), marks the note done, renders once more
+and prints the chat report in the fixed order plus the ```report fence — paste both as the last thing
+in your reply. Lead with the goal counter (interviews), then what was done, what needs them, what is due.
+
 Open with **successful applications**, then the **pace line** —
 `learn.py target`: valid today / `daily-target:` — then shortlist conversion and wasted shortlist.
 Below target at the end of a run: name the gate that cost the most (the skip counts), and offer

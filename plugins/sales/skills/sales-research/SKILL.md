@@ -1,6 +1,6 @@
 ---
 name: sales-research
-description: Research one shortlisted account in depth before anyone is contacted — the buying team (the economic buyer and the champion) from the company's own team, about and press pages and public posts, a reachable channel for each person (a brain tie, an intro path, a business address published on a public page, the contact form, a public profile), the why-now from its dated signals, every fact stamped with the page and the date it came from. Use for "research <account>", "who should I talk to at <account>", "add these to my pipeline", or after the lead report's top rows are approved.
+description: Research one shortlisted account in depth before anyone is contacted — the buying team (the economic buyer and the champion) from public pages, a reachable channel for each person with its evidence, the why-now from its dated signals, then the strategy (the angle, which offer to get them to try, use, buy or partner on, the conversion goal) and the reach-out mix ranked with reasons. Use for "research <account>", "who should I talk to at <account>", "what's the angle for <account>", "add these to my pipeline", or after the daily note's top rows are approved.
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch, Agent
 ---
 
@@ -43,16 +43,36 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/sales-scout/scripts/ledger.py get <KEY>
 4. **Why now** — the one or two dated signals that make this the week (already on the account
    from the sweep; add any the site showed as a signal row and re-merge).
 5. **Segment** — `ledger.py set <KEY> segment "<the icp segment it fits>"` (KPIs group by it).
+6. **The strategy** — from the `offers:` block of `profile/offer.md` (each offer has a `kind`:
+   **try** — a trial, a demo, a free tier · **use** — onboarding, a done-for-you pilot · **buy** — a
+   paid plan · **partner**) and the account's dated signals, decide in three lines:
+   - *why now* — the signal that makes this the week;
+   - *the angle* — the one claim from the offer that meets that signal (a proof point the linter
+     will accept, never an invented number);
+   - *the conversion goal* — "get them to **try** <offer>" (or use / buy / partner): the smallest
+     next commitment that fits the signal.
+   ```bash
+   python3 ${CLAUDE_PLUGIN_ROOT}/skills/sales-scout/scripts/ledger.py set <KEY> strategy "try"
+   python3 ${CLAUDE_PLUGIN_ROOT}/skills/sales-scout/scripts/ledger.py set <KEY> offer "<offer name from offer.md>"
+   python3 ${CLAUDE_PLUGIN_ROOT}/skills/sales-scout/scripts/ledger.py set <KEY> angle "<one line: the signal → the claim>"
+   ```
+7. **The reach-out mix** — rank the channels for this account with a reason each, as choices
+   (the seller or the level decides, the sequence follows them):
+   warm intro via a brain tie · email from the seller's own mailbox (a published address only) · a
+   LinkedIn / X note (social steps are **off by default**; LinkedIn's terms do not allow automation
+   and the account at risk is the seller's) · the company's contact form · a community or event
+   touch · content to share. `ledger.py set <KEY> channels '["intro","email","form"]'` — in order.
 
 ## Finish
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/sales-scout/scripts/lead_score.py why <KEY>
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/sales-scout/scripts/ledger.py stage <KEY> target
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/sales-scout/scripts/ledger.py stage <KEY> researched
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/sales-scout/scripts/render_sales.py
 ```
 
-Report per account in one line: the buyer, the way in, the why-now, and anything that stops it
+Report per account in one line: the buyer, the way in, the why-now, the strategy and angle, the best
+channel, and anything that stops it
 (no reachable buyer, a knock-out found on the site — e.g. they already use a competitor and
 `competitors` lists it). Then offer `sales-sequence`.
 

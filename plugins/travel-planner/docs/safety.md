@@ -33,6 +33,20 @@ traveller has not listed in `visa_ok` is flagged "check visa rules".
 Every price carries `quoted_at` — the moment it was read — and the URL. `itinerary.py`
 refuses a price without one, and the renderer withholds any that slips through.
 
+## Where you are — never the device
+
+*Today near me* needs to know where you are. It takes that from, in order: the active trip's stop
+whose dates include today; `home_city` in `profile/traveler.md`; what you said today ("I'm in
+Porto", stamped for the day only). It never reads a location from the machine, the browser, a photo
+or a network — and it never writes one anywhere but your own profile and the day's stamp.
+
+## Today's picks
+
+Nothing is booked or bought; a reservation is a link you follow. An opening time or an event is
+shown only with the moment its page was seen (`seen_at`) and the page; a price only with
+`quoted_at`. Web picks are marked *web only*; your own places cite their notes. The only thing the
+agent remembers from a day is what you tell it: went · loved · not for me.
+
 ## The vault
 
 The plugin writes only its own layer (`47-travel/`) and its hidden ledger

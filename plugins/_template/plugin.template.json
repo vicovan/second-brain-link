@@ -1,0 +1,14 @@
+{
+  "name": "__ID__",
+  "version": "0.1.0",
+  "description": "__BLURB__",
+  "author": {"name": "Second Brain Link", "url": "https://secondbrainlink.com"},
+  "homepage": "https://secondbrainlink.com",
+  "license": "MIT",
+  "keywords": ["second-brain", "agent", "__ID__"],
+  "network": {
+    "required": __NETWORK_REQUIRED__,
+    "why": "__NETWORK__",
+    "endpoints": []
+  }
+}

@@ -93,7 +93,31 @@ as whole words by `lint_claims.py`. Ask: *"What must an application never say �
 publish, features that aren't shipped?"* A company with no such list is a company that will
 eventually overclaim in a form.
 
-## Step 3 — finish
+### sources.md and scoring.md — what the daily sweeps, and how it weighs
 
-Run `founder_profile.py` again and show what it parsed. Then offer the next step: *"Build my funding plan"*
-(`raise-plan` via `raise-research`), or *"Screen this list"* if the founder has lists to hand.
+`round.md` may list `sweep:` — the directories, cohort calendars and public lists the founder wants
+swept for programs (names or URLs). Seed them as **Proven** rows of `profile/sources.md` and add a few
+**Candidates** (the daily tries a 20 % slice of them each run; the weekly review promotes the ones
+that convert and drops the ones that never find anything):
+
+```bash
+S=${CLAUDE_PLUGIN_ROOT}/skills/raise-research/scripts
+python3 $S/explore.py add --sources 46-fundraising/profile/sources.md --source "<directory or calendar>" --kind programs --proven
+python3 $S/explore.py add --sources 46-fundraising/profile/sources.md --source "<candidate source>" --kind investors
+```
+
+`profile/scoring.md` holds the fit weights the tiering uses (`references/scoring-template.md`); the
+optimizer may add lines to its *Optimizer weights* block, nothing else.
+
+## Step 3 — finish: seed the daily, then show the line
+
+```bash
+python3 $S/founder_profile.py                                   # show what it parsed
+python3 $S/stages.py init --contract ${CLAUDE_PLUGIN_ROOT}/studio.json --profile 46-fundraising/profile   # stage labels (sbl-stages/1)
+python3 $S/harness.py seed fundraising        # Goals: Raise my round · Get into a program; Routines: Daily raise · Weekly raise update (off)
+python3 $S/render_brain.py --quiet            # the first render: dashboard, KPI, lessons, the two funnels
+```
+
+Then say, in one line: *"Your daily is ready — switch it on in Routines or the Daily tab."* And offer
+the next step: *"Build my funding plan"* (`raise-plan` via `raise-research`), or *"Screen this list"*
+if the founder has lists to hand.

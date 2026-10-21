@@ -1,0 +1,100 @@
+{
+ "schema": "sbl-itinerary/1",
+ "trip_id": "madrid-spring-2",
+ "title": "Madrid in spring",
+ "status": "planned",
+ "created": "2026-08-26T09:00:00",
+ "updated": "2026-10-18T09:00:00",
+ "window": {
+  "earliest": "2026-09-30",
+  "latest": "2026-10-03",
+  "nights": 3,
+  "flex_days": 0
+ },
+ "currency": "EUR",
+ "budget": {},
+ "travelers": [
+  {
+   "id": "me",
+   "label": "me"
+  }
+ ],
+ "stops": [
+  {
+   "id": "s1",
+   "place": "Madrid",
+   "country": "ES",
+   "lat": 40.4168,
+   "lng": -3.7038,
+   "role": "base",
+   "arrive": "2026-09-30",
+   "depart": "2026-10-03",
+   "nights": 3,
+   "why": "saved, never visited",
+   "days": [
+    {
+     "date": "2026-09-30",
+     "route": "",
+     "items": [
+      "p1",
+      "p2"
+     ]
+    },
+    {
+     "date": "2026-10-01",
+     "route": "",
+     "items": [
+      "p3"
+     ]
+    }
+   ],
+   "stay": {}
+  }
+ ],
+ "legs": [],
+ "pois": [
+  {
+   "id": "p1",
+   "stop": "s1",
+   "name": "Ember Museum",
+   "kind": "market",
+   "lat": 40.40356764191953,
+   "lng": -3.6992209828492633,
+   "why": "the kind of place you love",
+   "from_brain": false,
+   "brain_note": "",
+   "rating": null,
+   "price_band": "",
+   "booking": null
+  },
+  {
+   "id": "p2",
+   "stop": "s1",
+   "name": "Fathom Cafe",
+   "kind": "cafe",
+   "lat": 40.425332024937426,
+   "lng": -3.7118790265232504,
+   "why": "the kind of place you love",
+   "from_brain": false,
+   "brain_note": "",
+   "rating": null,
+   "price_band": "",
+   "booking": null
+  },
+  {
+   "id": "p3",
+   "stop": "s1",
+   "name": "Lantern Museum",
+   "kind": "cafe",
+   "lat": 40.413312912479945,
+   "lng": -3.7108312883681256,
+   "why": "the kind of place you love",
+   "from_brain": false,
+   "brain_note": "",
+   "rating": null,
+   "price_band": "",
+   "booking": null
+  }
+ ],
+ "routes": []
+}

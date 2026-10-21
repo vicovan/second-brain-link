@@ -5,7 +5,11 @@ ledger.py - the Sales Agent's records: the account registry and the event log.
 Two files in the state root (inside a brain: <brain>/.plugins/sales/, hidden from the tree):
 
     accounts.jsonl   one account per line - every company any source ever named. A lead the
-                     scout found is stage `lead`; approving it makes it a `target`.
+                     scout found is stage `lead`; researching it makes it `researched`
+                     (was `target`); the first real send makes it `contacted`; a trial started
+                     is `trial` (was `opportunity`); "not now" is `nurture` (was `parked`).
+                     `ledger.py migrate` rewrites old ids (idempotent, .pre-migrate backup kept);
+                     a file not yet migrated is read with the old ids mapped in memory.
     events.jsonl     append-only, one event per line. THE source of truth for what happened:
                      what was sent, blocked, gated, approved, replied, booked, lost. Stages,
                      sequences, caps and KPIs are all computed from it.
@@ -26,8 +30,11 @@ Nothing here talks to the network or to a model.
     ledger.py approve --batch ID [--by user]     the owner approved a send batch
     ledger.py deny --batch ID --reason TEXT      ... or denied it, and why
     ledger.py events [--account KEY] [--kind K] [--days N] [--json]
-    ledger.py count KIND [--days N]              an integer: sent|replies|meetings|opportunities|won|...
+    ledger.py count KIND [--days N]              an integer: sent|touches|replies|meetings|trials|won|contacted|...
     ledger.py kpi [--json]                       counts by origin / segment / channel / step
+    ledger.py table shortlist|ledger             a Markdown table, script-rendered (the daily note)
+    ledger.py since DATE                         what changed since a date (events by account)
+    ledger.py migrate                            target->researched, opportunity->trial, parked->nurture
     ledger.py suppress VALUE --reason TEXT       add to profile/suppression.md (append-only)
     ledger.py export --contact NAME              everything held on one person (a DSAR answer)
 """
@@ -35,15 +42,20 @@ import argparse, datetime, json, os, pathlib, re, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from paths import state_root, profile_dir  # noqa: E402
+import ledger_base as LB  # noqa: E402  - the shared lock, tables, migration (R7, R2)
 
-STAGES = ("lead", "target", "sequenced", "replied", "meeting", "opportunity", "won", "lost", "parked")
+STAGES = ("lead", "researched", "sequenced", "contacted", "replied", "meeting", "trial", "won", "lost", "nurture", "out")
+# the stage ids this ledger used before the agent operating model; read mapped, migrated once
+LEGACY = {"target": "researched", "opportunity": "trial", "parked": "nurture"}
 ORIGINS = ("revival", "warm", "dormant", "intro", "cold")
 EMAIL_SOURCES = ("brain", "public-page", "reply", "pattern-unverified")
 # Events that end a sequence for that contact (stop-on-reply and friends).
 STOPS = ("replied", "unsubscribed", "bounced", "meeting_booked", "stopped")
 OUTCOME_KINDS = {
-    "sent": ("sent",), "replies": ("replied",), "meetings": ("meeting_booked",),
-    "opportunities": ("stage:opportunity",), "won": ("stage:won",), "lost": ("stage:lost",),
+    "sent": ("sent",), "touches": ("sent",), "replies": ("replied",), "meetings": ("meeting_booked",),
+    "trials": ("stage:trial",), "opportunities": ("stage:trial", "stage:opportunity"),
+    "contacted": ("stage:contacted",), "researched": ("stage:researched",),
+    "won": ("stage:won",), "lost": ("stage:lost",),
     "blocked": ("send_blocked",), "gated": ("gated",), "sourced": ("sourced",),
 }
 
@@ -87,6 +99,8 @@ def load_accounts():
             except ValueError:
                 d = None
             if isinstance(d, dict) and d.get("key"):
+                if d.get("stage") in LEGACY:            # an un-migrated file: the old id, mapped in memory
+                    d["stage"] = LEGACY[d["stage"]]
                 out[d["key"]] = d
     return out
 
@@ -230,6 +244,7 @@ def events(account=None, kind=None, days=None, contact=None):
 
 
 def set_stage(acc, a, to, by="agent", reason=""):
+    to = LEGACY.get(to, to)
     if to not in STAGES:
         raise SystemExit(f"unknown stage {to}; one of {', '.join(STAGES)}")
     if to in ("won", "lost") and by != "user":
@@ -289,6 +304,46 @@ def kpi():
     return {"stages": by_stage, "dims": rows, "totals": {k: count(k) for k in ("sent", "replies", "meetings", "opportunities", "won")}}
 
 
+def migrate():
+    """Rewrite the old stage ids in accounts.jsonl once (idempotent; `accounts.jsonl.pre-migrate`
+    kept beside it; one `migrated` event per account)."""
+    L = LB.Ledger(root(), "accounts.jsonl", status="stage", event_key="account", ts_field="ts")
+    return L.migrate(LEGACY)
+
+
+def table(which):
+    """The daily note's tables (R2): today's shortlist, or the whole ledger."""
+    acc = load_accounts()
+    if which == "shortlist":
+        try:
+            sl = json.loads((root() / "last_shortlist.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            sl = {}
+        rows = []
+        for x in sl.get("shortlist") or []:
+            a = acc.get(x["key"], {})
+            rows.append({"account": x.get("name"), "score": x.get("score"), "market": ", ".join(x.get("markets") or []),
+                         "strategy": (a.get("strategy") or ""), "angle": a.get("angle") or "",
+                         "channel": ", ".join(a.get("channels") or []) or (x.get("reach") or ""), "why": x.get("why") or ""})
+        return LB.Ledger.table(["account", "score", "market", "strategy", "angle", "channel", "why"], rows,
+                               labels=["Account", "Score", "Market", "Strategy", "Angle", "Best channel", "Why now"],
+                               empty="_Nothing cleared the floor today._")
+    rows = [{"account": a["name"], "stage": a.get("stage", "lead"), "origin": a.get("origin") or "", "segment": a.get("segment") or "",
+             "since": a.get("stage_since") or a.get("first_seen") or ""}
+            for a in sorted(acc.values(), key=lambda v: (v.get("stage", ""), v["name"].lower())) if a.get("stage", "lead") not in ("lead", "out")]
+    return LB.Ledger.table(["account", "stage", "origin", "segment", "since"], rows,
+                           labels=["Account", "Stage", "Origin", "Segment", "Since"], empty="_No account worked yet._")
+
+
+def since(date):
+    """Events since a date, grouped by account (R2)."""
+    out = {}
+    for e in events():
+        if str(e.get("ts") or "")[:10] >= date and e.get("kind") not in ("guard",):
+            out.setdefault(e.get("account") or "", []).append(e)
+    return out
+
+
 def suppress(value, reason):
     p = pathlib.Path(profile_dir()) / "suppression.md"
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -328,6 +383,9 @@ def main(argv=None):
     g = sub.add_parser("events"); g.add_argument("--account"); g.add_argument("--kind")
     g.add_argument("--days", type=float); g.add_argument("--contact"); g.add_argument("--json", action="store_true")
     g = sub.add_parser("count"); g.add_argument("kind"); g.add_argument("--days", type=float)
+    g = sub.add_parser("table"); g.add_argument("which", choices=["shortlist", "ledger"])
+    g = sub.add_parser("since"); g.add_argument("date"); g.add_argument("--json", action="store_true")
+    sub.add_parser("migrate")
     g = sub.add_parser("kpi"); g.add_argument("--json", action="store_true")
     g = sub.add_parser("suppress"); g.add_argument("value"); g.add_argument("--reason", default="")
     g = sub.add_parser("export"); g.add_argument("--contact", required=True)
@@ -432,6 +490,22 @@ def main(argv=None):
         return 0
     if a.cmd == "count":
         print(count(a.kind, a.days))
+        return 0
+    if a.cmd == "table":
+        print(table(a.which), end="")
+        return 0
+    if a.cmd == "since":
+        by = since(a.date)
+        if a.json:
+            _out(by)
+        elif not by:
+            print(f"_Nothing changed since {a.date}._")
+        else:
+            for k, es in sorted(by.items()):
+                print(f"- **{k}**: " + " · ".join(f"{e.get('kind')}" + (f" → {e.get('to')}" if e.get("to") else "") + f" ({str(e.get('ts') or '')[:10]})" for e in es))
+        return 0
+    if a.cmd == "migrate":
+        _out(migrate())
         return 0
     if a.cmd == "kpi":
         k = kpi()

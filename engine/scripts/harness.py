@@ -31,7 +31,10 @@ The five steps every run follows (the harness-engineering subsystems, made visib
     harness.py seed --from DIR --agent ID              harness.py routine-new --agent A --title T ...
     harness.py goal-new --agent A --title T ...        harness.py set NOTE KEY VALUE
     harness.py preflight ROUTINE                       harness.py when ROUTINE
-    harness.py due [--max-per-day N]                   harness.py fired ROUTINE [--status S]
+    harness.py due [--max-per-day N] [--max-concurrent N]   harness.py fired ROUTINE [--status S]
+    harness.py cadence AGENT                           harness.py seed AGENT   (the plugin's own templates)
+    harness.py routine-set ROUTINE KEY VALUE           harness.py goal-set GOAL KEY VALUE
+    harness.py inbox --count [--agent A]               harness.py profile-set --agent A KEY VALUE [--file REL]
     harness.py run-open --agent A [--routine R] [--trigger T] [--convo C]
     harness.py run-append RUN --line TEXT              harness.py run-close RUN --status S [...]
     harness.py last-report ROUTINE|AGENT               harness.py verify RUN
@@ -78,6 +81,15 @@ REVIEW_FILE = "_REVIEW.json"
 MAX_LINE = 2000
 DEFAULT_MAX_PER_DAY = 1
 DEFAULT_MAX_MINUTES = 30
+# Scheduled runs per brain per day (a personal brain with four agents fires 9 on a Monday: four
+# dailies, four weeklies and the Sales replies run) and heavy (browser) runs at once per machine.
+DEFAULT_BRAIN_MAX_PER_DAY = 10
+DEFAULT_MAX_CONCURRENT = 2
+DEFAULT_LIGHT_MAX = 4
+SET_ROUTINE_KEYS = {"enabled", "schedule", "status", "max_per_day", "max_minutes", "notify", "goal", "skill",
+                    "only_when", "validated_by", "validated_on"}
+SET_GOAL_KEYS = {"target", "by", "status", "routines", "metric", "metric_label", "stop_when_overdue",
+                 "stop_after_runs", "progress"}
 
 # ------------------------------------------------------------------ time (overridable for tests)
 _NOW: _dt.datetime | None = None
@@ -571,20 +583,30 @@ def next_slot(spec: dict, t: _dt.datetime) -> _dt.datetime | None:
 
 # ------------------------------------------------------------------ plugins (installed agents)
 def _plugin_roots() -> list[pathlib.Path]:
+    """Where agents are looked up, in order: $SBL_PLUGINS_DIR, then the place THIS copy of
+    harness.py lives (a plugin's own install dir, or the repo's plugins/ when run from a checkout -
+    so a test never reads a user's installed copy), then ~/.claude/skills (what Studio reads)."""
     roots = []
     env = os.environ.get("SBL_PLUGINS_DIR")
     if env:
         roots += [pathlib.Path(p).expanduser() for p in env.split(os.pathsep) if p]
-    roots.append(pathlib.Path.home() / ".claude" / "skills")
     here = pathlib.Path(__file__).resolve()
-    for d in here.parents:  # running from the repo: <repo>/plugins
-        if (d / "plugins").is_dir() and (d / "engine").is_dir():
-            roots.append(d / "plugins")
-            break
-        if (d / ".claude-plugin").is_dir():  # running from inside an installed plugin
+    for d in here.parents:
+        if (d / ".claude-plugin").is_dir():  # inside a (installed or checked-out) Claude plugin
             roots.append(d.parent)
             break
-    return roots
+        if (d / "plugins").is_dir() and (d / "engine").is_dir():  # the repo: <repo>/plugins
+            roots.append(d / "plugins")
+            break
+        if (d / "SKILL.md").is_file() and (d / "scripts").is_dir() and (d / "studio.json").is_file():
+            roots.append(d.parent)  # a flattened Codex skill
+            break
+    roots.append(pathlib.Path.home() / ".claude" / "skills")
+    out = []
+    for r in roots:
+        if r not in out:
+            out.append(r)
+    return out
 
 
 def plugin_dir(agent: str) -> pathlib.Path | None:
@@ -640,6 +662,48 @@ def agent_home(b: Brain, agent: str, force: bool = False) -> dict:
         return {"ran": False, "why": "home note exists"}
     rc, out = run_plugin_cmd(b, agent, cmd, timeout=180)
     return {"ran": True, "code": rc, "out": out[-600:]}
+
+
+def agent_render(b: Brain, agent: str, force: bool = False) -> dict:
+    """Draw an agent's Runtime line: studio.json `render: {"cmd": "<script.py args>"}` - the agent's
+    OWN deterministic render (no AI, no network), run while its layer has notes but its `pipeline`
+    file is missing or older than the layer's newest note. Studio calls it when Runtime finds a
+    layer without a line (a brain built before the agent wrote pipeline.json), and on "Draw it now"."""
+    sj = studio_json(agent)
+    r = sj.get("render") if isinstance(sj.get("render"), dict) else {}
+    cmd = str(r.get("cmd") or "")
+    if not cmd:
+        return {"ran": False, "why": "no render command"}
+    layer = str(sj.get("layer") or "")
+    pipe = str(sj.get("pipeline") or "")
+    bad = re.compile(r"(^|/)\.\.?(/|$)")
+    if not layer or bad.search(layer) or (pipe and bad.search(pipe)):
+        return {"ran": False, "why": "no layer"}
+    ld = b.root / layer
+    newest = 0.0
+    if ld.is_dir():
+        for n in ld.rglob("*.md"):
+            if any(part.startswith(".") for part in n.relative_to(ld).parts):
+                continue
+            try:
+                newest = max(newest, n.stat().st_mtime)
+            except OSError:
+                pass
+    if not force:
+        if not newest:
+            return {"ran": False, "why": "layer is empty"}
+        pf = b.root / pipe if pipe else None
+        if pf is not None and pf.is_file() and pf.stat().st_mtime >= newest - 1:
+            return {"ran": False, "why": "pipeline is fresh"}
+    rc, out = run_plugin_cmd(b, agent, cmd, timeout=120)
+    pf = b.root / pipe if pipe else None
+    if rc == 0 and pf is not None and pf.is_file():
+        try:  # an unchanged file is not rewritten: mark it checked, so it is not re-drawn on every open
+            os.utime(pf, None)
+        except OSError:
+            pass
+    return {"ran": True, "code": rc, "out": out[-600:],
+            "drawn": bool(pf is not None and pf.is_file())}
 
 
 def run_plugin_cmd(b: Brain, agent: str, cmd: str, timeout: int = 60) -> tuple[int, str]:
@@ -1065,9 +1129,23 @@ def verify_items(b: Brain, items: list[dict]) -> list[dict]:
 
 
 # ------------------------------------------------------------------ due (the scheduler's question)
-def due(b: Brain, max_per_day: int = 3) -> list[dict]:
-    """Every routine with what the scheduler should do now: run | wait | skip | blocked.
-    Deterministic and free: no model call decides whether to act."""
+def agent_weight(agent: str) -> str:
+    """heavy (a browser run) or light, from the contract's `concurrency` block; a plugin that
+    declares nothing is heavy when it uses Chrome."""
+    sj = studio_json(agent) if agent and agent != "brain" else {}
+    c = sj.get("concurrency") if isinstance(sj.get("concurrency"), dict) else {}
+    w = str(c.get("weight") or "")
+    if w in ("heavy", "light"):
+        return w
+    return "heavy" if (c.get("browser") or sj.get("chrome")) else "light"
+
+
+def due(b: Brain, max_per_day: int = DEFAULT_BRAIN_MAX_PER_DAY, max_concurrent: int = DEFAULT_MAX_CONCURRENT,
+        light_max: int = DEFAULT_LIGHT_MAX) -> list[dict]:
+    """Every routine with what the scheduler should do now: run | queued | wait | skip | blocked.
+    Deterministic and free: no model call decides whether to act. Runnable routines come back
+    in schedule order (a missed day runs each once, oldest slot first - never a stampede);
+    `queued` = due, but every heavy slot (`max_concurrent`) is taken: *waiting for a slot*."""
     t = now()
     st = read_state(b)
     sched_today = sum(1 for n in runs_for(b, day=t.date(), trigger="schedule")
@@ -1118,7 +1196,109 @@ def due(b: Brain, max_per_day: int = 3) -> list[dict]:
                 goal_check(b, g)  # a goal met since the last run stops its routine before it spends anything
             if g and str(read_note(g)[0].get("status") or "active") != "active" and rec.get("action") == "run":
                 rec.update(action="skip", why=f"Its goal '{goal}' is no longer active")
+        rec["weight"] = agent_weight(rec["agent"])
         out.append(rec)
+    # concurrency: runs already LIVE on this brain take the slots first (running, or parked on a
+    # question - a waiting run still owns its browser tab); a queued run owns nothing yet, so it
+    # never counts - otherwise two queued notes would starve the queue they wait in
+    live = {"heavy": 0, "light": 0}
+    for n in list_notes(b, "activity"):
+        if str(n["fm"].get("status") or "") in ("running", "awaiting"):
+            live[agent_weight(str(n["fm"].get("agent") or ""))] += 1
+    runnable = sorted([r for r in out if r.get("action") == "run"], key=lambda r: (r.get("slot") or "", r["routine"]))
+    for r in runnable:
+        cap = max_concurrent if r["weight"] == "heavy" else light_max
+        if live[r["weight"]] >= cap:
+            r.update(action="queued", why="waiting for a slot")
+        else:
+            live[r["weight"]] += 1
+    order = {"run": 0, "queued": 1, "blocked": 2, "skip": 3, "wait": 4, "manual": 5, "off": 6}
+    out.sort(key=lambda r: (order.get(r.get("action"), 9), r.get("slot") or "", r["routine"]))
+    return out
+
+
+def profile_set(b: Brain, agent: str, key: str, value: str, rel: str = "") -> dict:
+    """Set one `key: value` line in the agent's settings file (the contract's `daily.settings`, else
+    `requires.profile`): the Daily tab's level / explore / optimize. The line is replaced where it
+    already is (frontmatter or a fenced settings block, a trailing comment kept); a new key goes
+    into the first fenced block. The user's file, the user's words - nothing else is touched."""
+    if not re.match(r"^[A-Za-z_][\w.-]{0,40}$", key or ""):
+        raise SystemExit(f"harness: bad setting name {key!r}")
+    sj = studio_json(agent)
+    d = sj.get("daily") if isinstance(sj.get("daily"), dict) else {}
+    req = sj.get("requires") if isinstance(sj.get("requires"), dict) else {}
+    rel = rel or str(d.get("settings") or req.get("profile") or "")
+    if not rel or re.search(r"(^|/)\.\.?(/|$)", rel):
+        raise SystemExit("harness: no settings file for this agent")
+    p = b.abs(rel)
+    if not p.is_file():
+        raise SystemExit(f"harness: {rel} does not exist - set the agent up first")
+    txt = p.read_text(encoding="utf-8")
+    pat = re.compile(r"^([ \t]*-?[ \t]*)" + re.escape(key) + r"[ \t]*:[ \t]*([^#\n]*?)([ \t]*#.*)?$", re.M)
+    m = pat.search(txt)
+    if m:
+        new = f"{m.group(1)}{key}: {value}{m.group(3) or ''}"
+        txt = txt[:m.start()] + new + txt[m.end():]
+        where = "replaced"
+    else:
+        fm = re.search(r"```[a-z]*\n(.*?)\n```", txt, re.S)
+        if fm:
+            txt = txt[:fm.end(1)] + f"\n{key}: {value}" + txt[fm.end(1):]
+            where = "added to the settings block"
+        else:
+            front = re.match(r"\A\ufeff?---\n(.*?)\n---", txt, re.S)
+            if front:
+                txt = txt[:front.end(1)] + f"\n{key}: {value}" + txt[front.end(1):]
+                where = "added to the frontmatter"
+            else:
+                txt = txt.rstrip("\n") + f"\n\n```settings\n{key}: {value}\n```\n"
+                where = "added a settings block"
+    tmp = p.with_name(p.name + ".tmp")
+    tmp.write_text(txt, encoding="utf-8")
+    os.replace(tmp, p)
+    return {"path": rel, "key": key, "value": value, "where": where}
+
+
+def _next_human(t: _dt.datetime, nxt: _dt.datetime | None) -> str:
+    if not nxt:
+        return ""
+    d = (nxt.date() - t.date()).days
+    hhmm = f"{nxt:%H:%M}"
+    if d == 0:
+        return f"today {hhmm}"
+    if d == 1:
+        return f"tomorrow {hhmm}"
+    if 1 < d < 7:
+        return f"{nxt:%a} {hhmm}"
+    return f"{nxt:%Y-%m-%d} {hhmm}"
+
+
+def cadence(b: Brain, agent: str) -> list[dict]:
+    """One row per routine of an agent: the plain-English schedule, when it next runs, the last
+    run - the SAME words the Agents card, the left list and the Floor caption show (R9)."""
+    t = now()
+    st = read_state(b).get("routines") or {}
+    out = []
+    for n in list_notes(b, "routines"):
+        fm = n["fm"]
+        if str(fm.get("agent") or "") != agent:
+            continue
+        spec = parse_schedule(fm.get("schedule"))
+        enabled = fm.get("enabled") is True and str(fm.get("status") or "") != "retired"
+        nxt = next_slot(spec, t) if (spec and enabled and spec["kind"] != "manual") else None
+        sdesc = describe_schedule(fm.get("schedule"))
+        rec = st.get(n["name"], {})
+        runs = runs_for(b, routine=n["name"])
+        last = runs[0]["fm"] if runs else {}
+        kind = "weekly" if spec and spec.get("kind") == "days" and len(spec.get("days") or []) == 1 else \
+               ("monthly" if spec and spec.get("kind") == "monthly" else ("daily" if spec and spec["kind"] != "manual" else "manual"))
+        line = (f"runs {sdesc[0].lower() + sdesc[1:]}" + (f" · next {_next_human(t, nxt)}" if nxt else "")) if enabled \
+            else f"off · {sdesc[0].lower() + sdesc[1:]}"
+        out.append({"routine": n["name"], "path": n["path"], "agent": agent, "skill": fm.get("skill") or "",
+                    "schedule": fm.get("schedule") or "manual", "describe": sdesc, "enabled": enabled, "kind": kind,
+                    "next": iso(nxt) if nxt else None, "next_human": _next_human(t, nxt), "line": line,
+                    "last_fired": rec.get("last_fired"), "last_status": rec.get("last_status") or last.get("status"),
+                    "last_run": last.get("started"), "goal": unwl(fm.get("goal"))})
     return out
 
 
@@ -1545,13 +1725,22 @@ def main(argv=None) -> int:
     g.add_argument("--limit", type=int, default=0)
     g = sub.add_parser("show")
     g.add_argument("note")
-    g = sub.add_parser("set")
-    g.add_argument("note")
+    for name in ("set", "routine-set", "goal-set"):
+        g = sub.add_parser(name)
+        g.add_argument("note")
+        g.add_argument("key")
+        g.add_argument("value")
+    g = sub.add_parser("seed")
+    g.add_argument("agent_pos", nargs="?", default="", help="the agent whose own templates to seed")
+    g.add_argument("--from", dest="src", default="")
+    g.add_argument("--agent", default="")
+    g = sub.add_parser("cadence")
+    g.add_argument("agent")
+    g = sub.add_parser("profile-set")
+    g.add_argument("--agent", required=True)
     g.add_argument("key")
     g.add_argument("value")
-    g = sub.add_parser("seed")
-    g.add_argument("--from", dest="src", required=True)
-    g.add_argument("--agent", required=True)
+    g.add_argument("--file", default="")
     g = sub.add_parser("routine-new")
     for a in ("--agent", "--title"):
         g.add_argument(a, required=True)
@@ -1576,7 +1765,8 @@ def main(argv=None) -> int:
         g = sub.add_parser(name)
         g.add_argument("note")
     g = sub.add_parser("due")
-    g.add_argument("--max-per-day", type=int, default=3)
+    g.add_argument("--max-per-day", type=int, default=DEFAULT_BRAIN_MAX_PER_DAY)
+    g.add_argument("--max-concurrent", type=int, default=DEFAULT_MAX_CONCURRENT)
     g = sub.add_parser("fired")
     g.add_argument("routine")
     g.add_argument("--slot", default="")
@@ -1607,12 +1797,17 @@ def main(argv=None) -> int:
     g = sub.add_parser("home")
     g.add_argument("agent")
     g.add_argument("--force", action="store_true")
+    g = sub.add_parser("render")
+    g.add_argument("agent")
+    g.add_argument("--force", action="store_true")
     g = sub.add_parser("goal-progress")
     g.add_argument("goal", nargs="?", default="")
     g.add_argument("--check", action="store_true")
     g = sub.add_parser("inbox")
     g.add_argument("--read", default="")
     g.add_argument("--dismiss", default="")
+    g.add_argument("--count", action="store_true")
+    g.add_argument("--agent", default="")
     g = sub.add_parser("review")
     rs = g.add_subparsers(dest="rcmd", required=True)
     x = rs.add_parser("add")
@@ -1684,23 +1879,55 @@ def main(argv=None) -> int:
             return 2
         fm, body = read_note(p)
         _out({"path": b.rel(p), "fm": fm, "body": body}, j)
-    elif a.cmd == "set":
-        p = find_note(b, "routines", a.note) or find_note(b, "goals", a.note)
+    elif a.cmd in ("set", "routine-set", "goal-set"):
+        if a.cmd == "routine-set":
+            p, allowed = find_note(b, "routines", a.note), SET_ROUTINE_KEYS
+        elif a.cmd == "goal-set":
+            p, allowed = find_note(b, "goals", a.note), SET_GOAL_KEYS
+        else:
+            p = find_note(b, "routines", a.note) or find_note(b, "goals", a.note)
+            allowed = SET_ROUTINE_KEYS | SET_GOAL_KEYS
         if not p:
             print(f"harness: no routine or goal '{a.note}'", file=sys.stderr)
             return 2
-        allowed = {"enabled", "schedule", "status", "max_per_day", "max_minutes", "notify", "goal", "target",
-                   "by", "skill", "validated_by", "validated_on", "stop_when_overdue", "stop_after_runs", "progress"}
         if a.key not in allowed:
             print(f"harness: '{a.key}' can't be set here", file=sys.stderr)
             return 2
-        val = _unscalar(a.value)
+        if a.value.strip().startswith("[") and not a.value.strip().startswith("[["):
+            try:
+                val = json.loads(a.value)
+            except json.JSONDecodeError:
+                print("harness: a list value must be JSON", file=sys.stderr)
+                return 2
+        else:
+            val = _unscalar(a.value)
         if a.key == "schedule" and parse_schedule(a.value) is None:
             print("harness: unreadable schedule", file=sys.stderr)
             return 2
+        if a.key == "by" and a.value and _parse_dt(a.value) is None:
+            print("harness: 'by' must be an ISO date", file=sys.stderr)
+            return 2
+        if a.key in ("routines",) and not isinstance(val, list):
+            print("harness: routines must be a JSON list of [[links]]", file=sys.stderr)
+            return 2
         _out({"path": b.rel(p), "fm": set_fm(p, **{a.key: val})}, j)
     elif a.cmd == "seed":
-        _out(seed_from(b, pathlib.Path(a.src).expanduser(), a.agent), j)
+        agent = a.agent or a.agent_pos
+        if not agent:
+            print("harness: seed needs an agent", file=sys.stderr)
+            return 2
+        src = pathlib.Path(a.src).expanduser() if a.src else None
+        if src is None:
+            d = plugin_dir(agent)
+            if not d:
+                print(f"harness: agent '{agent}' is not installed", file=sys.stderr)
+                return 2
+            src = d / str(studio_json(agent).get("templates") or "harness")
+        _out(seed_from(b, src, agent), j)
+    elif a.cmd == "cadence":
+        _out(cadence(b, a.agent), j)
+    elif a.cmd == "profile-set":
+        _out(profile_set(b, a.agent, a.key, a.value, a.file), j)
     elif a.cmd == "routine-new":
         if parse_schedule(a.schedule) is None:
             print("harness: unreadable schedule", file=sys.stderr)
@@ -1736,7 +1963,7 @@ def main(argv=None) -> int:
         _out({"ok": ok, "reasons": reasons}, j)
         return 0 if ok else 1
     elif a.cmd == "due":
-        _out(due(b, a.max_per_day), j)
+        _out(due(b, a.max_per_day, a.max_concurrent), j)
     elif a.cmd == "fired":
         mark_fired(b, a.routine, a.slot, a.status)
         _out({"ok": True}, j)
@@ -1773,6 +2000,8 @@ def main(argv=None) -> int:
         _out(verify_items(b, items), j)
     elif a.cmd == "home":
         _out(agent_home(b, a.agent, a.force), j)
+    elif a.cmd == "render":
+        _out(agent_render(b, a.agent, a.force), j)
     elif a.cmd == "goal-progress":
         goals = [find_note(b, "goals", a.goal)] if a.goal else [b.abs(n["path"]) for n in list_notes(b, "goals")]
         res = [goal_check(b, g) if a.check else goal_progress(b, g) for g in goals if g]
@@ -1780,7 +2009,13 @@ def main(argv=None) -> int:
     elif a.cmd == "inbox":
         if a.read or a.dismiss:
             inbox_mark(b, a.read or a.dismiss, read=bool(a.read), dismiss=bool(a.dismiss))
-        _out(inbox(b), j)
+        items = inbox(b)
+        if a.agent:
+            items = [it for it in items if str(it.get("agent") or "") == a.agent]
+        if a.count:
+            _out({"count": len(items), "unread": sum(1 for it in items if not it.get("read")), "agent": a.agent}, j) if j else print(len(items))
+        else:
+            _out(items, j)
     elif a.cmd == "review":
         if a.rcmd == "add":
             _out(review_add(b, a.kind, a.title, a.note, a.detail, a.source), j)

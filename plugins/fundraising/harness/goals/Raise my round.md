@@ -12,7 +12,8 @@ target: 5
 by:
 status: active
 routines:
-  - "[[What's due in my raise]]"
+  - "[[Daily raise]]"
+  - "[[Weekly raise update]]"
 stop_when_overdue: false
 stop_after_runs: 0
 ---

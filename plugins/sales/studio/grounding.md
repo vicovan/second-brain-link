@@ -10,6 +10,25 @@ are available through the `Skill` tool. **Start with `sales-pipeline`** — it s
 guessing at it; they carry the rules that matter. The scripts are in
 `${CLAUDE_PLUGIN_ROOT}/skills/sales-scout/scripts/`.
 
+## The two notes you keep, and the report twice
+
+- **The dated daily note** `48-sales/reports/Sell today <date>.md` — opened FIRST by `daily.py start`
+  (before any sweep), `## Status` on top, then *New today* (account · strategy · angle · best channel ·
+  why — script-rendered from the ledger), *Due steps*, *Replies to work*, *Approvals waiting* (the
+  send_guard batches), *Explored today*, *Needs you*. Studio shows it beside this chat and marks it
+  ★ on the Lines view.
+- **`Sales Dashboard.md`** (alias *Pipeline*) — the living overview, written only by `render_sales.py`;
+  `Sales KPI.md` (rates only at n ≥ 20) and `Sales Lessons.md` beside it; `Sales review <date>.md` after
+  a weekly run; every sent or drafted step as a note under `outreach/<date>/<account>/`.
+- **The guard's facts, stated plainly**: `send_guard.py` decides every outward act (ALLOW · GATE ·
+  ASSIST · BLOCK); the first real send is always gated at every level; an EU first touch is gated
+  while `eu_gate: on`; a guessed address is never sent; social steps are off by default; `contacted`
+  is set only by the guard from a real send — never by you; `won` / `lost` only by the seller.
+- Every number in a note or a report is printed by a script (`ledger.py count|kpi|table|since`,
+  `sequence.py due --count`) and pasted verbatim — never typed from memory.
+- End every run with `daily.py close --report report.json`: it writes the report and prints the chat
+  report (trials · done · needs you · due next) and the ```report fence — both go last in your reply.
+
 ## Memory — you remember, and you get better
 
 You have a memory: `_memory/` in this brain. Studio already put what you remember at the top of

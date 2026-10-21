@@ -1,0 +1,100 @@
+{
+ "schema": "sbl-itinerary/1",
+ "trip_id": "lisbon-autumn-6",
+ "title": "Lisbon in autumn",
+ "status": "shopped",
+ "created": "2026-09-15T09:00:00",
+ "updated": "2026-10-18T09:00:00",
+ "window": {
+  "earliest": "2026-12-19",
+  "latest": "2026-12-22",
+  "nights": 3,
+  "flex_days": 0
+ },
+ "currency": "EUR",
+ "budget": {},
+ "travelers": [
+  {
+   "id": "me",
+   "label": "me"
+  }
+ ],
+ "stops": [
+  {
+   "id": "s1",
+   "place": "Lisbon",
+   "country": "PT",
+   "lat": 38.7223,
+   "lng": -9.1393,
+   "role": "base",
+   "arrive": "2026-12-19",
+   "depart": "2026-12-22",
+   "nights": 3,
+   "why": "saved, never visited",
+   "days": [
+    {
+     "date": "2026-12-19",
+     "route": "",
+     "items": [
+      "p1",
+      "p2"
+     ]
+    },
+    {
+     "date": "2026-12-20",
+     "route": "",
+     "items": [
+      "p3"
+     ]
+    }
+   ],
+   "stay": {}
+  }
+ ],
+ "legs": [],
+ "pois": [
+  {
+   "id": "p1",
+   "stop": "s1",
+   "name": "Tundra Market",
+   "kind": "museum",
+   "lat": 38.72842235396268,
+   "lng": -9.152604733037787,
+   "why": "the kind of place you love",
+   "from_brain": false,
+   "brain_note": "",
+   "rating": null,
+   "price_band": "",
+   "booking": null
+  },
+  {
+   "id": "p2",
+   "stop": "s1",
+   "name": "Summit Museum",
+   "kind": "museum",
+   "lat": 38.72621471006003,
+   "lng": -9.125720491135121,
+   "why": "the kind of place you love",
+   "from_brain": false,
+   "brain_note": "",
+   "rating": null,
+   "price_band": "",
+   "booking": null
+  },
+  {
+   "id": "p3",
+   "stop": "s1",
+   "name": "Marlin Museum",
+   "kind": "market",
+   "lat": 38.71081016538893,
+   "lng": -9.125672632232211,
+   "why": "the kind of place you love",
+   "from_brain": false,
+   "brain_note": "",
+   "rating": null,
+   "price_band": "",
+   "booking": null
+  }
+ ],
+ "routes": []
+}

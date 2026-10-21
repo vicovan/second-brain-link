@@ -4,6 +4,9 @@ title: Traveller
 tags: [travel, profile]
 owner: <Full Name — exactly as in 00-me/identity.md title>
 updated: <YYYY-MM-DD>
+home_city: <the city the daily picks are built for when no trip is on — never the device>
+radius_km: 6
+mix: [coffee, meal, activity, event, wildcard]
 home_airports: [<IATA>, <IATA>]
 citizenships: [<ISO country code>]
 visa_ok: []
@@ -15,7 +18,7 @@ visa_ok: []
 # Traveller
 
 ## Home
-- Home city:
+- Home city: see `home_city` above — *Today near me* builds its picks around it (radius `radius_km`); the agent never reads where the machine is
 - Home airports (first = preferred): see `home_airports` above
 - Will also fly from (with how far you would travel to reach it):
 

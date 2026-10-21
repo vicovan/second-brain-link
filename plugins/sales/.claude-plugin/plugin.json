@@ -1,6 +1,6 @@
 {
   "name": "sales",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Run outbound from your Second Brain, from inside Claude Code or Second Brain Studio: generate leads (your brain's warm ties and lost deals first, then companies on the public web with a reason to buy now, per market, with a coverage gate), research the buying team, run multi-step sequences, send email from your own mailbox and social steps in your own browser within your caps, work the replies and book the meetings — tracked as an indexed layer of your brain. No bought data, no tracking.",
   "author": {
     "name": "Second Brain Link",

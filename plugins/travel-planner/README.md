@@ -45,3 +45,22 @@ folder is hardcoded outside `paths.py`; stdlib-only Python. See `docs/safety.md`
 `docs/providers.md`.
 
 MIT — see `LICENSE`.
+
+## The daily loop (agent operating model)
+
+*Today near me* (every day 08:10, off until you turn it on) is "a traveller in your own city": where
+you are (the active trip's stop, else your profile's `home_city`, else what you said — **never the
+device**) → recall → **open `47-travel/reports/Today in <City> <date>.md` first** → the brain half
+(`today.py picks`: saved-but-never-visited places first, then the kinds you love, not picked in 30
+days, one per slot of the balanced mix: coffee · meal · activity · event · wildcard new neighbourhood ·
+social) → the web half (`today-scout`: events and openings this week, each with `seen_at`, marked web
+only) → a dated shortlist, one section per slot (the Map, `Today.geojson`, one click away) → nothing booked; you say *"I went to #2"*
+(`learn.py went|loved|not-for-me|save`) and the picks funnel counts it toward **Try my city**.
+*This weekend* (Fri 16:00) is the weekend edition; *Weekly trip check* (Mon 09:30) re-reads stale
+quotes on upcoming trips and runs `kpi.py` → `optimize.py` on the picks (proposals only; nothing
+changes a gate). Two funnels on Studio's Runtime — trips (idea → planned → shopped → booked → done;
+`render_brain.py --migrate-layout` rewrites the old ids draft / past once) and picks — and a
+six-machine Floor. Standard layout: `Travel Dashboard.md` · `Travel KPI.md` · `Travel Lessons.md` ·
+`pipeline.json` · `profile/` (+ `home_city`, `radius_km`, `mix`, `stages.json`, `sources.md`) ·
+`reports/` · `trips/<id>/` · `picks/<date>/` · the Map files. Contract: `studio.json` (`sbl-agent/1`);
+reference `engine/references/agent-contract.md`.

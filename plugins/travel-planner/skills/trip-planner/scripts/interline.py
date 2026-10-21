@@ -246,7 +246,7 @@ def write_to_itinerary(j, trip_id, origin, dest, dest_root=None):
         leg = {"from": conn["to_airport"], "segments": [], "tickets": [], "conns": [],
                "stopover": (stop["id"], conn)}
     close(dest.upper())
-    if it.get("status") == "draft":
+    if it.get("status") in ("planned", "draft"):
         it["status"] = "shopped"
     itin.save(it, dest_root)
     return it

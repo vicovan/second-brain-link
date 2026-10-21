@@ -64,6 +64,24 @@ founder and the company. The brain tunes *who to approach*; the profile supplies
    network, never drive one in the browser, never post, like, follow or message. The note's
    **✓ I posted it** button arrives as *"I posted the comment on t-…"* → `threads.py posted <id>`.
 
+## The notes you keep, and the report twice
+
+- **The dated daily note** `46-fundraising/reports/Raise today <date>.md` — opened FIRST by
+  `daily.py start` (before any search), `## Status` on top, then *New today* (programs and investors
+  found, why each fits, the deadline, the access and apply routes — script-rendered), *Due*,
+  *Angles today* (per investor: the angle + the draft), *Threads worth a comment*, *Needs you*,
+  *Explored today*. Studio shows it beside this chat and marks it ★ on the Lines view.
+- **`Fundraising Dashboard.md`** — the living overview; **`Funding Plan.md`** — the living strategy
+  (the filter, the tiers, the decisions, the partner track, *this week*), whose §0 ledger table is
+  rendered between `<!-- ledger:begin/end -->` markers by `render_brain.py` from the ledger; **`Fundraising
+  KPI.md`** (two funnels, rates only at n ≥ 20); **`Fundraising Lessons.md`**; `Raise update <date>.md`
+  after a weekly run.
+- Every number in a note or a report is printed by a script (`ledger.py stats|due|count|table|since`)
+  and pasted verbatim — never typed from memory.
+- End every run with `daily.py close --report report.json`: it writes the report and prints the chat
+  report (goal counters · done · needs you · due next) and the ```report fence — both go last in your
+  reply. A quiet run stays out of the Inbox; anything that needs the founder always reaches it.
+
 ## Asking the founder something — AskUserQuestion (a gate)
 
 **Use `AskUserQuestion`.** Studio shows the question and its options as buttons and your call

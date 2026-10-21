@@ -455,6 +455,17 @@ def _rate_table(recs, field, label):
 
 def cmd_kpi(a):
     """THE NORTH STAR: interviews won. Submissions are only the means."""
+    if getattr(a, "json", False):
+        # the funnel numbers the shared kpi.py computes from the rendered pipeline (R2)
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from paths import render_dir
+            import kpi as _kpi
+            doc = json.loads((render_dir() / "pipeline.json").read_text(encoding="utf-8"))
+            print(json.dumps(_kpi.compute(doc, [], signals=["portal", "archetype", "market", "source"]), ensure_ascii=False))
+        except (OSError, ValueError, ImportError) as e:
+            print(json.dumps({"error": f"render first (render_brain.py): {e}"}))
+        return
     recs = [r for r in rows(OUT) if r.get("status") != "prior_external"]
     applied = [r for r in recs if r.get("status") == "applied"]
     answered = [r for r in applied if r.get("result")]
@@ -547,6 +558,11 @@ def cmd_count(a):
     recs = [r for r in rows(OUT) if r.get("status") != "prior_external"]
     applied = [r for r in recs if r.get("status") == "applied"]
     res = [r.get("result") for r in applied if r.get("result")]
+    if a.what == "applications":   # throughput: valid applications sent in the last N days (default 1)
+        days = a.days if a.days is not None else 1
+        since = (datetime.date.today() - datetime.timedelta(days=days - 1)).isoformat()
+        print(sum(1 for r in applied if valid(r) and (sent_on(r) or "") >= since))
+        return
     n = {"interviews": sum(1 for x in res if x in ("interview", "offer")),
          "screens": sum(1 for x in res if x in POSITIVE),
          "offers": sum(1 for x in res if x == "offer"),
@@ -698,9 +714,10 @@ def main():
     g = sub.add_parser("consolidate"); g.set_defaults(f=cmd_consolidate)
     g.add_argument("--threshold", type=int, default=3)
 
-    sub.add_parser("kpi").set_defaults(f=cmd_kpi)
+    g = sub.add_parser("kpi"); g.add_argument("--json", action="store_true"); g.set_defaults(f=cmd_kpi)
     g = sub.add_parser("count"); g.set_defaults(f=cmd_count)
-    g.add_argument("what", choices=["interviews", "screens", "offers", "applied"])
+    g.add_argument("what", choices=["interviews", "screens", "offers", "applied", "applications"])
+    g.add_argument("--days", type=int, default=None)
     g = sub.add_parser("target"); g.set_defaults(f=cmd_target)
     g.add_argument("--json", action="store_true", help="machine-readable, for the pipeline")
     sub.add_parser("calibrate").set_defaults(f=cmd_calibrate)

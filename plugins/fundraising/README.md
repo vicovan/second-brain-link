@@ -84,3 +84,20 @@ It reads public pages and the lists you hand it, and it will be wrong where they
 says ⚠ rather than guessing. Forms change without notice; a failed fill falls back to paste-ready
 answers. Warm paths inherit the engine's name-only identity matching. It only knows an email was
 sent when you tell it.
+
+## The daily loop (agent operating model)
+
+*Daily raise* (weekdays 08:00, off until you turn it on) runs the Jobs loop over two item kinds:
+recall → orient → **open `46-fundraising/reports/Raise today <date>.md` first** → discover new
+programs and investors (the brain's ties first, the proven sources, a 20 % explore slice from
+`profile/sources.md`) → screen with your filter chain and verify → the note's *New today · Due ·
+Angles today · Threads* → apply to programs and draft investor angles within your `level:` (never sent)
+→ log → render → reflect → the report, twice. *Weekly raise update* (Mon 09:00) runs `kpi.py` →
+`optimize.py` (rates only at n ≥ 20; caps and gates never change), re-verifies stale claims, rebuilds
+the Funding Plan and writes `reports/Raise update <date>.md`. Two funnels on Studio's Runtime —
+programs (success: accepted) and investors (success: meeting; term sheet beyond) — and an 8-machine
+Floor. Standard layout: `Fundraising Dashboard.md` · `Fundraising KPI.md` · `Fundraising Lessons.md` ·
+`Funding Plan.md` (its §0 ledger script-rendered between markers) · `pipeline.json` · `profile/` ·
+`reports/` · `programs/` + `investors/` (was `targets/` — `render_brain.py --migrate-layout` moves
+the notes with their aliases) · `applications/<date>/<key>/` · `outreach/`. Contract: `studio.json`
+(`sbl-agent/1`); reference `engine/references/agent-contract.md`.

@@ -43,8 +43,9 @@ Commands: `/sell` · `/sales-leads` · `/sales-onboard` · `/sales-due` · `/sal
 Nothing personal ships in this plugin. Everything is written into **your** brain:
 
 ```
-<brain>/48-sales/            notes you read: Pipeline.md, pipeline.json (the board), accounts/,
-                             leads/Leads <date>.md, sequences/, profile/ (written by onboarding
+<brain>/48-sales/            notes you read: Sales Dashboard.md (alias Pipeline), reports/Sell today <date>.md
+                             (the dated daily note), Sales KPI.md, Sales Lessons.md, pipeline.json (the line),
+                             accounts/, outreach/<date>/<key>/, sequences/, profile/ (written by onboarding
                              and Studio's Sending tab)
 <brain>/.plugins/sales/      machinery, hidden from the tree: accounts.jsonl, events.jsonl
                              (append-only), scout_state.json, last_shortlist.json, _SALES_GENERATED.json
@@ -69,3 +70,20 @@ claude --plugin-dir plugins/sales                                    # one CLI s
 ```
 
 MIT licensed. Part of [Second Brain Link](https://secondbrainlink.com).
+
+## The daily loop (agent operating model)
+
+*Daily sales* (weekdays 07:30, off until you turn it on) runs the Jobs loop for outbound: recall →
+orient → **open `48-sales/reports/Sell today <date>.md` first** → replies → due steps (every one
+through the guard) → today's leads (your brain first, then every market's sources with the coverage
+gate and a 20 % explore slice) → screen and score → a **strategy per account** (why now · the angle ·
+which offer to get them to *try · use · buy · partner* on) and a **reach-out mix** ranked with reasons →
+the sequences that fit → log → render → reflect → the report, twice. *Work my replies* stays at 11:00;
+*Weekly sales review* (Mon 08:45) runs `kpi.py` → `optimize.py` (rates only at n ≥ 20; the caps, the
+level and the guard never change) and writes `reports/Sales review <date>.md`. The funnel on Studio's
+Runtime: lead → researched → sequenced → contacted → replied → meeting → **trial** → won / lost ·
+not now · knocked out (`ledger.py migrate` rewrites the old ids target / opportunity / parked once;
+`render_sales.py --migrate-layout` moves `Pipeline.md` → `Sales Dashboard.md` and `leads/` →
+`reports/` with aliases). The product stays the seller's own: everything the agent may say comes from
+`profile/offer.md` and `materials/`. Contract: `studio.json` (`sbl-agent/1`); reference
+`engine/references/agent-contract.md`.

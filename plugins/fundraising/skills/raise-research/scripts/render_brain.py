@@ -6,9 +6,16 @@ The ledger (targets.jsonl, events.jsonl) stays hidden in the state root. This tu
 into frontmattered notes that Obsidian and Second Brain Studio index, search and graph:
 
     Fundraising Dashboard.md      pipeline by status · Due · deadlines · tiers · recent
-    Fundraising KPI.md            reply / meeting rates by tier, kind, channel
-    targets/<Name> (target).md    one per record that is not screened out
+    Fundraising KPI.md            the two funnels' counts, conversions, rates at n >= 20 (kpi.py)
+    Fundraising Lessons.md        what the agent learned (lessons.md + _memory/, inferred flagged)
+    programs/<Name> (target).md   one per program / grant that is not screened out
+    investors/<Name> (target).md  one per fund / angel / strategic / syndicate
     applications/<day>/<key>/<Name> application <day>.md   index of each application folder
+    pipeline.json                 sbl-pipeline/2 with the two funnels + the floor (Studio's Runtime)
+    Funding Plan.md               NOT written here - only its §0 ledger between <!-- ledger:begin/end -->
+                                  markers is refreshed from `ledger.py table ledger` (R2)
+
+    python3 render_brain.py --migrate-layout   # targets/ -> programs/ + investors/ through the manifest (aliases kept)
 
     python3 render_brain.py            # render to this surface
     python3 render_brain.py --quiet    # after every status change — the founder is watching
@@ -30,6 +37,9 @@ import ledger as L  # noqa: E402
 import founder_profile as prof  # noqa: E402
 from lint_claims import gates_ok  # noqa: E402
 import pipeline_doc as pdoc  # noqa: E402
+import kpi as KPIlib  # noqa: E402
+import stages as STG  # noqa: E402
+from ledger_base import Writer as _BaseWriter, replace_between, between  # noqa: E402
 from paths import is_brain  # noqa: E402
 
 
@@ -51,7 +61,32 @@ def _threads():
 MANIFEST = "_FUNDRAISE_GENERATED.json"
 DASHBOARD = "Fundraising Dashboard.md"
 KPI = "Fundraising KPI.md"
+LESSONS = "Fundraising Lessons.md"
 PLAN = "Funding Plan.md"
+PROGRAM_KINDS = ("program", "grant")          # the programs funnel; every other kind is an investor
+FOLDER = {"programs": "programs", "investors": "investors"}
+
+
+def contract():
+    """The plugin's own studio.json (the sbl-agent/1 contract: funnels, floor, layout)."""
+    here = pathlib.Path(__file__).resolve()
+    for d in [here.parent] + list(here.parents):
+        sj = d / "studio.json"
+        if sj.is_file():
+            try:
+                return json.loads(sj.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                break
+    return {}
+
+
+def funnel_of(rec):
+    return "programs" if rec.get("kind") in PROGRAM_KINDS else "investors"
+
+
+def note_rel(rec):
+    """programs/<Name> (target).md or investors/<Name> (target).md - the standard layout."""
+    return f"{FOLDER[funnel_of(rec)]}/{title_of(rec)}.md"
 TODAY = datetime.date.today().isoformat()
 GLYPH = {"screened": "📋", "verified": "✅", "out": "⛔", "queued": "⬜", "drafted": "✏️",
          "draft_ready": "📨", "filed": "📤", "contacted": "📬", "no_reply": "⏳",
@@ -86,26 +121,13 @@ def cell(v):
     return str(v if v not in (None, "") else "—").replace("|", "/").replace("\n", " ")
 
 
-class Writer:
-    """Writes only what changed, and remembers what it wrote."""
+class Writer(_BaseWriter):
+    """The shared R6 writer (ledger_base.Writer): a note the founder edited is kept and the fresh
+    render lands beside it as <name>.new.md; machine files are always rewritten; the manifest
+    (`_FUNDRAISE_GENERATED.json`, beside the ledger) remembers what was rendered."""
 
-    def __init__(self, root, quiet=False):
-        self.root, self.quiet, self.man, self.wrote, self.same = pathlib.Path(root), quiet, {}, 0, 0
-
-    def text(self, rel, body):
-        p = self.root / rel
-        self.man[str(rel)] = hashlib.sha256(body.encode("utf-8")).hexdigest()
-        try:
-            if p.is_file() and p.read_text(encoding="utf-8") == body:
-                self.same += 1
-                return
-        except OSError:
-            pass
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(body, encoding="utf-8")
-        self.wrote += 1
-        if not self.quiet:
-            print(f"  + {rel}", file=sys.stderr)
+    def __init__(self, root, manifest_path, quiet=False):
+        super().__init__(root, manifest_path, quiet)
 
 
 def title_of(rec):
@@ -291,9 +313,11 @@ def dashboard(recs, known, packages=()):
     fm = frontmatter([("type", "fundraising-dashboard"), ("title", "Fundraising Dashboard"),
                       ("updated", TODAY), ("targets", len(recs))],
                      ["fundraising", "dashboard"])
+    today_note = f"Raise today {TODAY}"
     out = [fm, "# Fundraising Dashboard\n",
-           (f"The plan: [[Funding Plan]] · " if plan_exists else "No plan yet — ask the agent to build one · ")
-           + "[[Fundraising KPI]] · [[Memory — Fundraising Agent]] (what the agent remembers; [[Review]] for its inferences)\n",
+           (f"Today: [[{today_note}]] · " if (render_dir() / "reports" / f"{today_note}.md").is_file() else "")
+           + (f"The plan: [[Funding Plan]] · " if plan_exists else "No plan yet — ask the agent to build one · ")
+           + "[[Fundraising KPI]] · [[Fundraising Lessons]] · [[Memory — Fundraising Agent]] (what the agent remembers; [[Review]] for its inferences)\n",
            "## Pipeline\n", "| Status | Count |\n|---|---|"]
     for s in L.STATUSES:
         if counts.get(s):
@@ -376,35 +400,67 @@ def dashboard(recs, known, packages=()):
     return "\n".join(out) + "\n"
 
 
-def kpi_note():
-    k = None
+def kpi_note(doc, evs):
+    """`Fundraising KPI.md` from the shared kpi.py over the two funnels (R2: numbers from scripts)."""
+    k = KPIlib.compute(doc, evs, today=TODAY, signals=["origin", "kind", "tier", "channel", "angle"])
     import io, contextlib
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
         L.cmd_kpi(None)
-    k = json.loads(buf.getvalue())
-    fm = frontmatter([("type", "fundraising-kpi"), ("title", "Fundraising KPI"), ("updated", TODAY)],
-                     ["fundraising", "kpi"])
-    out = [fm, "# Fundraising KPI\n",
-           f"**{k['touched']}** targets contacted or applied to · replied **{k['replied']}** · "
-           f"meetings **{k['meetings']}** · accepted **{k['accepted']}** · term sheets **{k['term_sheets']}**\n"]
-    for dim, rows in k["by"].items():
-        if not rows:
-            continue
-        out.append(f"## By {dim}\n\n| {dim} | n | replied | meeting |\n|---|---|---|---|")
-        out += [f"| {g} | {v['n']} | {v['replied']} | {v['meeting']} |" for g, v in rows.items()]
-        out.append("")
+    old = json.loads(buf.getvalue() or "{}")
+    extra = [f"## Touched", "", f"**{old.get('touched', 0)}** targets contacted or applied to · replied **{old.get('replied', '0/0')}** · "
+             f"meetings **{old.get('meetings', '0/0')}** · accepted **{old.get('accepted', 0)}** · term sheets **{old.get('term_sheets', 0)}**"]
+    return KPIlib.markdown(k, "Fundraising", title="Fundraising KPI", extra="\n".join(extra), tags=["fundraising"])
+
+
+def lessons_note():
+    """The readable mirror of what the agent learned: lessons.md (ledger.py add-lesson) + _memory/."""
+    body = []
     lessons = state_root() / "lessons.md"
     if lessons.is_file():
-        out.append("## Lessons\n\n" + lessons.read_text(encoding="utf-8"))
-    return "\n".join(out) + "\n"
+        body += ["## Lessons recorded", "", lessons.read_text(encoding="utf-8").strip(), ""]
+    try:
+        import memory as M  # noqa: PLC0415
+        root = state_root()
+        brain = str(root.parent.parent) if root.parent.name == ".plugins" else None
+        items = M.recall("fundraising", None, 4000, stamp=False, brain=brain)
+        if items:
+            body += ["## What the agent remembers (inferred items are flagged)", ""] + ["- " + M.recall_line(it) for it in items] + [""]
+    except Exception:  # noqa: BLE001
+        pass
+    fm = frontmatter([("type", "synthesis"), ("title", "Fundraising Lessons"), ("updated", TODAY)], ["fundraising", "lessons"])
+    return fm + "# Fundraising Lessons\n\n> What outcomes taught this agent. Edit or remove any inferred item in Studio's Memory manager.\n\n" \
+        + ("\n".join(body) if body else "_Nothing learned yet._\n") + "\nBack to [[Fundraising Dashboard]]\n"
+
+
+def refresh_plan_ledger(dest):
+    """The Funding Plan's §0 table between <!-- ledger:begin --> / <!-- ledger:end --> markers is
+    script-rendered (`ledger.py table ledger`); the rest of the plan is the model's and never touched."""
+    plan = pathlib.Path(dest) / PLAN
+    if not plan.is_file():
+        return False
+    txt = plan.read_text(encoding="utf-8")
+    if between(txt, "ledger") is None:
+        return False
+    import io, contextlib
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        L.cmd_table(type("A", (), {"which": "ledger", "kind": None})())
+    new = replace_between(txt, "ledger", buf.getvalue().rstrip("\n"))
+    if new != txt:
+        tmp = plan.with_name(plan.name + ".tmp")
+        tmp.write_text(new, encoding="utf-8")
+        os.replace(tmp, plan)
+    return True
 
 
 def render(dest=None, quiet=False):
     dest = pathlib.Path(dest) if dest else render_dir()
     recs = list(L.load().values())
     evs = L.events()
-    w = Writer(dest, quiet)
+    mdir = state_root()
+    mdir.mkdir(parents=True, exist_ok=True)
+    w = Writer(dest, mdir / MANIFEST, quiet)
     live = [r for r in recs if r["status"] != "out"]
     known = {title_of(r) for r in live}
     existing_stems = {p.stem for p in dest.rglob("*.md")} if dest.is_dir() else set()
@@ -425,27 +481,21 @@ def render(dest=None, quiet=False):
         app_titles.add(t)
     exists = existing_stems | app_titles
     for r in live:
-        w.text(f"targets/{title_of(r)}.md",
-               target_note(r, [e for e in evs if e["key"] == r["key"]], exists))
+        w.text(note_rel(r), target_note(r, [e for e in evs if e["key"] == r["key"]], exists))
     w.text(DASHBOARD, dashboard(recs, known, packages))
-    w.text(KPI, kpi_note())
-    write_pipeline(w, dest, recs, evs, exists)
+    doc = write_pipeline(w, dest, recs, evs, exists)
+    if doc:
+        w.text(KPI, kpi_note(doc, evs))
+    w.text(LESSONS, lessons_note())
+    refresh_plan_ledger(dest)
 
-    mdir = state_root()
-    mdir.mkdir(parents=True, exist_ok=True)
-    mf = mdir / MANIFEST
-    old = {}
-    try:
-        old = json.loads(mf.read_text(encoding="utf-8")).get("files", {})
-    except (OSError, ValueError):
-        pass
-    gone = [k for k in old if k not in w.man]
-    mf.write_text(json.dumps({"schema": 1, "generated": TODAY, "dest": str(dest),
-                              "files": w.man}, indent=1, ensure_ascii=False), encoding="utf-8")
+    gone = w.finish({"dest": str(dest)})
     if not quiet:
-        print(f"\n{w.wrote} written · {w.same} unchanged · {len(live)} targets rendered "
+        print(f"\n{w.wrote} written · {w.same} unchanged · {len(w.kept)} kept (yours) · {len(live)} targets rendered "
               f"({len(recs) - len(live)} screened out, listed on the dashboard) -> {dest}",
               file=sys.stderr)
+        if w.kept:
+            print("kept as you edited them (fresh render beside as .new.md): " + ", ".join(w.kept[:5]), file=sys.stderr)
         if gone:
             print(f"{len(gone)} note(s) no longer rendered, left in place: "
                   + ", ".join(gone[:5]), file=sys.stderr)
@@ -487,13 +537,22 @@ def write_pipeline(w, dest, recs, evs, exists):
     dest = pathlib.Path(dest)
     pre = dest.name + "/" if is_brain(dest.parent) else ""
     doc = pdoc.new("fundraising", "Fundraising", "#0f9d74")
-    stages = []
-    for sid in L.STATUSES:
-        nxt = sorted(x for x in L.TRANSITIONS.get(sid, set()) if x != sid)
-        gate = "owner" if sid in L.FOUNDER_ONLY else ("reason" if sid in ("passed", "rejected") else ("confirm" if sid in ("withdrawn", "filed") else "none"))
-        stages.append(S(sid, FR_LABEL.get(sid, sid), FR_ROLE.get(sid, "open"), next=nxt, gate=gate,
-                        move_prompt=FR_PROMPT.get(sid, "Move {title} to {stage_label}.")))
-    doc["stages"] = stages
+    # the two funnels (programs · investors) are the contract's: fixed IDs, roles, gates; the labels
+    # per funnel ("Found", "Angle") come from there too; `next` from the ledger's own table
+    c = contract()
+    funnels = []
+    for f in c.get("funnels") or []:
+        ids = {x["id"] for x in f["stages"]}
+        stages = []
+        for x in f["stages"]:
+            sid = x["id"]
+            nxt = sorted(y for y in L.TRANSITIONS.get(sid, set()) if y != sid and y in ids)
+            stages.append(S(sid, x.get("label") or FR_LABEL.get(sid, sid), x.get("role", "open"), next=nxt, gate=x.get("gate", "none"),
+                            move_prompt=FR_PROMPT.get(sid, "Move {title} to {stage_label}."), collapsed=bool(x.get("collapsed"))))
+        funnels.append(pdoc.funnel(f["id"], f["label"], f["item"], f["success"], stages, f.get("success2")))
+    doc["funnels"] = funnels
+    doc["floor"] = [pdoc.floor_group(g["id"], g["label"], g["stages"], g.get("funnel")) for g in (c.get("floor") or [])]
+    known_stage = {f["id"]: {x["id"] for x in f["stages"]} for f in funnels}
     last_ev = {}
     for e in evs:
         last_ev[e["key"]] = e.get("at")
@@ -514,13 +573,18 @@ def write_pipeline(w, dest, recs, evs, exists):
         if stale and st not in ("out", "withdrawn"):
             flags.append("stale")
         title = title_of(r)
+        fid = funnel_of(r)
+        if st not in known_stage.get(fid, {st}):
+            st = "screened"
         attrs = {"kind": r.get("kind") or "", "tier": f"Tier {r['tier']}" if r.get("tier") else "untiered",
-                 "deadline_days": dl_days if dl_days is not None else None, "stale": len(stale)}
+                 "deadline_days": dl_days if dl_days is not None else None, "stale": len(stale),
+                 "origin": (r.get("origin") or [""])[0], "channel": (r["drafts"][-1].get("channel") if r.get("drafts") else ("form" if r.get("apps") else "")),
+                 "angle": r.get("angle") or "", "day": str(r.get("created") or "")[:10]}
         sub = " · ".join(x for x in (r.get("kind") or "", f"tier {r['tier']}" if r.get("tier") else "",
                                      f"deadline {dl.isoformat()}" if dl else "") if x)
-        it = pdoc.item(r["key"], r["name"], st, sub=sub or None, score=r.get("fit"), flags=flags or None, needs=needs or None,
+        it = pdoc.item(r["key"], r["name"], st, funnel=fid, sub=sub or None, score=r.get("fit"), flags=flags or None, needs=needs or None,
                        why=r.get("out_reason") or r.get("why") or None, url=r.get("url") or None,
-                       note=(pre + f"targets/{title}.md") if st != "out" else None,
+                       note=(pre + note_rel(r)) if st != "out" else None,
                        attrs={k: v for k, v in attrs.items() if v is not None},
                        next={"label": r["next"].get("action"), "due": r["next"].get("due")} if r.get("next") else None,
                        stage_since=str(last_ev.get(r["key"]) or r.get("updated") or "")[:10] or None,
@@ -543,7 +607,11 @@ def write_pipeline(w, dest, recs, evs, exists):
             for d in r.get("drafts") or []:
                 stem = pathlib.Path(d.get("path", "")).stem
                 if stem in exists and d.get("path"):
-                    work.append({"label": f"{d.get('channel', 'email')} draft {str(d.get('at') or '')[:10]}", "note": pre + d["path"]})
+                    # a draft's path may already be brain-relative ("46-fundraising/outreach/…"):
+                    # never prefix the layer twice
+                    dp = str(d["path"])
+                    work.append({"label": f"{d.get('channel', 'email')} draft {str(d.get('at') or '')[:10]}",
+                                 "note": dp if (pre and dp.startswith(pre)) else pre + dp})
             hist = [{"label": f"{e.get('from') or '∅'} → {e['to']}", "status": "done", "date": str(e.get("at") or "")[:10]}
                     for e in evs if e["key"] == r["key"]][-8:]
             it["detail"] = {"claims": claims, "people": people, "work": work, "history": hist}
@@ -553,13 +621,17 @@ def write_pipeline(w, dest, recs, evs, exists):
     reached = count("filed", "contacted", "no_reply", "replied", "meeting", "term_sheet", "accepted", "passed", "rejected")
     meetings = count("meeting", "term_sheet", "accepted")
     doc["headline"] = {"label": "meetings", "value": meetings, "n": reached, "period": "all time"}
+    doc["throughput"] = pdoc.throughput((c.get("throughput") or {}).get("label") or "filed + drafted / day",
+                                        [e.get("at") for e in evs if e.get("to") in ("filed", "drafted", "draft_ready")], TODAY)
     doc["stats"] = [{"label": "replies or better / reached", "num": count("replied", "meeting", "term_sheet", "accepted"), "den": reached, "min_n": 20},
                     {"label": "meetings / reached", "num": meetings, "den": reached, "min_n": 20}]
     doc["lenses"] = [pdoc.lens("fit", "Fit", "score", domain=[40, 100]),
                      pdoc.lens("deadline", "Days to deadline", "attrs.deadline_days", domain=[0, 60]),
                      pdoc.lens("age", "Age in stage", "stage_since", scale="days", buckets=[3, 7, 14, 30]),
-                     pdoc.lens("needs", "Needs you", "flags", scale="flag", value="needs-you")]
-    doc["facets"] = [pdoc.facet("kind", "Kind", "attrs.kind"), pdoc.facet("tier", "Tier", "attrs.tier")]
+                     pdoc.lens("needs", "Needs you", "flags", scale="flag", value="needs-you"),
+                     pdoc.lens("today", "New today", "attrs.day", scale="flag", value=TODAY)]
+    doc["facets"] = [pdoc.facet("kind", "Kind", "attrs.kind"), pdoc.facet("tier", "Tier", "attrs.tier"),
+                     pdoc.facet("origin", "Origin", "attrs.origin"), pdoc.facet("channel", "Channel", "attrs.channel")]
     doc["panel"] = {
         "top": ["{attrs.kind}", "{stage_label}", "{attrs.tier}", "fit {score}"],
         "sections": [{"type": "text", "label": "Why this one", "from": "why"},
@@ -580,20 +652,50 @@ def write_pipeline(w, dest, recs, evs, exists):
             A("Screen these {n}", "Verify these {n} targets on their own sites and tier them: {titles}.", "primary", stages=["screened"], bulk=True),
         ],
     }
-    doc["actions"] = [A("Build my funding plan", "Build my funding plan: screen every target, verify the survivors, write the dated plan.", "primary"),
+    doc["actions"] = [A("Run today's raise", "Run today's raise: new programs and investors, screened, applied and drafted within my level, and what's due.", "primary"),
+                      A("Build my funding plan", "Build my funding plan: screen every target, verify the survivors, write the dated plan."),
                       A("What's due?", "What's due? Follow-ups, deadlines in the next two weeks, claims to re-verify.")]
     doc["generated"] = max([str(r.get("updated") or "") for r in recs] + [""])
+    STG.apply(doc, dest / "profile")          # the founder's labels / hidden stages (profile/stages.json)
     probs = pdoc.check(doc)
     if probs:
         print("  ! pipeline.json not written: " + "; ".join(probs[:3]), file=sys.stderr)
-        return
-    w.text("pipeline.json", pdoc.dumps(doc))
+        return None
+    w.text("pipeline.json", pdoc.dumps(doc), machine=True)
+    return doc
+
+def migrate_layout(dest=None, dry_run=False):
+    """targets/<Name> (target).md -> programs/ or investors/ by kind, THROUGH the manifest: a note
+    still matching its rendered sha moves and gets `aliases: [<old title>]`; one the founder edited
+    stays where it is and is listed. Nothing is deleted; the old folder stays until empty."""
+    dest = pathlib.Path(dest) if dest else render_dir()
+    recs = L.load()
+    moves = []
+    for r in recs.values():
+        old = f"targets/{title_of(r)}.md"
+        if (dest / old).is_file():
+            moves.append((old, note_rel(r), title_of(r)))
+    w = Writer(dest, state_root() / MANIFEST, quiet=True)
+    rep_ = w.migrate_layout(moves, dry_run=dry_run)
+    for a_, b_ in rep_["moved"]:
+        print(f"{'would move' if dry_run else 'move'}  {a_} -> {b_}", file=sys.stderr)
+    for left in rep_["left"]:
+        print(f"LEFT (edited by you): {left}", file=sys.stderr)
+    for a_, b_, why in rep_["skipped"]:
+        print(f"SKIPPED {a_} -> {b_} ({why})", file=sys.stderr)
+    print(f"{len(rep_['moved'])} moved, {len(rep_['left'])} left, {len(rep_['skipped'])} skipped. Nothing was deleted.", file=sys.stderr)
+    return 0
+
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dest")
     ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--migrate-layout", action="store_true", help="targets/ -> programs/ + investors/ (aliases kept)")
+    ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
+    if a.migrate_layout:
+        return migrate_layout(a.dest, a.dry_run)
     render(a.dest, a.quiet)
 
 

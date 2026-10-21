@@ -7,7 +7,7 @@ tags:
 id: routine-trip-ideas-from-my-places
 agent: travel-planner
 skill: trip-scout
-goal: ""
+goal: "[[Plan my next trip]]"
 schedule: MONTHLY 1 09:00
 only_when: []
 max_per_day: 1

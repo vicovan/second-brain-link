@@ -147,8 +147,8 @@ def cmd_send(a):
     ledger.log("sent", account=rec.get("key") or a.account, contact=a.contact, channel="email",
                batch=a.batch, step=a.step, message_id=msg["Message-ID"], subject=a.subject,
                msg_kind=a.kind, sink=bool(a.sink))
-    if rec and rec.get("stage") in ("lead", "target"):
-        ledger.set_stage(acc, rec, "sequenced", "agent", "first email sent")
+    if rec and rec.get("stage") in ("lead", "researched", "sequenced"):
+        ledger.set_stage(acc, rec, "contacted", "agent", "first email sent")
         ledger.save_accounts(acc)
     print(f"SENT {msg['Message-ID']} → {a.to}")
     return 0

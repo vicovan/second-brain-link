@@ -31,6 +31,8 @@ step is yours whatever the setting says.
 
 Everything else — the ledger, the scoring, the vault layer, the CV builder — is the same.
 
+Every run starts with `python3 scripts/daily.py start --agent job-search` (the dated Shortlist note first) and ends with `scripts/daily.py close --report report.json` (the report, twice). Mondays run `scripts/kpi.py` → `scripts/optimize.py` (the weekly review).
+
 ## The five workflows
 
 Read the one you need, in full, before acting. They are the real instructions; this

@@ -1,0 +1,13 @@
+{"trip_id": "lisbon-spring-1", "kind": "planned", "ref": "", "note": "", "at": "2026-09-20T09:00:00"}
+{"trip_id": "madrid-spring-2", "kind": "planned", "ref": "", "note": "", "at": "2026-09-20T09:00:00"}
+{"trip_id": "tokyo-spring-3", "kind": "planned", "ref": "", "note": "", "at": "2026-09-20T09:00:00"}
+{"trip_id": "tokyo-spring-3", "kind": "shopped", "ref": "", "note": "", "at": "2026-09-20T09:00:00"}
+{"trip_id": "paris-autumn-4", "kind": "planned", "ref": "", "note": "", "at": "2026-09-20T09:00:00"}
+{"trip_id": "paris-autumn-4", "kind": "shopped", "ref": "", "note": "", "at": "2026-09-20T09:00:00"}
+{"trip_id": "paris-autumn-4", "kind": "booked", "ref": "", "note": "", "at": "2026-09-20T09:00:00"}
+{"trip_id": "berlin-autumn-5", "kind": "planned", "ref": "", "note": "", "at": "2026-09-20T09:00:00"}
+{"trip_id": "berlin-autumn-5", "kind": "shopped", "ref": "", "note": "", "at": "2026-09-20T09:00:00"}
+{"trip_id": "berlin-autumn-5", "kind": "booked", "ref": "", "note": "", "at": "2026-09-20T09:00:00"}
+{"trip_id": "berlin-autumn-5", "kind": "travelled", "ref": "", "note": "", "at": "2026-09-20T09:00:00"}
+{"trip_id": "lisbon-autumn-6", "kind": "planned", "ref": "", "note": "", "at": "2026-09-20T09:00:00"}
+{"trip_id": "lisbon-autumn-6", "kind": "shopped", "ref": "", "note": "", "at": "2026-09-20T09:00:00"}

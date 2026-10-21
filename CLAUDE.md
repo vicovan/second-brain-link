@@ -276,6 +276,9 @@ second-brain-link/
 │   │   ├── harvester.py          #   universal shape recognizer (nothing lost)
 │   │   ├── correlate.py          #   cross-entity correlation vault
 │   │   ├── diagrams.py selfheal.py new_source.py
+│   │   ├── harness.py memory.py pipeline_doc.py daily.py ledger_base.py kpi.py optimize.py explore.py report.py stages.py
+│   │   │                         #   the agent platform's shared libraries (byte-identical copies in every plugin)
+│   │   ├── validate_agent.py     #   the sbl-agent/1 rule book (engine-only; tests + build_plugin run it)
 │   │   ├── emitters/             #   obsidian (default), gbrain (opt-in), base, __init__
 │   │   └── sources/
 │   │       ├── __init__.py common.py _template.py
@@ -306,7 +309,8 @@ second-brain-link/
 ├── sbl                           # one command: demo · build · refresh · ask · query · goals · routines · runs · eval …
 ├── integrations/mcp/server.py    # optional stdio MCP server (no port) — outside engine/'s zero-network promise
 ├── packaging/build_skill.py      # assembles engine + a manifest → dist/<provider>/…
-├── packaging/build_plugin.py     # a plugin → dist/plugins/{claude/<n>.zip, openai/<n>.skill}
+├── packaging/build_plugin.py     # a plugin → dist/plugins/{claude/<n>.zip, openai/<n>.skill} (refuses a non-contract plugin)
+├── packaging/new_agent.py        # scaffold a contract-complete agent from plugins/_template/
 ├── dist/
 │   ├── claude/second-brain-link.skill     # committed installable (unpacked folder git-ignored)
 │   └── openai/second-brain-link.skill
@@ -343,8 +347,24 @@ tree, graph and dashboard render it when present (the same arrangement as analyz
 (Travel Dashboard, Trip Ideas, Places I Love, `Current Trip.geojson`, and per trip
 `trips/<id>/itinerary.json` + `map.geojson` + title-prefixed notes; own `_TRAVEL_GENERATED.json`
 manifest in the hidden ledger). **`48-sales/`** (both subjects) is the `sales` layer key, written by the `sales`
-plugin (`Pipeline.md`, `pipeline.json` — the sbl-pipeline/2 file Studio's **Pipeline** canvas draws; `45-jobs/`, `46-fundraising/` and `47-travel/` each write one too, via the shared `pipeline_doc.py` — `accounts/`,
-`leads/Leads <date>.md`, `sequences/`, `profile/`; ledger + `_SALES_GENERATED.json` in `.plugins/sales/`). Place notes carry `kind`/`country`/`city`/`rating` as fields
+plugin (`Sales Dashboard.md` (alias *Pipeline*), `reports/Sell today <date>.md`, `pipeline.json` — the sbl-pipeline/2 file (with `funnels` + `floor` + `throughput`) Studio's **Runtime** draws; `45-jobs/`, `46-fundraising/` and `47-travel/` each write one too, via the shared `pipeline_doc.py` — `accounts/`,
+`outreach/<date>/<key>/`, `sequences/`, `profile/`; ledger + `_SALES_GENERATED.json` in `.plugins/sales/`).
+
+**The agent operating model (2026-10-20; plan of record `second-brain-link-docs/docs-agents/AGENT-OPERATING-MODEL.md`,
+status `…/IMPLEMENTATION-STATUS.md`).** Every agent plugin is one instance of one contract, **`sbl-agent/1`** in its
+`studio.json` (reference `engine/references/agent-contract.md`; rule book `engine/scripts/validate_agent.py`, run by
+`tests/run.py` and `packaging/build_plugin.py`, incl. a check that every script / `${CLAUDE_PLUGIN_ROOT}` path a skill
+names exists — the installed plugins may be symlinks to this checkout). The standard layer layout (Jobs is the
+standard): `<Agent> Dashboard.md` · `<Agent> KPI.md` · `<Agent> Lessons.md` · `pipeline.json` · `profile/` (+
+`stages.json`, `sources.md`, `scoring.md`) · `reports/<Daily> <date>.md` (the **dated daily note, opened first**, the
+home) · `<items>/` · `<work>/<date>/<key>/`. The shared libraries ship byte-identical in every plugin
+(`build_plugin.SHARED_FILES`, canonical in `engine/scripts/`): `daily.py` (the eleven-step runner), `ledger_base.py`
+(records + events + lock + the R6 writer that never destroys a hand edit + `replace_between` markers), `kpi.py`,
+`optimize.py` (never a cap or a gate), `explore.py` (20 % explore slice), `report.py`, `stages.py`, plus
+`pipeline_doc.py`, `harness.py` (cap 10, `cadence`, `routine-set`/`goal-set`, `inbox --count`, `profile-set`,
+`seed <agent>`, the heavy-run queue), `memory.py`. New agents: `packaging/new_agent.py` + `plugins/_template/`
+(`plugins/README.md` → *Build an agent*). Sim ledgers for every daily: `tests/fixtures/<agent>-sim/`
+(`tests/fixtures/agent-sim/make_sim.py`, fictional, deterministic). Place notes carry `kind`/`country`/`city`/`rating` as fields
 (country/city from the offline gazetteer's reverse lookup, `geocode.nearest`), and
 `graph.json` copies them onto place nodes. **Company brains use company-named folders** for the middle layers (20-brand, 30-content, 35-procurement, 40-pipeline w/ one note per deal, 50-market-view, 60-knowledge w/ meetings.md, 70-support, 80-signals, 85-locations) — driven by `mappings/brain/layout.json` `variants` via `VaultWriter.L(key)` (never hardcode a layer folder). Full field reference: `docs/ENTITY-MAP.md`.
 

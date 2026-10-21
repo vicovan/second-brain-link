@@ -13,6 +13,23 @@ meeting_link:
 website: https://example.com
 ```
 
+## Offers — what a buyer can take up (one line each; the daily's strategy picks one per account)
+
+```offers
+- name: Free pilot on one export
+  kind: try            # try · use · buy · partner
+  ask: a 20-minute call and one export they already have
+- name: Done-for-you onboarding
+  kind: use
+  ask: a signed pilot for one team
+- name: Team plan
+  kind: buy
+  ask: a paid month
+- name: Integration partnership
+  kind: partner
+  ask: a joint pilot with a tool they already sell
+```
+
 ## What it does (in the buyer's words)
 
 - <the problem, as a buyer would say it>

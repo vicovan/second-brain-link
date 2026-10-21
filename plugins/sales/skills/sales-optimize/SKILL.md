@@ -7,11 +7,19 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion
 # Sales Optimize — the weekly review
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/sales-scout/scripts/ledger.py kpi
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/sales-scout/scripts/ledger.py kpi --json
+S=${CLAUDE_PLUGIN_ROOT}/skills/sales-scout/scripts
+python3 $S/daily.py start --agent sales --routine "Weekly sales review" --mode week    # opens reports/Sales review <date>.md
+python3 $S/ledger.py kpi
+python3 $S/kpi.py --pipeline 48-sales/pipeline.json --events <state root>/events.jsonl --signals origin,segment,channel,step,signal,strategy --md --label Sales
+python3 $S/optimize.py apply --pipeline 48-sales/pipeline.json --events <state root>/events.jsonl --profile 48-sales/profile \
+    --contract ${CLAUDE_PLUGIN_ROOT}/studio.json --level <level> --review-out "48-sales/reports/Sales review <date>.md" --label Sales
 ```
 
-Write `<sales layer>/reviews/Week <YYYY-Www>.md`:
+`optimize.py` writes the review note's skeleton (*where the funnel leaks · what converted · what I
+changed and why*) and, at `autonomous`, applies the signal re-weights to `profile/scoring.md`'s
+optimizer block and the source promotions / drops to `profile/sources.md`; at `supervised` or
+`draft` it lists them as *proposed* for your one card. It never touches `sending.md`, a cap, the
+level or `offer.md`. Complete **`48-sales/reports/Sales review <date>.md`** with:
 
 1. **The numbers** — sent, replies, meetings, opportunities this week and in total. A rate only
    where n ≥ 20; below that, counts and the words "too few to tell".
@@ -28,4 +36,5 @@ At `autonomous`, apply the weight and sequence edits (show the diff in the repor
 `supervised` or `draft`, propose them in one card and apply what the seller approves. Never edit
 `offer.md` facts — those are the seller's.
 
-Save each change and its reason to memory (`observe --source outcome --tags optimize`).
+Save each change and its reason to memory (`observe --source outcome --tags optimize`), then
+`python3 $S/daily.py close --agent sales --report report.json`.

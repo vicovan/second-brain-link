@@ -1,0 +1,322 @@
+{
+ "aperture|director-of-engineering-0": {
+  "title": "Director of Engineering",
+  "company": "Aperture",
+  "score": 92,
+  "first_seen": "2026-10-16",
+  "url": "https://jobs.example.com/seen/0",
+  "source": "explore"
+ },
+ "umbrella|staff-engineer-1": {
+  "title": "Staff Engineer",
+  "company": "Umbrella",
+  "score": 84,
+  "first_seen": "2026-10-11",
+  "url": "https://jobs.example.com/seen/1",
+  "source": "careers board"
+ },
+ "vandelay|staff-engineer-2": {
+  "title": "Staff Engineer",
+  "company": "Vandelay",
+  "score": 40,
+  "first_seen": "2026-10-17",
+  "url": "https://jobs.example.com/seen/2",
+  "source": "careers board"
+ },
+ "soylent|staff-engineer-3": {
+  "title": "Staff Engineer",
+  "company": "Soylent",
+  "score": 81,
+  "first_seen": "2026-10-11",
+  "url": "https://jobs.example.com/seen/3",
+  "source": "brain"
+ },
+ "soylent|engineering-lead-4": {
+  "title": "Engineering Lead",
+  "company": "Soylent",
+  "score": 51,
+  "first_seen": "2026-10-09",
+  "url": "https://jobs.example.com/seen/4",
+  "source": "careers board"
+ },
+ "tidewater|engineering-lead-5": {
+  "title": "Engineering Lead",
+  "company": "Tidewater",
+  "score": 71,
+  "first_seen": "2026-10-15",
+  "url": "https://jobs.example.com/seen/5",
+  "source": "brain"
+ },
+ "initech|staff-engineer-6": {
+  "title": "Staff Engineer",
+  "company": "Initech",
+  "score": 76,
+  "first_seen": "2026-10-14",
+  "url": "https://jobs.example.com/seen/6",
+  "source": "careers board"
+ },
+ "umbrella|head-of-data-7": {
+  "title": "Head of Data",
+  "company": "Umbrella",
+  "score": 87,
+  "first_seen": "2026-10-15",
+  "url": "https://jobs.example.com/seen/7",
+  "source": "careers board"
+ },
+ "wayne|staff-engineer-8": {
+  "title": "Staff Engineer",
+  "company": "Wayne",
+  "score": 68,
+  "first_seen": "2026-09-30",
+  "url": "https://jobs.example.com/seen/8",
+  "source": "brain"
+ },
+ "initech|engineering-lead-9": {
+  "title": "Engineering Lead",
+  "company": "Initech",
+  "score": 45,
+  "first_seen": "2026-10-11",
+  "url": "https://jobs.example.com/seen/9",
+  "source": "careers board"
+ },
+ "pied piper|head-of-data-10": {
+  "title": "Head of Data",
+  "company": "Pied Piper",
+  "score": 57,
+  "first_seen": "2026-10-18",
+  "url": "https://jobs.example.com/seen/10",
+  "source": "explore"
+ },
+ "northwind|engineering-lead-11": {
+  "title": "Engineering Lead",
+  "company": "Northwind",
+  "score": 70,
+  "first_seen": "2026-10-05",
+  "url": "https://jobs.example.com/seen/11",
+  "source": "brain"
+ },
+ "initech|head-of-data-12": {
+  "title": "Head of Data",
+  "company": "Initech",
+  "score": 43,
+  "first_seen": "2026-10-12",
+  "url": "https://jobs.example.com/seen/12",
+  "source": "careers board"
+ },
+ "aperture|head-of-data-13": {
+  "title": "Head of Data",
+  "company": "Aperture",
+  "score": 46,
+  "first_seen": "2026-10-14",
+  "url": "https://jobs.example.com/seen/13",
+  "source": "brain"
+ },
+ "northwind|staff-engineer-14": {
+  "title": "Staff Engineer",
+  "company": "Northwind",
+  "score": 78,
+  "first_seen": "2026-10-04",
+  "url": "https://jobs.example.com/seen/14",
+  "source": "explore"
+ },
+ "cyberdyne|staff-engineer-15": {
+  "title": "Staff Engineer",
+  "company": "Cyberdyne",
+  "score": 88,
+  "first_seen": "2026-10-10",
+  "url": "https://jobs.example.com/seen/15",
+  "source": "brain"
+ },
+ "soylent|director-of-engineering-16": {
+  "title": "Director of Engineering",
+  "company": "Soylent",
+  "score": 63,
+  "first_seen": "2026-10-10",
+  "url": "https://jobs.example.com/seen/16",
+  "source": "explore"
+ },
+ "hooli|director-of-engineering-17": {
+  "title": "Director of Engineering",
+  "company": "Hooli",
+  "score": 82,
+  "first_seen": "2026-10-08",
+  "url": "https://jobs.example.com/seen/17",
+  "source": "explore"
+ },
+ "monarch|head-of-data-18": {
+  "title": "Head of Data",
+  "company": "Monarch",
+  "score": 62,
+  "first_seen": "2026-10-10",
+  "url": "https://jobs.example.com/seen/18",
+  "source": "careers board"
+ },
+ "northwind|staff-engineer-19": {
+  "title": "Staff Engineer",
+  "company": "Northwind",
+  "score": 95,
+  "first_seen": "2026-10-08",
+  "url": "https://jobs.example.com/seen/19",
+  "source": "brain"
+ },
+ "tidewater|head-of-data-20": {
+  "title": "Head of Data",
+  "company": "Tidewater",
+  "score": 78,
+  "first_seen": "2026-10-17",
+  "url": "https://jobs.example.com/seen/20",
+  "source": "brain"
+ },
+ "wayne|engineering-lead-21": {
+  "title": "Engineering Lead",
+  "company": "Wayne",
+  "score": 63,
+  "first_seen": "2026-10-06",
+  "url": "https://jobs.example.com/seen/21",
+  "source": "brain"
+ },
+ "cyberdyne|staff-engineer-22": {
+  "title": "Staff Engineer",
+  "company": "Cyberdyne",
+  "score": 82,
+  "first_seen": "2026-10-14",
+  "url": "https://jobs.example.com/seen/22",
+  "source": "careers board"
+ },
+ "wonka|head-of-data-23": {
+  "title": "Head of Data",
+  "company": "Wonka",
+  "score": 80,
+  "first_seen": "2026-10-09",
+  "url": "https://jobs.example.com/seen/23",
+  "source": "careers board"
+ },
+ "wonka|staff-engineer-24": {
+  "title": "Staff Engineer",
+  "company": "Wonka",
+  "score": 54,
+  "first_seen": "2026-10-01",
+  "url": "https://jobs.example.com/seen/24",
+  "source": "explore"
+ },
+ "pied piper|head-of-data-25": {
+  "title": "Head of Data",
+  "company": "Pied Piper",
+  "score": 62,
+  "first_seen": "2026-10-07",
+  "url": "https://jobs.example.com/seen/25",
+  "source": "explore"
+ },
+ "initech|staff-engineer-26": {
+  "title": "Staff Engineer",
+  "company": "Initech",
+  "score": 58,
+  "first_seen": "2026-10-01",
+  "url": "https://jobs.example.com/seen/26",
+  "source": "careers board"
+ },
+ "tidewater|head-of-data-27": {
+  "title": "Head of Data",
+  "company": "Tidewater",
+  "score": 48,
+  "first_seen": "2026-10-05",
+  "url": "https://jobs.example.com/seen/27",
+  "source": "careers board"
+ },
+ "stark|staff-engineer-28": {
+  "title": "Staff Engineer",
+  "company": "Stark",
+  "score": 50,
+  "first_seen": "2026-10-06",
+  "url": "https://jobs.example.com/seen/28",
+  "source": "careers board"
+ },
+ "cyberdyne|engineering-lead-29": {
+  "title": "Engineering Lead",
+  "company": "Cyberdyne",
+  "score": 55,
+  "first_seen": "2026-10-14",
+  "url": "https://jobs.example.com/seen/29",
+  "source": "careers board"
+ },
+ "acme|head-of-data-30": {
+  "title": "Head of Data",
+  "company": "Acme",
+  "score": 67,
+  "first_seen": "2026-10-20",
+  "url": "https://jobs.example.com/seen/30",
+  "source": "careers board"
+ },
+ "wonka|staff-engineer-31": {
+  "title": "Staff Engineer",
+  "company": "Wonka",
+  "score": 89,
+  "first_seen": "2026-10-12",
+  "url": "https://jobs.example.com/seen/31",
+  "source": "careers board"
+ },
+ "wayne|staff-engineer-32": {
+  "title": "Staff Engineer",
+  "company": "Wayne",
+  "score": 82,
+  "first_seen": "2026-10-17",
+  "url": "https://jobs.example.com/seen/32",
+  "source": "brain"
+ },
+ "tidewater|staff-engineer-33": {
+  "title": "Staff Engineer",
+  "company": "Tidewater",
+  "score": 45,
+  "first_seen": "2026-10-10",
+  "url": "https://jobs.example.com/seen/33",
+  "source": "careers board"
+ },
+ "aperture|head-of-data-34": {
+  "title": "Head of Data",
+  "company": "Aperture",
+  "score": 81,
+  "first_seen": "2026-10-10",
+  "url": "https://jobs.example.com/seen/34",
+  "source": "explore"
+ },
+ "pied piper|staff-engineer-35": {
+  "title": "Staff Engineer",
+  "company": "Pied Piper",
+  "score": 91,
+  "first_seen": "2026-10-13",
+  "url": "https://jobs.example.com/seen/35",
+  "source": "careers board"
+ },
+ "wayne|head-of-data-36": {
+  "title": "Head of Data",
+  "company": "Wayne",
+  "score": 58,
+  "first_seen": "2026-10-18",
+  "url": "https://jobs.example.com/seen/36",
+  "source": "careers board"
+ },
+ "acme|director-of-engineering-37": {
+  "title": "Director of Engineering",
+  "company": "Acme",
+  "score": 87,
+  "first_seen": "2026-10-02",
+  "url": "https://jobs.example.com/seen/37",
+  "source": "careers board"
+ },
+ "initech|director-of-engineering-38": {
+  "title": "Director of Engineering",
+  "company": "Initech",
+  "score": 48,
+  "first_seen": "2026-10-10",
+  "url": "https://jobs.example.com/seen/38",
+  "source": "explore"
+ },
+ "aperture|head-of-data-39": {
+  "title": "Head of Data",
+  "company": "Aperture",
+  "score": 59,
+  "first_seen": "2026-10-19",
+  "url": "https://jobs.example.com/seen/39",
+  "source": "brain"
+ }
+}

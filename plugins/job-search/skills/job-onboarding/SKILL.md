@@ -294,6 +294,24 @@ Close by naming what is still a TBD, and run one sweep to prove it works:
 python3 ${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts/ats_pool.py --quiet
 ```
 
+## Step 6 — Seed the daily, then show the line
+
+The profile is written; now the agent's loop is switched on in the brain (off until the user turns it on):
+
+```bash
+S=${CLAUDE_PLUGIN_ROOT}/skills/job-scout/scripts
+python3 $S/stages.py init --contract ${CLAUDE_PLUGIN_ROOT}/studio.json --profile 45-jobs/profile   # stage labels (sbl-stages/1), defaults
+python3 $S/explore.py add --sources 45-jobs/profile/sources.md --source "<board or query>" --proven   # one per source the user named
+python3 $S/explore.py add --sources 45-jobs/profile/sources.md --source "<candidate>"                 # a few candidates from regional-sources.md
+python3 $S/harness.py seed job-search          # Goals/Get hired · Routines/Daily job scout + Weekly job review (both off)
+python3 $S/render_brain.py --quiet             # the first render: the dashboard, the KPI, the line
+```
+
+`sources.md` keeps the user's own words at the top and gains two tables, **Proven** and **Candidates**
+(`explore.py`); the daily sweeps every proven row and a 20 % slice of the candidates, and the weekly
+review promotes or drops them on evidence. Then say, in one line: *"Your daily is ready — switch it
+on in Routines or the Daily tab."*
+
 ## Non-negotiables
 
 - **Never invent a fact, a title, a date or a number.** A TBD in the file is fine; a fabrication

@@ -174,7 +174,7 @@ def build_openai(name: str) -> bool:
         shutil.copy2(f, dest)
 
     # 5. docs + licence so the installed skill can explain itself offline
-    for extra in ("LICENSE", "README.md", "requirements.txt"):
+    for extra in ("LICENSE", "README.md", "requirements.txt", "studio.json"):
         if (src / extra).is_file():
             shutil.copy2(src / extra, out / extra)
 
@@ -260,7 +260,7 @@ def discover():
     if not PLUGINS.is_dir():
         return []
     return sorted(p.name for p in PLUGINS.iterdir()
-                  if p.is_dir() and (p / ".claude-plugin" / "plugin.json").is_file())
+                  if p.is_dir() and not p.name.startswith("_") and (p / ".claude-plugin" / "plugin.json").is_file())
 
 
 def install(name: str, provider: str) -> bool:
@@ -300,19 +300,16 @@ def install(name: str, provider: str) -> bool:
 
 
 # Files every plugin ships byte-identical (the Codex build flattens per plugin, so each plugin
-# carries its own copy). The job-search copies are canonical; a drifted copy fails the build.
+# carries its own copy). The engine's copy (engine/scripts/<name>) is canonical for the .py files
+# and the job-search copy for the .md references; a drifted copy fails the build. A plugin that is
+# not in this table (docs-connector) ships none of them. New agents: packaging/new_agent.py adds
+# the row; the shared libraries are listed in engine/references/agent-contract.md.
 SHARED_FILES = {
     "memory.py": {
         "job-search": "skills/job-scout/scripts/memory.py",
         "fundraising": "skills/raise-research/scripts/memory.py",
         "travel-planner": "skills/trip-planner/scripts/memory.py",
         "sales": "skills/sales-scout/scripts/memory.py",
-    },
-    "memory-protocol.md": {
-        "job-search": "skills/job-apply/references/memory-protocol.md",
-        "fundraising": "skills/raise-apply/references/memory-protocol.md",
-        "travel-planner": "skills/flight-search/references/memory-protocol.md",
-        "sales": "skills/sales-send/references/memory-protocol.md",
     },
     "harness.py": {
         "job-search": "skills/job-scout/scripts/harness.py",
@@ -325,6 +322,54 @@ SHARED_FILES = {
         "fundraising": "skills/raise-research/scripts/pipeline_doc.py",
         "travel-planner": "skills/trip-planner/scripts/pipeline_doc.py",
         "sales": "skills/sales-scout/scripts/pipeline_doc.py",
+    },
+    "daily.py": {
+        "job-search": "skills/job-scout/scripts/daily.py",
+        "fundraising": "skills/raise-research/scripts/daily.py",
+        "travel-planner": "skills/trip-planner/scripts/daily.py",
+        "sales": "skills/sales-scout/scripts/daily.py",
+    },
+    "ledger_base.py": {
+        "job-search": "skills/job-scout/scripts/ledger_base.py",
+        "fundraising": "skills/raise-research/scripts/ledger_base.py",
+        "travel-planner": "skills/trip-planner/scripts/ledger_base.py",
+        "sales": "skills/sales-scout/scripts/ledger_base.py",
+    },
+    "kpi.py": {
+        "job-search": "skills/job-scout/scripts/kpi.py",
+        "fundraising": "skills/raise-research/scripts/kpi.py",
+        "travel-planner": "skills/trip-planner/scripts/kpi.py",
+        "sales": "skills/sales-scout/scripts/kpi.py",
+    },
+    "optimize.py": {
+        "job-search": "skills/job-scout/scripts/optimize.py",
+        "fundraising": "skills/raise-research/scripts/optimize.py",
+        "travel-planner": "skills/trip-planner/scripts/optimize.py",
+        "sales": "skills/sales-scout/scripts/optimize.py",
+    },
+    "explore.py": {
+        "job-search": "skills/job-scout/scripts/explore.py",
+        "fundraising": "skills/raise-research/scripts/explore.py",
+        "travel-planner": "skills/trip-planner/scripts/explore.py",
+        "sales": "skills/sales-scout/scripts/explore.py",
+    },
+    "report.py": {
+        "job-search": "skills/job-scout/scripts/report.py",
+        "fundraising": "skills/raise-research/scripts/report.py",
+        "travel-planner": "skills/trip-planner/scripts/report.py",
+        "sales": "skills/sales-scout/scripts/report.py",
+    },
+    "stages.py": {
+        "job-search": "skills/job-scout/scripts/stages.py",
+        "fundraising": "skills/raise-research/scripts/stages.py",
+        "travel-planner": "skills/trip-planner/scripts/stages.py",
+        "sales": "skills/sales-scout/scripts/stages.py",
+    },
+    "memory-protocol.md": {
+        "job-search": "skills/job-apply/references/memory-protocol.md",
+        "fundraising": "skills/raise-apply/references/memory-protocol.md",
+        "travel-planner": "skills/flight-search/references/memory-protocol.md",
+        "sales": "skills/sales-send/references/memory-protocol.md",
     },
     "browser-setup.md": {
         "job-search": "skills/job-apply/references/browser-setup.md",
@@ -349,8 +394,11 @@ def check_shared(names) -> bool:
             ok = False
         for n in names:
             rel = where.get(n)
-            if not rel:
-                continue
+            if not rel:  # an agent scaffolded after this table was written: find its one copy
+                hits = sorted((PLUGINS / n).glob("skills/*/scripts/" + fname)) + sorted((PLUGINS / n).glob("skills/*/references/" + fname))
+                if not hits:
+                    continue
+                rel = hits[0].relative_to(PLUGINS / n).as_posix()
             p = PLUGINS / n / rel
             if not p.is_file():
                 print(f"  ! {n}: missing shared file {rel}")
@@ -358,6 +406,22 @@ def check_shared(names) -> bool:
             elif canon.is_file() and not filecmp.cmp(canon, p, shallow=False):
                 print(f"  ! {n}: {rel} differs from the canonical {canon.relative_to(PLUGINS)} — copy it over")
                 ok = False
+    return ok
+
+
+def check_contracts(names) -> bool:
+    """A plugin with a studio.json must be a contract-complete agent (validate_agent.py)."""
+    sys.path.insert(0, str(REPO / "engine" / "scripts"))
+    import validate_agent  # noqa: PLC0415
+
+    ok = True
+    for n in names:
+        if not (PLUGINS / n / "studio.json").is_file():
+            continue
+        probs, _warn = validate_agent.validate(PLUGINS / n, REPO)
+        for x in probs:
+            print(f"  ! {n}: {x}")
+        ok = ok and not probs
     return ok
 
 
@@ -383,6 +447,8 @@ def main():
     provs = ["claude", "openai"] if provider == "all" else [provider]
     print(f"Packaging plugin(s): {', '.join(names)} → {', '.join(provs)}")
     if not check_shared(names):
+        sys.exit(1)
+    if not check_contracts(names):
         sys.exit(1)
     ok = True
     for n in names:

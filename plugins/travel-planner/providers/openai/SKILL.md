@@ -27,6 +27,7 @@ Read the one you need, in full, before acting.
 |---|---|---|
 | Onboarding | `references/travel-onboarding.md` | No `47-travel/profile/` yet, or preferences changed |
 | Trip ideas | `references/trip-scout.md` | "where should I go" |
+| Today near me | `references/today-scout.md` | "what should I do today", the daily (start it with `scripts/daily.py start --agent travel-planner`; the brain half is `scripts/today.py`; web picks need `--seen-at`) |
 | Itinerary | `references/trip-planner.md` | A destination is chosen; editing a trip |
 | End to end | `references/trip-pipeline.md` | "plan me a trip" |
 | Flights / stays / ground / food | `references/flight-search.md`, `references/stay-search.md`, `references/ground-search.md`, `references/taste-scout.md` | For the links and the traps — skip their browser steps |

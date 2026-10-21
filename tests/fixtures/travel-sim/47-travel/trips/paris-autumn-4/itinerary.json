@@ -1,0 +1,100 @@
+{
+ "schema": "sbl-itinerary/1",
+ "trip_id": "paris-autumn-4",
+ "title": "Paris in autumn",
+ "status": "booked",
+ "created": "2026-09-05T09:00:00",
+ "updated": "2026-10-18T09:00:00",
+ "window": {
+  "earliest": "2026-11-09",
+  "latest": "2026-11-12",
+  "nights": 3,
+  "flex_days": 0
+ },
+ "currency": "EUR",
+ "budget": {},
+ "travelers": [
+  {
+   "id": "me",
+   "label": "me"
+  }
+ ],
+ "stops": [
+  {
+   "id": "s1",
+   "place": "Paris",
+   "country": "FR",
+   "lat": 48.8566,
+   "lng": 2.3522,
+   "role": "base",
+   "arrive": "2026-11-09",
+   "depart": "2026-11-12",
+   "nights": 3,
+   "why": "saved, never visited",
+   "days": [
+    {
+     "date": "2026-11-09",
+     "route": "",
+     "items": [
+      "p1",
+      "p2"
+     ]
+    },
+    {
+     "date": "2026-11-10",
+     "route": "",
+     "items": [
+      "p3"
+     ]
+    }
+   ],
+   "stay": {}
+  }
+ ],
+ "legs": [],
+ "pois": [
+  {
+   "id": "p1",
+   "stop": "s1",
+   "name": "Meridian Museum",
+   "kind": "cafe",
+   "lat": 48.85289975158976,
+   "lng": 2.341549618230383,
+   "why": "the kind of place you love",
+   "from_brain": false,
+   "brain_note": "",
+   "rating": null,
+   "price_band": "",
+   "booking": null
+  },
+  {
+   "id": "p2",
+   "stop": "s1",
+   "name": "Harbor Museum",
+   "kind": "market",
+   "lat": 48.87513898751324,
+   "lng": 2.359203897160741,
+   "why": "the kind of place you love",
+   "from_brain": false,
+   "brain_note": "",
+   "rating": null,
+   "price_band": "",
+   "booking": null
+  },
+  {
+   "id": "p3",
+   "stop": "s1",
+   "name": "Granite Market",
+   "kind": "market",
+   "lat": 48.86800856746601,
+   "lng": 2.344384513678624,
+   "why": "the kind of place you love",
+   "from_brain": false,
+   "brain_note": "",
+   "rating": null,
+   "price_band": "",
+   "booking": null
+  }
+ ],
+ "routes": []
+}

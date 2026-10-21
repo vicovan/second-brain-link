@@ -37,6 +37,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from paths import (state_root, render_dir, surface_root, work_root, brain_at_cwd,  # noqa: E402
                    brain_state_root, LEGACY_STATE_DIRNAME, is_brain)
 import pipeline_doc as pdoc  # noqa: E402
+import kpi as KPIlib  # noqa: E402
+import stages as STG  # noqa: E402
+from ledger_base import Writer as _BaseWriter, replace_between, add_alias  # noqa: E402
 
 MANIFEST = "_JOBS_GENERATED.json"
 # Names are prefixed on purpose. A vault root already has `Dashboard.md` and `_BUILD_REPORT.md`,
@@ -44,7 +47,9 @@ MANIFEST = "_JOBS_GENERATED.json"
 # filename as well as title (vaultCore.ts), so a duplicate name silently repoints real links.
 DASHBOARD = "Job Dashboard.md"
 LESSONS = "Job Lessons.md"
-KPI = "Job Pipeline KPI.md"
+KPI = "Job KPI.md"                 # was "Job Pipeline KPI.md" (alias kept; --migrate-layout moves it)
+KPI_OLD = "Job Pipeline KPI.md"
+DAILY_SCHEMA = "sbl-daily/1"
 BUILD_REPORT = "_JOBS_BUILD_REPORT.md"
 TODAY = datetime.date.today().isoformat()
 
@@ -119,45 +124,13 @@ def sha(text):
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-class Writer:
-    """Writes only what changed, and remembers what it wrote."""
+class Writer(_BaseWriter):
+    """The shared R6 writer (ledger_base.Writer): a note the user edited is kept and the fresh
+    render lands beside it as <name>.new.md; machine files are always rewritten; the manifest
+    (`_JOBS_GENERATED.json`, beside the ledger) remembers what was rendered."""
 
-    def __init__(self, root, quiet=False):
-        self.root, self.quiet, self.man, self.wrote, self.same = pathlib.Path(root), quiet, {}, 0, 0
-
-    def text(self, rel, body):
-        p = self.root / rel
-        self.man[str(rel)] = sha(body)
-        try:
-            if p.is_file() and p.read_text(encoding="utf-8") == body:
-                self.same += 1
-                return False
-        except OSError:
-            pass
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(body, encoding="utf-8")
-        self.wrote += 1
-        if not self.quiet:
-            print(f"  + {rel}", file=sys.stderr)
-        return True
-
-    def binary(self, rel, src):
-        p = self.root / rel
-        try:
-            data = pathlib.Path(src).read_bytes()
-        except OSError:
-            return False
-        self.man[str(rel)] = hashlib.sha256(data).hexdigest()
-        if p.is_file() and p.stat().st_size == len(data):
-            self.same += 1
-            return False
-        p.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, p)
-        self.wrote += 1
-        if not self.quiet:
-            print(f"  + {rel}", file=sys.stderr)
-        return True
-
+    def __init__(self, root, manifest_path, quiet=False):
+        super().__init__(root, manifest_path, quiet)
 
 
 def cv_label(company, role, taken):
@@ -494,7 +467,11 @@ def application_note(row, app_dir, cv_names, known=frozenset()):
 def report_note(path, labels):
     date = path.stem
     raw = path.read_text(encoding="utf-8")
-    raw = re.sub(r"^#\s+.*\n", "", raw, count=1)
+    # The agent sometimes writes the report with its own frontmatter block. This note carries
+    # the frontmatter, so drop the report's (it printed as a line of "type: … ---" text), then
+    # its leading H1 (the note title is already the heading).
+    raw = re.sub(r"\A﻿?\s*---\s*\n.*?\n---[ \t]*\n", "", raw, count=1, flags=re.S)
+    raw = re.sub(r"\A\s*#\s+.*\n", "", raw, count=1)
     # The ledger's reports link CVs by a path relative to <state>/reports/, which resolves
     # nowhere once the note is read from a vault — and a non-http markdown link is not even
     # rendered as a link. Rewrite them to wikilinks, which resolve by basename.
@@ -633,6 +610,67 @@ def pipeline_note(rows):
 
 
 
+def contract():
+    """The plugin's own studio.json (the sbl-agent/1 contract: funnels, floor, layout)."""
+    here = pathlib.Path(__file__).resolve()
+    for d in [here.parent] + list(here.parents):
+        sj = d / "studio.json"
+        if sj.is_file():
+            try:
+                return json.loads(sj.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                break
+    return {}
+
+
+FALLBACK_FUNNEL = {"id": "postings", "label": "Postings", "item": "posting", "success": "interview", "stages": [
+    {"id": "shortlist", "label": "Shortlist", "role": "open"}, {"id": "prepared", "label": "Prepared", "role": "open"},
+    {"id": "applied", "label": "Applied", "role": "open", "gate": "confirm"}, {"id": "handoff", "label": "Hand-off", "role": "open"},
+    {"id": "screen", "label": "Screen", "role": "open"}, {"id": "interview", "label": "Interview", "role": "open"},
+    {"id": "offer", "label": "Offer", "role": "positive", "gate": "reason"}, {"id": "rejected", "label": "Rejected", "role": "negative", "gate": "reason"},
+    {"id": "seen", "label": "Seen", "role": "parked"}, {"id": "out", "label": "Out", "role": "parked", "gate": "reason"},
+    {"id": "prior", "label": "Applied myself", "role": "parked"}]}
+
+
+def kpi_note(doc, rows):
+    """`Job KPI.md` from the shared kpi.py over the pipeline doc (R2: numbers from scripts)."""
+    k = KPIlib.compute(doc, [], today=TODAY, signals=["portal", "archetype", "market", "source"])
+    sub = [r for r in rows if r.get("status") == "applied"]
+    by_portal = {}
+    for r in sub:
+        by_portal.setdefault(r.get("portal", "unknown"), []).append(r)
+    extra = ["## Applications sent", "", f"**{len(sub)} applications sent** · {len(rows)} tracked · "
+             f"{len([r for r in rows if r.get('result')])} with a result.", "", "| Portal | Submitted |", "|---|---|"]
+    extra += [f"| {k_} | {len(v)} |" for k_, v in sorted(by_portal.items(), key=lambda x: -len(x[1]))]
+    got = [r for r in rows if r.get("result")]
+    if not got:
+        extra += ["", "_No results recorded yet. Until `learn.py set-result` is run when replies arrive, the loop cannot learn anything._"]
+    return KPIlib.markdown(k, "Job", title="Job KPI", extra="\n".join(extra), tags=["jobsearch", "synthesis"], aliases=["Job pipeline KPI", "Job Pipeline KPI"])
+
+
+def merge_into_daily(path, body):
+    """The dated Shortlist note is the daily note daily.py opened FIRST (schema sbl-daily/1): the
+    scout's report goes into its `## Shortlist` section between markers, and the rest of the note
+    - Status, Goal, what the model wrote - is never touched. Returns True when it merged."""
+    try:
+        txt = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    if f"schema: {DAILY_SCHEMA}" not in txt.split("---", 2)[1] if txt.startswith("---") else True:
+        return False
+    body = re.sub(r"\A\ufeff?\s*---\s*\n.*?\n---[ \t]*\n", "", body, count=1, flags=re.S)
+    body = re.sub(r"\A\s*#\s+.*\n", "", body, count=1).strip("\n")
+    new = replace_between(txt, "shortlist", body, heading="Shortlist")
+    if "## Shortlist" in txt and "<!-- shortlist:begin -->" not in txt:
+        pat = re.compile(r"(^## Shortlist\n)(.*?)(?=^## |^Back to \[\[|\Z)", re.S | re.M)
+        new = pat.sub(lambda m: m.group(1) + "\n<!-- shortlist:begin -->\n" + body + "\n<!-- shortlist:end -->\n\n", txt, count=1)
+    if new != txt:
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_text(new, encoding="utf-8")
+        os.replace(tmp, path)
+    return True
+
+
 # ---------------------------------------------------------------- the Pipeline canvas
 # Studio's Pipeline canvas draws every agent's pipeline.json (schema sbl-pipeline/2, built and
 # checked by pipeline_doc.py). The Jobs Agent's: every posting it has seen, shortlisted, prepared,
@@ -667,20 +705,22 @@ def write_pipeline(w, root, rows, dest):
     pre = dest.name + "/" if is_brain(dest.parent) else ""
     doc = pdoc.new("job-search", "Jobs", "#3e6ae1")
     rec = "Record that {title} moved to {stage_label}."
-    doc["stages"] = [
-        S("shortlist", "Shortlist", next=["prepared", "out"]),
-        S("prepared", "Prepared", next=["applied", "handoff", "out"], move_prompt="Prepare my application to {title}."),
-        S("applied", "Applied", next=["screen", "interview", "rejected"], gate="confirm",
-          move_prompt="Submit my application to {title}."),
-        S("handoff", "Hand-off", next=["applied", "out"], move_prompt="Hand {title} to me — I apply on the portal myself."),
-        S("screen", "Screen", next=["interview", "offer", "rejected"], move_prompt=rec),
-        S("interview", "Interview", next=["offer", "rejected"], move_prompt=rec),
-        S("offer", "Offer", "positive", gate="reason", move_prompt=rec),
-        S("rejected", "Rejected", "negative", gate="reason", move_prompt=rec),
-        S("out", "Out", "parked", gate="reason", move_prompt="Skip {title}."),
-        S("prior", "Applied myself", "parked"),
-        S("seen", "Seen", "parked", next=["shortlist"], move_prompt="Put {title} on my shortlist."),
-    ]
+    NEXT = {"shortlist": ["prepared", "out"], "prepared": ["applied", "handoff", "out"], "applied": ["screen", "interview", "rejected"],
+            "handoff": ["applied", "out"], "screen": ["interview", "offer", "rejected"], "interview": ["offer", "rejected"],
+            "seen": ["shortlist"]}
+    PROMPT = {"prepared": "Prepare my application to {title}.", "applied": "Submit my application to {title}.",
+              "handoff": "Hand {title} to me — I apply on the portal myself.", "screen": rec, "interview": rec, "offer": rec,
+              "rejected": rec, "out": "Skip {title}.", "seen": "Put {title} on my shortlist."}
+    # the stage IDs, roles and gates are the contract's (studio.json funnels); only the prompts live here
+    c = contract()
+    funnels = []
+    for f in c.get("funnels") or [FALLBACK_FUNNEL]:
+        funnels.append(pdoc.funnel(f["id"], f["label"], f["item"], f["success"],
+                                   [S(x["id"], x.get("label") or x["id"].title(), x.get("role", "open"), next=NEXT.get(x["id"], []),
+                                      gate=x.get("gate", "none"), move_prompt=PROMPT.get(x["id"], "Move {title} to {stage_label}."))
+                                    for x in f["stages"]], f.get("success2")))
+    doc["funnels"] = funnels
+    doc["floor"] = [pdoc.floor_group(g["id"], g["label"], g["stages"], g.get("funnel")) for g in (c.get("floor") or [])]
     items, keys = [], set()
     for r in rows:
         key = str(r.get("job_key") or "")
@@ -700,8 +740,8 @@ def write_pipeline(w, root, rows, dest):
         elif (r.get("status") or "") == "filled":
             flags, needs = ["needs-you"], "Filled — waiting for your submit"
         attrs = {"portal": r.get("portal") or "", "market": r.get("market") or "", "archetype": r.get("archetype") or "",
-                 "status": r.get("status") or ""}
-        it = pdoc.item(key, title, stage, sub=" · ".join(x for x in (r.get("location") or "", r.get("portal") or "") if x),
+                 "status": r.get("status") or "", "source": r.get("source") or "", "day": str(r.get("date") or "")[:10]}
+        it = pdoc.item(key, title, stage, funnel="postings", sub=" · ".join(x for x in (r.get("location") or "", r.get("portal") or "") if x),
                        score=score, flags=flags or None, needs=needs or None, url=r.get("url") or None,
                        note=(pre + r["_note"]) if r.get("_note") else None, attrs=attrs,
                        stage_since=str(r.get("result_date") or r.get("date") or "") or None, updated=str(r.get("date") or "") or None)
@@ -744,9 +784,9 @@ def write_pipeline(w, root, rows, dest):
         except ValueError:
             age = 999
         stage = "shortlist" if score is not None and score >= SHORTLIST_SCORE and age <= SHORTLIST_DAYS else "seen"
-        it = pdoc.item(iid, f"{v.get('company', '?')} — {v.get('title', '?')}", stage, score=score,
+        it = pdoc.item(iid, f"{v.get('company', '?')} — {v.get('title', '?')}", stage, funnel="postings", score=score,
                        url=v.get("url") or None, stage_since=v.get("first_seen"), updated=v.get("first_seen"),
-                       attrs={"status": "seen"})
+                       attrs={"status": "seen", "source": str(v.get("source") or ""), "day": str(v.get("first_seen") or "")[:10]})
         if stage == "shortlist":
             it["detail"] = {"evidence": [{"label": "The posting", "url": v.get("url"), "seen": v.get("first_seen")}] if v.get("url") else []}
         items.append(it)
@@ -754,11 +794,14 @@ def write_pipeline(w, root, rows, dest):
     sent = sum(1 for r in rows if r.get("status") == "applied")
     interviews = sum(1 for r in rows if (r.get("result") or "") in ("interview", "offer"))
     doc["headline"] = {"label": "interviews", "value": interviews, "n": sent, "period": "all time"}
+    doc["throughput"] = pdoc.throughput((contract().get("throughput") or {}).get("label") or "applications / day",
+                                        [r.get("applied_date") or r.get("date") for r in rows if r.get("status") == "applied"], TODAY)
     doc["stats"] = [{"label": "interviews / applications", "num": interviews, "den": sent, "min_n": 20},
                     {"label": "screens or better / applications", "num": sum(1 for r in rows if (r.get("result") or "") in ("screen", "interview", "offer")), "den": sent, "min_n": 20}]
     doc["lenses"] = [pdoc.lens("score", "Score", "score", domain=[40, 100]),
                      pdoc.lens("age", "Age in stage", "stage_since", scale="days", buckets=[3, 7, 14, 30]),
-                     pdoc.lens("needs", "Needs you", "flags", scale="flag", value="needs-you")]
+                     pdoc.lens("needs", "Needs you", "flags", scale="flag", value="needs-you"),
+                     pdoc.lens("today", "New today", "attrs.day", scale="flag", value=TODAY)]
     doc["facets"] = [pdoc.facet("portal", "Portal", "attrs.portal"), pdoc.facet("market", "Market", "attrs.market"),
                      pdoc.facet("archetype", "Role type", "attrs.archetype"), pdoc.facet("status", "Status", "attrs.status")]
     doc["panel"] = {
@@ -781,16 +824,18 @@ def write_pipeline(w, root, rows, dest):
     doc["actions"] = [A("Run today's search", "Run today's job search: sweep the boards against my criteria and give me today's ranked shortlist.", "primary"),
                       A("How is it going?", "Show me the KPI: interview rate by archetype, score band and portal.")]
     doc["generated"] = max([str(r.get("date") or "") for r in rows] + [str(v.get("first_seen") or "") for v in seen.values()] + [""])
+    STG.apply(doc, dest / "profile")          # the user's labels / hidden stages (profile/stages.json)
     probs = pdoc.check(doc)
     if probs:
         print("  ! pipeline.json not written: " + "; ".join(probs[:3]), file=sys.stderr)
-        return
-    w.text("pipeline.json", pdoc.dumps(doc))
+        return None
+    w.text("pipeline.json", pdoc.dumps(doc), machine=True)
+    return doc
 
 # ---------------------------------------------------------------- the run
 def render(dest, quiet=False):
     root = state_root()
-    w = Writer(dest, quiet)
+    w = Writer(dest, machinery_dir(root, dest) / MANIFEST, quiet)
     on_disk = scan_app_dirs(root)
     rows = merge_rows(load_outcomes(root), on_disk)
     known = org_index(dest)
@@ -846,11 +891,16 @@ def render(dest, quiet=False):
 
     reports = sorted((root / "reports").glob("*.md")) if (root / "reports").is_dir() else []
     for p in reports:
-        w.text(f"reports/Shortlist {p.stem}.md", report_note(p, labels))
+        body = report_note(p, labels)
+        target = pathlib.Path(dest) / f"reports/Shortlist {p.stem}.md"
+        if target.is_file() and merge_into_daily(target, body):
+            continue           # the daily note owns the file; the report sits in its Shortlist section
+        w.text(f"reports/Shortlist {p.stem}.md", body)
 
-    write_pipeline(w, root, rows, dest)
+    doc = write_pipeline(w, root, rows, dest)
     w.text(LESSONS, lessons_note(root, rows))
-    w.text(KPI, pipeline_note(rows))
+    if doc:
+        w.text(KPI, kpi_note(doc, rows))
 
     prof = pathlib.Path(dest) / "profile"
     w.text(DASHBOARD, dashboard_note(rows, reports, dest,
@@ -858,17 +908,7 @@ def render(dest, quiet=False):
 
     # our own manifest - deliberately NOT SBL's _GENERATED.json, so the vault engine treats these
     # as user files and never prunes them. profile/ is input and stays out of it.
-    old = {}
-    mf = machinery_dir(root, dest) / MANIFEST
-    if mf.is_file():
-        try:
-            old = (json.loads(mf.read_text(encoding="utf-8")) or {}).get("files", {})
-        except json.JSONDecodeError:
-            old = {}
-    gone = [k for k in old if k not in w.man]
-    mf.parent.mkdir(parents=True, exist_ok=True)
-    mf.write_text(json.dumps({"schema": 1, "generated": TODAY, "files": w.man},
-                             indent=1, ensure_ascii=False), encoding="utf-8")
+    gone = w.finish()
 
     (machinery_dir(root, dest) / BUILD_REPORT).write_text(
         frontmatter([("type", "report"), ("title", "Job layer render report"),
@@ -877,12 +917,14 @@ def render(dest, quiet=False):
         + f"# Render report\n\nRendered: {TODAY}\n\n"
         f"- source ledger: `{root}`\n- notes written: {w.wrote}\n- unchanged: {w.same}\n"
         f"- applications: {len(rows)}\n- reports: {len(reports)}\n"
+        + (f"\n## Kept as you edited them ({len(w.kept)})\n\nThe fresh render sits beside each as `<name>.new.md`:\n\n"
+           + "".join(f"- `{k}`\n" for k in w.kept) if w.kept else "")
         + (f"\n## No longer in the ledger ({len(gone)})\n\nLeft in place — nothing is deleted "
            "automatically. Remove them yourself if you want them gone:\n\n"
            + "".join(f"- `{g}`\n" for g in gone) if gone else ""), encoding="utf-8")
 
     if not quiet:
-        print(f"\n{w.wrote} written · {w.same} unchanged · {len(rows)} applications "
+        print(f"\n{w.wrote} written · {w.same} unchanged · {len(w.kept)} kept (yours) · {len(rows)} applications "
               f"-> {dest}", file=sys.stderr)
         if gone:
             print(f"{len(gone)} file(s) no longer in the ledger, left in place — see "
@@ -947,6 +989,18 @@ def migrate_layout(dest, dry_run=False):
     for name in (MANIFEST, BUILD_REPORT):
         plan(dest / name, target / name)
 
+    # --- 4. the standard layout: `Job Pipeline KPI.md` -> `Job KPI.md` (alias kept) ---------
+    # through the manifest: a user-edited copy stays where it is and is reported, never moved.
+    std = []
+    if (dest / KPI_OLD).is_file() and not (dest / KPI).exists():
+        mw = Writer(dest, target / MANIFEST, quiet=True)
+        rep_ = mw.migrate_layout([(KPI_OLD, KPI, "Job pipeline KPI")], dry_run=dry_run)
+        std = rep_["moved"]
+        for left in rep_["left"]:
+            skipped.append((dest / left, dest / KPI, "edited by you - left in place"))
+        for a_, b_ in std:
+            print(f"{'would move' if dry_run else 'move'}  {dest / a_}\n      -> {dest / b_}  (aliases: Job pipeline KPI)", file=sys.stderr)
+
     for src, dst in moves:
         print(f"{'would move' if dry_run else 'move'}  {src}\n      -> {dst}", file=sys.stderr)
         if not dry_run:
@@ -978,7 +1032,7 @@ def migrate_layout(dest, dry_run=False):
             print(f"manifest repointed at the new paths ({len(out)} entries)", file=sys.stderr)
     for src, dst, why in skipped:
         print(f"SKIPPED {src} -> {dst}  ({why}; nothing was removed)", file=sys.stderr)
-    print(f"\n{len(moves)} moved, {len(skipped)} skipped. Nothing was deleted.", file=sys.stderr)
+    print(f"\n{len(moves) + len(std)} moved, {len(skipped)} skipped. Nothing was deleted.", file=sys.stderr)
     return 0 if not skipped else 1
 
 

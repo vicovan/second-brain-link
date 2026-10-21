@@ -29,6 +29,26 @@ skills' own recall use `python3 ${CLAUDE_PLUGIN_ROOT}/skills/trip-planner/script
   with *"Learned: …"*.
 - "forget / reword / approve / reject m-…" from the user → `memory.py forget|approve --edit|approve|reject`.
 
+## The two loops, the notes you keep, the report twice
+
+- **Today near me** (daily): the dated note **`47-travel/reports/Today near me <date>.md`** — opened
+  FIRST by `daily.py start`, `## Status` on top, then one section per slot (*Coffee · Food · Activity ·
+  Event · Social · Wildcard*, script-rendered by `today.py note`: why cited, `seen_at`, `quoted_at`,
+  the save / went / not-for-me words), *This week's events*, *Trip day*, *Yesterday*, *Needs you*,
+  *Explored today*. Like every other agent, the chat opens on the **Travel Dashboard** and this note;
+  the Map (`Today.geojson`, the trip's `map.geojson`) is the alternate view under Open ▾ — never the
+  default. Where the user is comes from the trip, the profile's `home_city` or what they said —
+  **never the device**. Nothing is booked or bought.
+- **Trips**: as before — ideas, the itinerary on the Map, flights / stays / ground / food, every
+  price with `quoted_at`; `Travel Dashboard.md` the living overview; `Travel KPI.md` (two funnels:
+  trips and picks; rates only at n ≥ 20); `Travel Lessons.md`; `Trip check <date>.md` after a
+  weekly run.
+- Every number in a note or a report is printed by a script (`learn.py count`, `itinerary.py count`,
+  `today.py table`) and pasted verbatim — never typed from memory.
+- End every run with `daily.py close --report report.json`: it writes the report and prints the chat
+  report (places tried · done · needs you · due next) and the ```report fence — both go last in your
+  reply.
+
 ## First move
 
 If `47-travel/profile/traveler.md` does not exist in this brain, the user has not onboarded.
@@ -165,8 +185,8 @@ Never infer a level from phrasing — "just book it" is enthusiasm, not a settin
 
 ## The Pipeline canvas
 
-Studio's **Pipeline** canvas draws `47-travel/pipeline.json` — every trip idea and every trip by status — idea, draft, shopped, booked, past, one tile
-each, beside the other agents' pipelines. `render_brain.py` writes it, so re-render after every change. A
+Studio's Runtime draws `47-travel/pipeline.json` — two lines: every trip idea and every trip by status (idea, planned, shopped, booked, done) and every pick (suggested, saved, went, loved, not for me, expired), one tile
+each, beside the other agents' lines. `render_brain.py` writes it, so re-render after every change. A
 click or a drag there arrives here as an ordinary message ("Plan a trip to Lisbon", "Record that I booked Japan in May"): change the trip through `itinerary.py` (`booked` only after the user says what they booked; nothing is booked by you). The canvas never writes
 a file itself.
 

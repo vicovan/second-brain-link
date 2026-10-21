@@ -227,3 +227,17 @@ Chrome extension for the apply half. The scout and the CV builder work without C
 `reportlab` the CV is produced as Markdown and the PDF step is skipped with a notice.
 
 MIT licensed.
+
+## The daily loop (agent operating model)
+
+Every run follows the same eleven steps through the shared `daily.py`: recall → orient → **open the
+dated note first** (`45-jobs/reports/Shortlist <date>.md`, `## Status` on top) → discover (brain first,
+proven sources, a 20 % explore slice from `profile/sources.md`) → screen + score → shortlist into the
+note → act behind the gates of `level:` → log → render after every change → reflect → the report,
+twice (chat + ```report fence → the Inbox). Mondays, *Weekly job review* runs `kpi.py` → `optimize.py`
+(rates only at n ≥ 20; caps and gates never change) and writes `reports/Job review <date>.md`.
+Standard layout: `Job Dashboard.md` · `Job KPI.md` (was *Job Pipeline KPI* — alias kept;
+`render_brain.py --migrate-layout` moves it) · `Job Lessons.md` · `pipeline.json` (sbl-pipeline/2 with
+`funnels` + `floor`) · `profile/` (+ `stages.json`, `sources.md`, `scoring.md`) · `reports/` ·
+`applications/<date>/<key>/`. Contract: `studio.json` (`sbl-agent/1`); reference
+`engine/references/agent-contract.md`.

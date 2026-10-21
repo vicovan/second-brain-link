@@ -1,0 +1,100 @@
+{
+ "schema": "sbl-itinerary/1",
+ "trip_id": "berlin-autumn-5",
+ "title": "Berlin in autumn",
+ "status": "done",
+ "created": "2026-09-10T09:00:00",
+ "updated": "2026-10-18T09:00:00",
+ "window": {
+  "earliest": "2026-11-29",
+  "latest": "2026-12-02",
+  "nights": 3,
+  "flex_days": 0
+ },
+ "currency": "EUR",
+ "budget": {},
+ "travelers": [
+  {
+   "id": "me",
+   "label": "me"
+  }
+ ],
+ "stops": [
+  {
+   "id": "s1",
+   "place": "Berlin",
+   "country": "DE",
+   "lat": 52.52,
+   "lng": 13.405,
+   "role": "base",
+   "arrive": "2026-11-29",
+   "depart": "2026-12-02",
+   "nights": 3,
+   "why": "saved, never visited",
+   "days": [
+    {
+     "date": "2026-11-29",
+     "route": "",
+     "items": [
+      "p1",
+      "p2"
+     ]
+    },
+    {
+     "date": "2026-11-30",
+     "route": "",
+     "items": [
+      "p3"
+     ]
+    }
+   ],
+   "stay": {}
+  }
+ ],
+ "legs": [],
+ "pois": [
+  {
+   "id": "p1",
+   "stop": "s1",
+   "name": "Saffron Museum",
+   "kind": "cafe",
+   "lat": 52.53385111410493,
+   "lng": 13.405017294944363,
+   "why": "the kind of place you love",
+   "from_brain": false,
+   "brain_note": "",
+   "rating": null,
+   "price_band": "",
+   "booking": null
+  },
+  {
+   "id": "p2",
+   "stop": "s1",
+   "name": "Quarry Museum",
+   "kind": "market",
+   "lat": 52.53941234861857,
+   "lng": 13.416280946506607,
+   "why": "the kind of place you love",
+   "from_brain": false,
+   "brain_note": "",
+   "rating": null,
+   "price_band": "",
+   "booking": null
+  },
+  {
+   "id": "p3",
+   "stop": "s1",
+   "name": "Zenith Museum",
+   "kind": "market",
+   "lat": 52.518069680047574,
+   "lng": 13.385040042344523,
+   "why": "the kind of place you love",
+   "from_brain": false,
+   "brain_note": "",
+   "rating": null,
+   "price_band": "",
+   "booking": null
+  }
+ ],
+ "routes": []
+}
