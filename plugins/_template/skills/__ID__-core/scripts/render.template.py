@@ -79,7 +79,7 @@ def write_pipeline(w, dest, recs, evs):
         doc["headline"] = {"label": f0["success_label"], "value": f0["success_rate"]["num"], "n": f0["success_rate"]["den"], "period": "all time"}
         doc["stats"] = [{"label": f"{f0['success_label']} / {f0['chain'][0] if f0['chain'] else 'items'}", "num": f0["success_rate"]["num"], "den": f0["success_rate"]["den"], "min_n": KPI.MIN_N}]
     doc["lenses"] = [pdoc.lens("score", "Score", "score", domain=[0, 100]),
-                     pdoc.lens("age", "Age in stage", "stage_since", scale="days", buckets=[3, 7, 14, 30]),
+                     pdoc.lens("age", "Age", "stage_since", scale="days", buckets=[3, 7, 14, 30]),
                      pdoc.lens("today", "New today", "attrs.day", scale="flag", value=TODAY)]
     doc["facets"] = [pdoc.facet("source", "Source", "attrs.source"), pdoc.facet("kind", "Kind", "attrs.kind")]
     doc["panel"] = {"top": ["{stage_label}", "score {score}", "{attrs.source}"],

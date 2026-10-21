@@ -642,7 +642,7 @@ def pipeline_v2(acc, by_acc, cards, sl, st, cov, stamp, setup, starter, summary,
     doc["notices"] = notices
     doc["lenses"] = [pdoc.lens("score", "Score", "score", domain=[0, 100]),
                      pdoc.lens("warmth", "Warmth", "attrs.warmth", domain=[0, 100]),
-                     pdoc.lens("age", "Age in stage", "stage_since", scale="days", buckets=[3, 7, 14, 30]),
+                     pdoc.lens("age", "Age", "stage_since", scale="days", buckets=[3, 7, 14, 30]),
                      pdoc.lens("needs", "Needs you", "flags", scale="flag", value="needs-you"),
                      pdoc.lens("today", "New today", "attrs.day", scale="flag", value=today.isoformat())]
     doc["facets"] = [pdoc.facet("origin", "Origin", "attrs.origin", {k: {"label": k, "glyph": g} for k, g in ORIGIN_GLYPH.items()}),

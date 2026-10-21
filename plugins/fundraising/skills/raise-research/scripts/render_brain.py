@@ -627,7 +627,7 @@ def write_pipeline(w, dest, recs, evs, exists):
                     {"label": "meetings / reached", "num": meetings, "den": reached, "min_n": 20}]
     doc["lenses"] = [pdoc.lens("fit", "Fit", "score", domain=[40, 100]),
                      pdoc.lens("deadline", "Days to deadline", "attrs.deadline_days", domain=[0, 60]),
-                     pdoc.lens("age", "Age in stage", "stage_since", scale="days", buckets=[3, 7, 14, 30]),
+                     pdoc.lens("age", "Age", "stage_since", scale="days", buckets=[3, 7, 14, 30]),
                      pdoc.lens("needs", "Needs you", "flags", scale="flag", value="needs-you"),
                      pdoc.lens("today", "New today", "attrs.day", scale="flag", value=TODAY)]
     doc["facets"] = [pdoc.facet("kind", "Kind", "attrs.kind"), pdoc.facet("tier", "Tier", "attrs.tier"),

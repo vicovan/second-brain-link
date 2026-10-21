@@ -799,7 +799,7 @@ def write_pipeline(w, root, rows, dest):
     doc["stats"] = [{"label": "interviews / applications", "num": interviews, "den": sent, "min_n": 20},
                     {"label": "screens or better / applications", "num": sum(1 for r in rows if (r.get("result") or "") in ("screen", "interview", "offer")), "den": sent, "min_n": 20}]
     doc["lenses"] = [pdoc.lens("score", "Score", "score", domain=[40, 100]),
-                     pdoc.lens("age", "Age in stage", "stage_since", scale="days", buckets=[3, 7, 14, 30]),
+                     pdoc.lens("age", "Age", "stage_since", scale="days", buckets=[3, 7, 14, 30]),
                      pdoc.lens("needs", "Needs you", "flags", scale="flag", value="needs-you"),
                      pdoc.lens("today", "New today", "attrs.day", scale="flag", value=TODAY)]
     doc["facets"] = [pdoc.facet("portal", "Portal", "attrs.portal"), pdoc.facet("market", "Market", "attrs.market"),
